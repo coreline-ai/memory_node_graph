@@ -1,0 +1,61 @@
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import "./globals.css";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const requestHeaders = await headers();
+  const host =
+    requestHeaders.get("x-forwarded-host") ??
+    requestHeaders.get("host") ??
+    "localhost:3000";
+  const protocol =
+    requestHeaders.get("x-forwarded-proto") ??
+    (host.startsWith("localhost") ? "http" : "https");
+  const baseUrl = `${protocol}://${host}`;
+
+  return {
+    metadataBase: new URL(baseUrl),
+    title: {
+      default: "AI Systems Atlas",
+      template: "%s · AI Systems Atlas",
+    },
+    description:
+      "AI 시스템의 개념과 관계를 빛나는 3D 별자리로 탐색하는 지식 그래프 데모.",
+    icons: {
+      icon: "/favicon.svg",
+      shortcut: "/favicon.svg",
+    },
+    openGraph: {
+      title: "AI Systems Atlas",
+      description: "관계로 탐색하는 AI 지식 우주",
+      type: "website",
+      locale: "ko_KR",
+      images: [
+        {
+          url: `${baseUrl}/og.png`,
+          width: 1200,
+          height: 630,
+          alt: "AI Systems Atlas — 관계로 탐색하는 AI 지식 우주",
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "AI Systems Atlas",
+      description: "관계로 탐색하는 AI 지식 우주",
+      images: [`${baseUrl}/og.png`],
+    },
+  };
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="ko">
+      <body>{children}</body>
+    </html>
+  );
+}
