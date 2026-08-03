@@ -1,0 +1,22 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"],
+    "noEmit": false,
+    "incremental": false,
+    "declaration": false,
+    "sourceMap": true,
+    "rootDir": "..",
+    "outDir": "../.connector-dist"
+  },
+  "include": [
+    "./**/*.ts",
+    "../app/graph-data.ts",
+    "../app/lib/llm/enrichment-contracts.ts",
+    "../app/lib/llm/enrichment-result-validator.ts",
+    "../app/lib/markdown/extract-graph.ts"
+  ]
+}

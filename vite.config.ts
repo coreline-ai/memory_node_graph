@@ -44,6 +44,28 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: "three-renderer",
+                test: /node_modules[\\/]three/,
+                maxSize: 360_000,
+                priority: 20,
+              },
+              {
+                name: "graph-layout",
+                test: /node_modules[\\/](?:d3-|d3-force-3d)/,
+                maxSize: 260_000,
+                priority: 15,
+              },
+            ],
+          },
+        },
+      },
+    },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
