@@ -198,13 +198,16 @@ export async function createEnrichmentIdempotencyKey(input: {
   parserVersion: string;
   promptVersion: string;
   providerVersion: string;
+  reprocessNonce?: string;
 }) {
-  const canonical = JSON.stringify([
+  const canonicalParts = [
     input.documentHash,
     input.parserVersion,
     input.promptVersion,
     input.providerVersion,
-  ]);
+  ];
+  if (input.reprocessNonce) canonicalParts.push(input.reprocessNonce);
+  const canonical = JSON.stringify(canonicalParts);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
   return [...new Uint8Array(digest)]
     .map((item) => item.toString(16).padStart(2, "0"))
@@ -271,6 +274,7 @@ export const ENRICHMENT_OUTPUT_SCHEMA = Object.freeze({
 
 export async function buildEnrichmentJobInput(input: {
   jobId?: string;
+  reprocessNonce?: string;
   document: EnrichmentJobInput["document"];
   providerVersion: string;
   promptVersion?: string;
@@ -284,6 +288,7 @@ export async function buildEnrichmentJobInput(input: {
     parserVersion: input.document.parserVersion,
     promptVersion,
     providerVersion: input.providerVersion,
+    reprocessNonce: input.reprocessNonce,
   });
 
   return {

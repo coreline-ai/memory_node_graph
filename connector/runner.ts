@@ -5,7 +5,6 @@ import type { ConnectorConfig } from "./config.js";
 
 const sleep = (milliseconds: number, signal?: AbortSignal) => new Promise<void>((resolve) => {
   const timeout = setTimeout(resolve, milliseconds);
-  timeout.unref?.();
   signal?.addEventListener("abort", () => {
     clearTimeout(timeout);
     resolve();

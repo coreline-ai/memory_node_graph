@@ -44,6 +44,7 @@ export async function ingestMarkdown(input: {
   fileName: string;
   source: string;
   size?: number;
+  forceReindex?: boolean;
 }) {
   validateMarkdownFileName(input.fileName);
   const normalizedSource = normalizeMarkdown(input.source);
@@ -58,7 +59,7 @@ export async function ingestMarkdown(input: {
   const existing = await findDocumentByName(normalizedName);
   const documentId = existing?.id ?? `document-${stableKey(normalizedName)}`;
 
-  if (existing?.hash === hash) {
+  if (existing?.hash === hash && !input.forceReindex) {
     const job = jobFor(documentId, input.fileName, "unchanged", "변경된 내용 없음");
     await saveUnchangedJob(job);
     return { document: existing as DocumentRecord, job, unchanged: true };
@@ -86,12 +87,23 @@ export async function ingestMarkdown(input: {
     "completed",
     `${graph.nodes.length}개 노드 · ${graph.edges.length}개 기본 관계 생성`,
   );
-  await saveDocument({ document, source: normalizedSource, graph, job });
   let enrichment: EnqueueEnrichmentJobResult | null = null;
   let enrichmentWarning: string | undefined;
+  let enrichmentRepository: Awaited<ReturnType<typeof getEnrichmentJobRepository>> | undefined;
   try {
-    const repository = await getEnrichmentJobRepository();
-    await repository.markDocumentStale(document.id, document.hash);
+    enrichmentRepository = await getEnrichmentJobRepository();
+    await enrichmentRepository.markDocumentStale(
+      document.id,
+      document.hash,
+      undefined,
+      input.forceReindex === true,
+    );
+  } catch (error) {
+    enrichmentWarning = error instanceof Error ? error.message : "기존 보강 작업을 무효화하지 못했습니다.";
+  }
+  await saveDocument({ document, source: normalizedSource, graph, job });
+  try {
+    const repository = enrichmentRepository ?? await getEnrichmentJobRepository();
     const enrichmentInput = await buildEnrichmentJobInput({
       document: {
         id: document.id,
@@ -103,6 +115,7 @@ export async function ingestMarkdown(input: {
       nodes: graph.nodes,
       existingRelations: graph.edges,
       blocks: graph.blocks,
+      reprocessNonce: input.forceReindex ? crypto.randomUUID() : undefined,
     });
     enrichment = await repository.enqueue(enrichmentInput);
   } catch (error) {
@@ -118,5 +131,6 @@ export async function reindexDocument(id: string) {
     fileName: document.fileName,
     source: document.source,
     size: document.size,
+    forceReindex: true,
   });
 }

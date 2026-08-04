@@ -187,9 +187,13 @@ test("enrichment input applies deterministic idempotency and evidence caps", asy
   const first = await contracts.buildEnrichmentJobInput(base);
   const duplicate = await contracts.buildEnrichmentJobInput(base);
   const changed = await contracts.buildEnrichmentJobInput({ ...base, providerVersion: "provider-v2" });
+  const forced = await contracts.buildEnrichmentJobInput({ ...base, reprocessNonce: "manual-reindex-1" });
+  const forcedDuplicate = await contracts.buildEnrichmentJobInput({ ...base, reprocessNonce: "manual-reindex-1" });
 
   assert.equal(first.idempotencyKey, duplicate.idempotencyKey);
   assert.notEqual(first.idempotencyKey, changed.idempotencyKey);
+  assert.notEqual(first.idempotencyKey, forced.idempotencyKey);
+  assert.equal(forced.idempotencyKey, forcedDuplicate.idempotencyKey);
   assert.equal(first.jobId, duplicate.jobId);
   assert.equal(first.nodes.length, contracts.ENRICHMENT_INPUT_LIMITS.maxNodes);
   assert.ok(first.evidenceBlocks.length <= contracts.ENRICHMENT_INPUT_LIMITS.maxEvidenceBlocks);
@@ -198,6 +202,31 @@ test("enrichment input applies deterministic idempotency and evidence caps", asy
     first.evidenceBlocks.reduce((sum, block) => sum + block.text.length, 0) <=
       contracts.ENRICHMENT_INPUT_LIMITS.maxEvidenceCharacters,
   );
+});
+
+test("forced reindex invalidates matching-hash enrichment jobs before enqueueing a replacement", async () => {
+  const { contracts, repository } = await enrichmentModules();
+  const memory = repository.createMemoryEnrichmentJobRepository();
+  const sqlite = new SqliteD1Database();
+  try {
+    const d1 = repository.createD1EnrichmentJobRepository(sqlite);
+    for (const candidate of [memory, d1]) {
+      const input = await makeInput(contracts, "force-hash", `force-${candidate === memory ? "memory" : "d1"}`);
+      await candidate.enqueue(input, { now: "2026-08-04T00:00:00.000Z" });
+      assert.equal(
+        await candidate.markDocumentStale(
+          input.document.id,
+          input.document.hash,
+          "2026-08-04T00:00:01.000Z",
+          true,
+        ),
+        1,
+      );
+      assert.equal((await candidate.get(input.jobId)).status, "stale");
+    }
+  } finally {
+    sqlite.close();
+  }
 });
 
 async function exerciseRepository(repository, contracts, setDocumentHash = () => {}) {

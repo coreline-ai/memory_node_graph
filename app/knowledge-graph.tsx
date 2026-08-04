@@ -105,6 +105,21 @@ type GraphApi = {
   setLuminosityControls?: (controls: LuminosityControls) => void;
 };
 
+type ShowcaseState = {
+  viewMode: GraphViewMode;
+  activeLens: string;
+  activeDomains: Domain[];
+  activeKinds: NodeKind[];
+  activeRelations: RelationKind[];
+  selectedId: string | null;
+  autoRotate: boolean;
+  labelsVisible: boolean;
+  luminosity: LuminosityPreset;
+  luminosityControls: LuminosityControls;
+  savedCustomControls: LuminosityControls | null;
+  luminosityCustom: boolean;
+};
+
 const VIEW_LABELS: Record<GraphViewMode, string> = {
   constellation: "별자리",
   nebula: "성운",
@@ -197,7 +212,7 @@ function createParticleGlowTexture() {
 
 function useSetToggle<T>(
   initial: T[] = [],
-): [Set<T>, (value: T) => void, () => void] {
+): [Set<T>, (value: T) => void, () => void, (values: readonly T[]) => void] {
   const [set, update] = useState(() => new Set(initial));
   const toggle = useCallback((value: T) => {
     update((current) => {
@@ -208,7 +223,8 @@ function useSetToggle<T>(
     });
   }, []);
   const clear = useCallback(() => update(new Set()), []);
-  return [set, toggle, clear];
+  const replace = useCallback((values: readonly T[]) => update(new Set(values)), []);
+  return [set, toggle, clear, replace];
 }
 
 export default function KnowledgeGraph() {
@@ -221,6 +237,9 @@ export default function KnowledgeGraph() {
   const dataMenuButtonRef = useRef<HTMLButtonElement>(null);
   const dataMenuPanelRef = useRef<HTMLElement>(null);
   const urlInitializedRef = useRef(false);
+  const dataSourceInitializedRef = useRef(false);
+  const showcaseStateRef = useRef<ShowcaseState | null>(null);
+  const shouldFitShowcaseRef = useRef(false);
   const viewModeRef = useRef<GraphViewMode>("constellation");
   const luminosityRef = useRef<LuminosityPreset>("bright");
   const luminosityPreviewRef = useRef(false);
@@ -265,9 +284,9 @@ export default function KnowledgeGraph() {
     },
   });
   const [activeLens, setActiveLens] = useState("all");
-  const [activeDomains, toggleDomain, clearDomains] = useSetToggle<Domain>();
-  const [activeKinds, toggleKind, clearKinds] = useSetToggle<NodeKind>();
-  const [activeRelations, toggleRelation, clearRelations] =
+  const [activeDomains, toggleDomain, clearDomains, replaceDomains] = useSetToggle<Domain>();
+  const [activeKinds, toggleKind, clearKinds, replaceKinds] = useSetToggle<NodeKind>();
+  const [activeRelations, toggleRelation, clearRelations, replaceRelations] =
     useSetToggle<RelationKind>();
 
   const changeViewMode = useCallback(
@@ -337,32 +356,122 @@ export default function KnowledgeGraph() {
     setDataMenuOpen(true);
   };
 
+  const captureShowcaseState = useCallback(() => {
+    showcaseStateRef.current = {
+      viewMode,
+      activeLens,
+      activeDomains: [...activeDomains],
+      activeKinds: [...activeKinds],
+      activeRelations: [...activeRelations],
+      selectedId,
+      autoRotate,
+      labelsVisible,
+      luminosity,
+      luminosityControls: { ...luminosityControls },
+      savedCustomControls: savedCustomControls ? { ...savedCustomControls } : null,
+      luminosityCustom,
+    };
+  }, [
+    activeDomains,
+    activeKinds,
+    activeLens,
+    activeRelations,
+    autoRotate,
+    labelsVisible,
+    luminosity,
+    luminosityControls,
+    luminosityCustom,
+    savedCustomControls,
+    selectedId,
+    viewMode,
+  ]);
+
+  const applyShowcasePresentation = useCallback(() => {
+    setActiveLens("all");
+    clearDomains();
+    clearKinds();
+    clearRelations();
+    setSelectedId(null);
+    setViewMode("constellation");
+    setAutoRotate(true);
+    setLabelsVisible(false);
+    setLuminosity("supernova");
+    setLuminosityControls({ ...luminosityPresetControls.supernova });
+    setSavedCustomControls(null);
+    setLuminosityCustom(false);
+    setLuminosityPanelOpen(false);
+    shouldFitShowcaseRef.current = true;
+  }, [clearDomains, clearKinds, clearRelations]);
+
+  const restoreShowcaseState = useCallback((state: ShowcaseState) => {
+    setActiveLens(state.activeLens);
+    replaceDomains(state.activeDomains);
+    replaceKinds(state.activeKinds);
+    replaceRelations(state.activeRelations);
+    setSelectedId(state.selectedId);
+    setViewMode(state.viewMode);
+    setAutoRotate(state.autoRotate);
+    setLabelsVisible(state.labelsVisible);
+    setLuminosity(state.luminosity);
+    setLuminosityControls({ ...state.luminosityControls });
+    setSavedCustomControls(
+      state.savedCustomControls ? { ...state.savedCustomControls } : null,
+    );
+    setLuminosityCustom(state.luminosityCustom);
+    setLuminosityPanelOpen(false);
+    showcaseStateRef.current = null;
+  }, [replaceDomains, replaceKinds, replaceRelations]);
+
   const selectDataSource = useCallback(
     async (source: "current" | "max") => {
       const url = new URL(window.location.href);
-      if (source === "max") url.searchParams.set("showcase", "max");
-      else url.searchParams.delete("showcase");
+      const wasShowcase = url.searchParams.get("showcase") === "max";
+      const restoreState = source === "current" && wasShowcase
+        ? showcaseStateRef.current
+        : null;
+      if (source === "max") {
+        if (!wasShowcase) captureShowcaseState();
+        applyShowcasePresentation();
+        url.searchParams.set("showcase", "max");
+        url.searchParams.set("view", "constellation");
+      } else {
+        url.searchParams.delete("showcase");
+        if (restoreState) {
+          url.searchParams.set("view", restoreState.viewMode);
+          if (restoreState.viewMode === "orbit" && restoreState.selectedId) {
+            url.searchParams.set("node", restoreState.selectedId);
+          } else {
+            url.searchParams.delete("node");
+          }
+        }
+      }
       url.searchParams.delete("fixture");
-      url.searchParams.delete("node");
+      if (source === "max") url.searchParams.delete("node");
       window.history.replaceState({}, "", url);
       setDataMenuOpen(false);
       await loadGraph();
+      if (restoreState) restoreShowcaseState(restoreState);
       dataMenuButtonRef.current?.focus();
     },
-    [loadGraph],
+    [applyShowcasePresentation, captureShowcaseState, loadGraph, restoreShowcaseState],
   );
 
   useEffect(() => {
+    if (dataSourceInitializedRef.current) return;
+    dataSourceInitializedRef.current = true;
     const previewEnabled =
       new URL(window.location.href).searchParams.get("preview") === "luminosity-v2";
+    const initialShowcase =
+      new URL(window.location.href).searchParams.get("showcase") === "max";
     luminosityPreviewRef.current = previewEnabled;
     const frame = window.requestAnimationFrame(() => {
+      if (initialShowcase) applyShowcasePresentation();
       setLuminosityPreviewEnabled(previewEnabled);
       setPerformanceEnabled(new URL(window.location.href).searchParams.get("perf") === "1");
       void loadGraph();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [loadGraph]);
+  }, [applyShowcasePresentation, loadGraph]);
 
   const nodeMap = useMemo(
     () => new Map(knowledgeNodes.map((nodeItem) => [nodeItem.id, nodeItem])),
@@ -405,6 +514,22 @@ export default function KnowledgeGraph() {
 
   const selectedNode = selectedId ? nodeMap.get(selectedId) ?? null : null;
   const showcaseActive = graphData.meta.provider === "performance-fixture";
+
+  useEffect(() => {
+    if (!showcaseActive || !shouldFitShowcaseRef.current) return;
+    let innerFrame: number | undefined;
+    const outerFrame = window.requestAnimationFrame(() => {
+      innerFrame = window.requestAnimationFrame(() => {
+        graphApiRef.current?.reset();
+        shouldFitShowcaseRef.current = false;
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outerFrame);
+      if (innerFrame !== undefined) window.cancelAnimationFrame(innerFrame);
+    };
+  }, [graphData, showcaseActive]);
+
   const controlDataStatus = graphLoading
     ? "SYNC"
     : showcaseActive
@@ -1111,8 +1236,11 @@ export default function KnowledgeGraph() {
         title.textContent = descriptor.title;
         detail.textContent = descriptor.detail;
         count.textContent = String(descriptor.count).padStart(2, "0");
-        copy.append(title, detail);
-        element.append(rail, copy, count);
+        copy.appendChild(title);
+        copy.appendChild(detail);
+        element.appendChild(rail);
+        element.appendChild(copy);
+        element.appendChild(count);
         orbitDepthLayer.appendChild(element);
         return {
           key: descriptor.key as OrbitDepthKey,
@@ -2673,7 +2801,11 @@ export default function KnowledgeGraph() {
                 aria-expanded={dataMenuOpen}
                 aria-controls="graph-data-source-panel"
                 aria-haspopup="dialog"
-                aria-label={showcaseActive ? "최대 밀도 데이터 선택" : "그래프 데이터 선택"}
+                aria-label={
+                  showcaseActive
+                    ? "최대 밀도 데모 데이터 사용 중: 실제 지식 데이터가 아니며 읽기 전용입니다"
+                    : "그래프 데이터 선택"
+                }
                 onClick={toggleDataMenu}
                 title="그래프 데이터 선택"
               >
@@ -2769,7 +2901,7 @@ export default function KnowledgeGraph() {
             style={{ left: dataMenuPosition.left, bottom: dataMenuPosition.bottom }}
           >
             <header>
-              <span>DATA SOURCE</span>
+              <span>{showcaseActive ? "DEMO · 500 NODES / 2,000 EDGES" : "DATA SOURCE"}</span>
               <strong>{showcaseActive ? "MAX DENSITY" : "CURRENT GRAPH"}</strong>
             </header>
             <div className="data-source-options">
@@ -2803,14 +2935,14 @@ export default function KnowledgeGraph() {
                 <i className="data-option-max" aria-hidden="true" />
                 <span>
                   <strong>최대 밀도 쇼케이스</strong>
-                  <small>500 노드 · 2,000 관계 시각 샘플</small>
+                  <small>DEMO · 500 노드 · 2,000 관계 시각 샘플</small>
                 </span>
                 <b>{showcaseActive ? "ACTIVE" : "VIEW"}</b>
               </button>
             </div>
-            <footer>
+            <footer role="status" aria-live="polite">
               <i aria-hidden="true" />
-              저장되지 않는 읽기 전용 시각 샘플
+              읽기 전용 · 저장되지 않음 · 실제 지식 데이터 아님
             </footer>
           </section>
         )}

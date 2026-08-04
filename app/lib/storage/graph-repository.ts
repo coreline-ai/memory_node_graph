@@ -1,4 +1,10 @@
-import { knowledgeEdges, knowledgeNodes, type KnowledgeEdge, type KnowledgeNode } from "../../graph-data";
+import {
+  knowledgeEdges,
+  knowledgeNodes,
+  type KnowledgeEdge,
+  type KnowledgeNode,
+  type RelationEvidence,
+} from "../../graph-data";
 import type { DashboardEnrichmentJob, DashboardSnapshot, DocumentRecord, GraphSnapshot, IngestionJob } from "../graph/model";
 import type { EnrichmentResult } from "../llm/enrichment-contracts";
 import { getEnrichmentJobRepository } from "./enrichment-job-repository";
@@ -121,6 +127,24 @@ const asJob = (row: Record<string, unknown>): IngestionJob => ({
   completedAt: row.completed_at ? String(row.completed_at) : undefined,
 });
 
+const asRelationEvidence = (value: unknown): RelationEvidence[] | undefined => {
+  if (typeof value !== "string" || !value) return undefined;
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return undefined;
+    const evidence = parsed.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const { blockId, explanation } = item as Record<string, unknown>;
+      return typeof blockId === "string" && typeof explanation === "string"
+        ? [{ blockId, explanation }]
+        : [];
+    });
+    return evidence.length ? evidence : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 export async function findDocumentByName(normalizedName: string) {
   const db = await database();
   if (!db) {
@@ -186,14 +210,20 @@ export async function saveDocument(input: {
         .bind(stageId, node.id, node.label, node.shortLabel, node.kind, node.domain, node.summary, node.insight, JSON.stringify(node.tags), document.updatedAt),
     );
     statements.push(
-      db.prepare("INSERT OR REPLACE INTO staged_entity_mentions (stage_id, id, document_id, entity_id, block_id, origin) VALUES (?, ?, ?, ?, NULL, 'rule')")
-        .bind(stageId, `mention:${stableKey(`${document.id}:${node.id}`)}`, document.id, node.id),
+      db.prepare("INSERT OR REPLACE INTO staged_entity_mentions (stage_id, id, document_id, entity_id, block_id, origin) VALUES (?, ?, ?, ?, ?, 'rule')")
+        .bind(
+          stageId,
+          `mention:${stableKey(`${document.id}:${node.id}`)}`,
+          document.id,
+          node.id,
+          graph.nodeBlockIds[node.id] ?? graph.blocks[0]?.id ?? null,
+        ),
     );
   });
   graph.edges.forEach((edge) => {
     statements.push(
-      db.prepare("INSERT OR REPLACE INTO staged_relations (stage_id, id, document_id, source_id, target_id, type, confidence, note, origin, provider, provider_version, prompt_version, evidence_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'rule', 'markdown-ast', ?, NULL, '[]', ?)")
-        .bind(stageId, `relation:${stableKey(`${document.id}:${edge.source}:${edge.target}:${edge.type}`)}`, document.id, edge.source, edge.target, edge.type, edge.confidence, edge.note, document.parserVersion, document.updatedAt),
+      db.prepare("INSERT OR REPLACE INTO staged_relations (stage_id, id, document_id, source_id, target_id, type, confidence, note, origin, provider, provider_version, prompt_version, evidence_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'rule', 'markdown-ast', ?, NULL, ?, ?)")
+        .bind(stageId, `relation:${stableKey(`${document.id}:${edge.source}:${edge.target}:${edge.type}`)}`, document.id, edge.source, edge.target, edge.type, edge.confidence, edge.note, document.parserVersion, JSON.stringify(edge.evidence ?? []), document.updatedAt),
     );
   });
 
@@ -369,7 +399,7 @@ export async function getGraphSnapshot(): Promise<GraphSnapshot> {
     const [documentResult, nodeResult, edgeResult] = await Promise.all([
       db.prepare("SELECT COUNT(*) AS count FROM documents WHERE status IN ('completed', 'unchanged')").first<{ count: number }>(),
       db.prepare("SELECT DISTINCT e.* FROM entities e INNER JOIN entity_mentions m ON m.entity_id = e.id").all<Record<string, unknown>>(),
-      db.prepare("SELECT DISTINCT source_id, target_id, type, confidence, note FROM relations").all<Record<string, unknown>>(),
+      db.prepare("SELECT DISTINCT source_id, target_id, type, confidence, note, evidence_json FROM relations").all<Record<string, unknown>>(),
     ]);
     documentCount = Number(documentResult?.count ?? 0);
     nodes = nodeResult.results.map((row) => ({
@@ -388,6 +418,7 @@ export async function getGraphSnapshot(): Promise<GraphSnapshot> {
       type: String(row.type) as KnowledgeEdge["type"],
       confidence: Number(row.confidence),
       note: String(row.note),
+      evidence: asRelationEvidence(row.evidence_json),
     }));
   }
 
@@ -440,6 +471,7 @@ export async function mergeMemoryEnrichmentResult(
       type: relation.type,
       confidence: relation.confidence,
       note: relation.note,
+      evidence: relation.evidence,
     });
     addedKeys.push(key);
     added += 1;

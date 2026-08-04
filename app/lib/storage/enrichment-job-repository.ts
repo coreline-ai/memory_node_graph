@@ -72,7 +72,12 @@ export interface EnrichmentJobRepository {
   retry(jobId: string, now?: string): Promise<EnrichmentJobRecord>;
   recordConnectorHeartbeat(input: ConnectorHeartbeatInput): Promise<ConnectorHeartbeatRecord>;
   listConnectorHeartbeats(): Promise<ConnectorHeartbeatRecord[]>;
-  markDocumentStale(documentId: string, currentDocumentHash: string, now?: string): Promise<number>;
+  markDocumentStale(
+    documentId: string,
+    currentDocumentHash: string,
+    now?: string,
+    includeCurrentHash?: boolean,
+  ): Promise<number>;
   deleteForDocument(documentId: string): Promise<number>;
 }
 
@@ -325,13 +330,18 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
       .map(clone);
   }
 
-  async markDocumentStale(documentId: string, currentDocumentHash: string, nowValue?: string) {
+  async markDocumentStale(
+    documentId: string,
+    currentDocumentHash: string,
+    nowValue?: string,
+    includeCurrentHash = false,
+  ) {
     const now = timestamp(nowValue);
     let changes = 0;
     for (const job of this.jobs.values()) {
       if (
         job.documentId !== documentId ||
-        job.documentHash === currentDocumentHash ||
+        (!includeCurrentHash && job.documentHash === currentDocumentHash) ||
         !canTransitionEnrichmentJob(job.status, "stale")
       ) continue;
       job.status = "stale";
@@ -673,13 +683,19 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     return result.results.map(asD1Heartbeat);
   }
 
-  async markDocumentStale(documentId: string, currentDocumentHash: string, nowValue?: string) {
+  async markDocumentStale(
+    documentId: string,
+    currentDocumentHash: string,
+    nowValue?: string,
+    includeCurrentHash = false,
+  ) {
     await this.ready();
     const now = timestamp(nowValue);
     const outcome = await this.db.prepare(`UPDATE enrichment_jobs
       SET status = 'stale', error_code = 'document_stale', error_message = '문서 해시가 변경되어 작업을 무효화했습니다.', lease_owner = NULL, lease_expires_at = NULL, updated_at = ?, completed_at = ?
-      WHERE document_id = ? AND document_hash <> ? AND status IN ('queued', 'leased', 'running', 'completed', 'warning')`)
-      .bind(now, now, documentId, currentDocumentHash).run();
+      WHERE document_id = ? AND (document_hash <> ? OR ? = 1)
+        AND status IN ('queued', 'leased', 'running', 'completed', 'warning')`)
+      .bind(now, now, documentId, currentDocumentHash, includeCurrentHash ? 1 : 0).run();
     return Number(outcome.meta.changes ?? 0);
   }
 

@@ -34,12 +34,18 @@ export type KnowledgeNode = {
   tags: string[];
 };
 
+export type RelationEvidence = {
+  blockId: string;
+  explanation: string;
+};
+
 export type KnowledgeEdge = {
   source: string;
   target: string;
   type: RelationKind;
   confidence: number;
   note: string;
+  evidence?: RelationEvidence[];
 };
 
 const node = (

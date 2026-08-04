@@ -190,8 +190,23 @@ test("document API validates, parses, deduplicates, and deletes Markdown", async
   const graphPayload = await graph.json();
   assert.equal(graphPayload.meta.source, "documents");
   assert.ok(graphPayload.nodes.some((node) => node.label === "세 가지 보기"));
+  assert.ok(graphPayload.edges.every((edge) =>
+    Array.isArray(edge.evidence) && edge.evidence.every((item) => item.blockId && item.explanation),
+  ));
 
   const documentId = uploaded.snapshot.documents[0].id;
+  const reindexed = await request(`/api/documents/${encodeURIComponent(documentId)}/reindex`, {
+    method: "POST",
+  });
+  assert.equal(reindexed.status, 200);
+  const reindexedPayload = await reindexed.json();
+  assert.equal(reindexedPayload.result.unchanged, false);
+  assert.equal(reindexedPayload.result.enrichment.created, true);
+  assert.equal(
+    reindexedPayload.snapshot.enrichmentJobs.filter((job) => job.documentId === documentId).length,
+    2,
+  );
+
   const removed = await request(`/api/documents/${encodeURIComponent(documentId)}`, {
     method: "DELETE",
   });

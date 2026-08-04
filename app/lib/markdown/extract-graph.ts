@@ -4,6 +4,7 @@ import type {
   Domain,
   KnowledgeEdge,
   KnowledgeNode,
+  RelationEvidence,
   NodeKind,
   RelationKind,
 } from "../../graph-data";
@@ -21,6 +22,7 @@ export type ExtractedGraph = {
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
   blocks: DocumentBlock[];
+  nodeBlockIds: Record<string, string>;
 };
 
 const textOf = (node: unknown): string => {
@@ -90,15 +92,24 @@ export function extractGraph(
 ): ExtractedGraph {
   const nodes: KnowledgeNode[] = [];
   const edges: KnowledgeEdge[] = [];
-  const blocks: DocumentBlock[] = [];
+  const rootBlockId = `block:${documentId}:root`;
+  const blocks: DocumentBlock[] = [{
+    id: rootBlockId,
+    type: "document",
+    depth: 0,
+    text: fileName,
+    ordinal: -1,
+  }];
   const nodeById = new Map<string, KnowledgeNode>();
+  const nodeBlockIds: Record<string, string> = {};
   const edgeKeys = new Set<string>();
   const headingStack: Array<{ depth: number; id: string }> = [];
   const documentNodeId = `document:${documentId}`;
 
-  const addNode = (node: KnowledgeNode) => {
+  const addNode = (node: KnowledgeNode, blockId = rootBlockId) => {
     if (nodeById.has(node.id) || nodes.length >= 220) return nodeById.get(node.id);
     nodeById.set(node.id, node);
+    nodeBlockIds[node.id] = blockId;
     nodes.push(node);
     return node;
   };
@@ -108,13 +119,24 @@ export function extractGraph(
     type: RelationKind,
     note: string,
     confidence = 0.82,
+    evidence: RelationEvidence[] = [{
+      blockId: rootBlockId,
+      explanation: "문서 수준의 규칙 기반 관계입니다.",
+    }],
   ) => {
     if (source === target || edges.length >= 540) return;
     const key = `${source}|${target}|${type}`;
     if (edgeKeys.has(key)) return;
     edgeKeys.add(key);
-    edges.push({ source, target, type, confidence, note: short(note, 140) });
+    edges.push({ source, target, type, confidence, note: short(note, 140), evidence });
   };
+  const evidenceFor = (blockId: string, explanation: string): RelationEvidence[] => [
+    { blockId, explanation },
+  ];
+  const sourceBlockFor = (...candidates: string[]) =>
+    blocks.find((block) =>
+      block.id !== rootBlockId && candidates.some((candidate) => candidate && block.text.includes(candidate)),
+    ) ?? blocks[0];
 
   addNode({
     id: documentNodeId,
@@ -125,7 +147,7 @@ export function extractGraph(
     summary: `${fileName}에서 생성된 문서 지식 루트입니다.`,
     insight: "문서의 제목 계층, 링크, 인라인 코드와 명시적 패턴을 연결합니다.",
     tags: ["document", fileName.split(".").pop() ?? "md"],
-  });
+  }, rootBlockId);
 
   root.children.forEach((child: RootContent, ordinal) => {
     const text = textOf(child).replace(/\s+/g, " ").trim();
@@ -138,11 +160,19 @@ export function extractGraph(
       const nodeId = `section:${documentId}:${stableKey(`${depth}:${text}`)}`;
       const section = addNode(
         makeNode(nodeId, text, `문서의 ${depth}단계 제목 섹션입니다.`, ["section", `h${depth}`]),
+        blockId,
       );
       if (!section) return;
       while (headingStack.length && headingStack.at(-1)!.depth >= depth) headingStack.pop();
       const parentId = headingStack.at(-1)?.id ?? documentNodeId;
-      addEdge(parentId, nodeId, "extends", "문서 제목 계층에 포함됨", 0.98);
+      addEdge(
+        parentId,
+        nodeId,
+        "extends",
+        "문서 제목 계층에 포함됨",
+        0.98,
+        evidenceFor(blockId, "제목 계층에서 확인된 포함 관계입니다."),
+      );
       headingStack.push({ depth, id: nodeId });
       return;
     }
@@ -152,26 +182,61 @@ export function extractGraph(
     if (explicit) {
       const label = explicit[2].trim();
       const nodeId = `entity:${stableKey(`${explicit[1]}:${label}`)}`;
-      const entity = addNode(makeNode(nodeId, label, text, [explicit[1], "explicit"]));
-      if (entity) addEdge(parentId, nodeId, relationFor(explicit[1]), text, 0.94);
+      const entity = addNode(makeNode(nodeId, label, text, [explicit[1], "explicit"]), blockId);
+      if (entity) {
+        addEdge(
+          parentId,
+          nodeId,
+          relationFor(explicit[1]),
+          text,
+          0.94,
+          evidenceFor(blockId, "명시적 Markdown 패턴에서 추출한 관계입니다."),
+        );
+      }
     }
   });
 
   visit(root, "inlineCode", (node) => {
     const label = textOf(node).trim();
     if (!label || label.length > 80) return;
+    const block = sourceBlockFor(label);
     const nodeId = `entity:${stableKey(`code:${label.toLowerCase()}`)}`;
-    const entity = addNode(makeNode(nodeId, label, `문서에서 인라인 코드로 강조된 개념입니다.`, ["code", "concept"]));
-    if (entity) addEdge(documentNodeId, nodeId, "uses", `${fileName}에서 인라인 코드로 언급`, 0.86);
+    const entity = addNode(
+      makeNode(nodeId, label, `문서에서 인라인 코드로 강조된 개념입니다.`, ["code", "concept"]),
+      block.id,
+    );
+    if (entity) {
+      addEdge(
+        documentNodeId,
+        nodeId,
+        "uses",
+        `${fileName}에서 인라인 코드로 언급`,
+        0.86,
+        evidenceFor(block.id, "인라인 코드 언급에서 추출한 사용 관계입니다."),
+      );
+    }
   });
 
   visit(root, "link", (node) => {
     const label = textOf(node).trim() || node.url;
     if (!label || !node.url) return;
+    const block = sourceBlockFor(label, node.url);
     const nodeId = `reference:${stableKey(node.url)}`;
-    const reference = addNode(makeNode(nodeId, label, node.url, ["reference", "link"]));
-    if (reference) addEdge(documentNodeId, nodeId, "uses", `Markdown 링크: ${node.url}`, 0.9);
+    const reference = addNode(
+      makeNode(nodeId, label, node.url, ["reference", "link"]),
+      block.id,
+    );
+    if (reference) {
+      addEdge(
+        documentNodeId,
+        nodeId,
+        "uses",
+        `Markdown 링크: ${node.url}`,
+        0.9,
+        evidenceFor(block.id, "Markdown 링크에서 추출한 참조 관계입니다."),
+      );
+    }
   });
 
-  return { nodes, edges, blocks };
+  return { nodes, edges, blocks, nodeBlockIds };
 }
