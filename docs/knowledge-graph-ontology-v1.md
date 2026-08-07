@@ -1,5 +1,7 @@
 # Knowledge Graph Ontology v1
 
+> **문서 역할:** 이 온톨로지는 규칙·Codex 관계 결과의 검증 기준으로 계속 유효하다. Codex 실행은 OpenAI API Key 없이 [현재 OAuth 런타임 방향](./current-oauth-runtime.md)을 따른다.
+
 작성 일시: `2026-08-06 KST`
 
 ## 목적과 적용 범위
