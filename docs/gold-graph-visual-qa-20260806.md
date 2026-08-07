@@ -2,7 +2,7 @@
 
 > **문서 역할:** 이 문서는 그래프 시각 회귀 기준이며 OAuth 런타임 변경과 독립적으로 유지한다. 현재 인증·실행 방향은 [current-oauth-runtime.md](./current-oauth-runtime.md)를 따른다.
 
-최근 캡처: [현재 Gold Graph 화면](./screenshots/05-gold-graph.png) · 전체 화면 목록: [스크린샷 카탈로그](./screenshots/README.md)
+최근 캡처: [현재 Gold Graph 화면](./screenshots/05-gold-graph-min.png) · 전체 화면 목록: [스크린샷 카탈로그](./screenshots/README.md)
 
 검증 시각: `2026-08-06 20:43 KST`
 검증 URL: `http://localhost:3000/?showcase=gold&view=constellation`

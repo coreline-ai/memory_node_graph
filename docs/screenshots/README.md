@@ -18,12 +18,12 @@
 
 | 파일 | URL 상태 | 내용 |
 |---|---|---|
-| `01-overview-orbit-detail.png` | `?scope=overview&view=orbit&node=repository:github:1322252398` | 저장소 overview 궤도·노드 상세·원문 근거 |
-| `02-corpus-constellation.png` | `?scope=corpus&view=constellation` | 전체 D1 관계 중심 별자리 |
-| `03-corpus-nebula.png` | `?scope=corpus&view=nebula` | 전체 D1 커뮤니티 성운 |
-| `04-repository-constellation.png` | `?scope=repository&repositoryId=1322252398&view=constellation` | `memory_node_graph` 저장소 상세 |
-| `05-gold-graph.png` | `?showcase=gold&view=constellation` | 68노드·101관계 Gold Graph |
-| `06-max-density-showcase.png` | `?showcase=max&view=constellation` | 500노드·2,000관계 최대 밀도 fixture |
+| `01-overview-orbit-detail-min.png` | `?scope=overview&view=orbit&node=repository:github:1322252398` | 저장소 overview 궤도·노드 상세·원문 근거 |
+| `02-corpus-constellation-min.png` | `?scope=corpus&view=constellation` | 전체 D1 관계 중심 별자리 |
+| `03-corpus-nebula-min.png` | `?scope=corpus&view=nebula` | 전체 D1 커뮤니티 성운 |
+| `04-repository-constellation-min.png` | `?scope=repository&repositoryId=1322252398&view=constellation` | `memory_node_graph` 저장소 상세 |
+| `05-gold-graph-min.png` | `?showcase=gold&view=constellation` | 68노드·101관계 Gold Graph |
+| `06-max-density-showcase-min.png` | `?showcase=max&view=constellation` | 500노드·2,000관계 최대 밀도 fixture |
 
 ## 대시보드 화면
 
@@ -37,7 +37,7 @@
 
 ## README 반영 원칙
 
-- 대표 이미지는 `02-corpus-constellation.png`을 사용한다.
+- 대표 이미지는 `02-corpus-constellation-min.png`을 사용한다.
 - 갤러리는 그래프 보기, 검토 fixture, 대시보드 운영 흐름 순서로 배치한다.
 - 현재 대시보드의 `NO SIGNAL`은 분리형 Connector 구현 이력임을 명시한다.
 - 통합 OAuth 런타임 구현 후 Connector UI가 사라지면 대시보드 캡처 5장을 다시 촬영한다.

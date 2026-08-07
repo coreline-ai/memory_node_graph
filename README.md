@@ -24,7 +24,7 @@
 
 </div>
 
-![전체 D1 관계 중심 지식 그래프](./docs/screenshots/02-corpus-constellation.png)
+![전체 D1 관계 중심 지식 그래프](./docs/screenshots/02-corpus-constellation-min.png)
 
 > [!IMPORTANT]
 > **OpenAI API와 API Key를 사용하지 않습니다.** 기본 그래프는 Markdown AST와 규칙 추출만으로 완성됩니다. 현재 릴리스의 선택형 Codex 보강은 공식 `@openai/codex-sdk`와 기존 `codex login` OAuth 세션을 사용하는 로컬 Connector 방식입니다.
@@ -65,11 +65,11 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="./docs/screenshots/02-corpus-constellation.png" alt="전체 corpus 별자리 보기" width="100%" />
+      <img src="./docs/screenshots/02-corpus-constellation-min.png" alt="전체 corpus 별자리 보기" width="100%" />
       <br /><strong>별자리 · 전체 Corpus</strong><br />89,669개 고유 엔티티에서 관계 중심 500노드 투영
     </td>
     <td width="50%" align="center">
-      <img src="./docs/screenshots/03-corpus-nebula.png" alt="전체 corpus 성운 보기" width="100%" />
+      <img src="./docs/screenshots/03-corpus-nebula-min.png" alt="전체 corpus 성운 보기" width="100%" />
       <br /><strong>성운 · Knowledge Communities</strong><br />분야별 커뮤니티와 브리지 구조
     </td>
   </tr>
@@ -80,11 +80,11 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="./docs/screenshots/01-overview-orbit-detail.png" alt="저장소 overview 궤도와 노드 상세" width="100%" />
+      <img src="./docs/screenshots/01-overview-orbit-detail-min.png" alt="저장소 overview 궤도와 노드 상세" width="100%" />
       <br /><strong>궤도 · Node Focus</strong><br />선택 노드의 CORE, 1-hop, 2-hop 관계와 원문 근거
     </td>
     <td width="50%" align="center">
-      <img src="./docs/screenshots/04-repository-constellation.png" alt="단일 저장소 별자리 그래프" width="100%" />
+      <img src="./docs/screenshots/04-repository-constellation-min.png" alt="단일 저장소 별자리 그래프" width="100%" />
       <br /><strong>Repository Graph</strong><br />README·개발 계획·Phase·Task 상세 그래프
     </td>
   </tr>
@@ -95,11 +95,11 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 <table>
   <tr>
     <td width="50%" align="center">
-      <img src="./docs/screenshots/05-gold-graph.png" alt="온톨로지 Gold Graph" width="100%" />
+      <img src="./docs/screenshots/05-gold-graph-min.png" alt="온톨로지 Gold Graph" width="100%" />
       <br /><strong>Ontology Gold Graph</strong><br />68노드·101개 근거 관계 정본 표본
     </td>
     <td width="50%" align="center">
-      <img src="./docs/screenshots/06-max-density-showcase.png" alt="500노드 2000관계 최대 밀도 showcase" width="100%" />
+      <img src="./docs/screenshots/06-max-density-showcase-min.png" alt="500노드 2000관계 최대 밀도 showcase" width="100%" />
       <br /><strong>Max Density Showcase</strong><br />500노드·2,000선 시각 성능 fixture
     </td>
   </tr>
