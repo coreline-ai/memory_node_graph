@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAtlasWriteAccess } from "../../lib/auth/write-access";
 import { ingestMarkdown, MAX_MARKDOWN_FILES } from "../../lib/ingestion/ingestion-service";
-import { validateDecodedMarkdown } from "../../lib/markdown/validate-markdown";
+import { decodeMarkdownBytes } from "../../lib/markdown/validate-markdown";
 import { getDashboardSnapshot } from "../../lib/storage/graph-repository";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +27,7 @@ export async function POST(request: Request) {
     }
     const results = [];
     for (const file of files) {
-      const source = await file.text();
-      validateDecodedMarkdown(file.name, source, file.size);
+      const source = decodeMarkdownBytes(file.name, await file.arrayBuffer());
       results.push(await ingestMarkdown({ fileName: file.name, source, size: file.size }));
     }
     return NextResponse.json({ results, snapshot: await getDashboardSnapshot() }, { status: 201 });

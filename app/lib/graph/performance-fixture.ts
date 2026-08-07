@@ -9,7 +9,10 @@ import type { GraphSnapshot } from "./model";
 
 const kinds: NodeKind[] = ["thesis", "concept", "system", "tool", "practice", "risk"];
 const domains: Domain[] = ["reasoning", "agents", "memory", "safety", "product", "infrastructure"];
-const relations: RelationKind[] = ["supports", "extends", "requires", "uses", "mitigates", "risks", "contradicts"];
+const relations: RelationKind[] = [
+  "documents", "plans", "contains", "supports", "extends",
+  "requires", "uses", "mitigates", "risks", "contradicts",
+];
 
 export function createPerformanceGraphSnapshot(
   nodeCount = 500,
@@ -44,6 +47,9 @@ export function createPerformanceGraphSnapshot(
         type,
         confidence: 0.72 + (cursor % 24) / 100,
         note: `성능 fixture 관계 ${edges.length + 1}`,
+        layer: cursor % 11 === 0 ? "display" : cursor % 7 === 0 ? "inferred" : cursor % 3 === 0 ? "explicit" : "structural",
+        origin: "display",
+        provider: "performance-fixture",
       });
     }
     cursor += 1;

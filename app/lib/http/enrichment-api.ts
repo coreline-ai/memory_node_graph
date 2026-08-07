@@ -3,6 +3,8 @@ import {
   EnrichmentRepositoryError,
 } from "../storage/enrichment-job-repository";
 import { EnrichmentValidationError } from "../llm/enrichment-result-validator";
+import { GraphAnswerValidationError } from "../llm/graph-answer-result-validator";
+import { GraphAnswerRepositoryError } from "../storage/graph-answer-job-repository";
 
 export class RequestBodyError extends Error {
   constructor(message: string) {
@@ -30,10 +32,18 @@ export async function readLimitedJson(
 }
 
 export function enrichmentApiError(error: unknown) {
-  if (error instanceof RequestBodyError || error instanceof EnrichmentValidationError) {
+  if (
+    error instanceof RequestBodyError
+    || error instanceof EnrichmentValidationError
+    || error instanceof GraphAnswerValidationError
+  ) {
     return NextResponse.json({ error: error.message, code: "invalid_result" }, { status: 400 });
   }
   if (error instanceof EnrichmentRepositoryError) {
+    const status = error.code === "lease_conflict" || error.code === "lease_expired" ? 409 : 400;
+    return NextResponse.json({ error: error.message, code: error.code }, { status });
+  }
+  if (error instanceof GraphAnswerRepositoryError) {
     const status = error.code === "lease_conflict" || error.code === "lease_expired" ? 409 : 400;
     return NextResponse.json({ error: error.message, code: error.code }, { status });
   }

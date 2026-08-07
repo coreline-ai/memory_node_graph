@@ -420,6 +420,59 @@ test("D1 result merge rolls back relations when completion update fails", async 
   }
 });
 
+test("겹침 청크의 동일 관계는 confidence와 evidence를 유실 없이 병합한다", async () => {
+  const { contracts, repository } = await enrichmentModules();
+  const sqlite = new SqliteD1Database();
+  try {
+    const d1 = repository.createD1EnrichmentJobRepository(sqlite);
+    const firstInput = await makeInput(contracts, "hash-chunk-merge", "document-chunk-merge");
+    const secondInput = {
+      ...structuredClone(firstInput),
+      jobId: `${firstInput.jobId}-second`,
+      idempotencyKey: `${firstInput.idempotencyKey}-second`,
+      chunk: { ...firstInput.chunk, index: 1, count: 2, key: "chunk:2:2:1-1" },
+    };
+    sqlite.setDocumentHash(firstInput.document.id, firstInput.document.hash);
+    await d1.enqueue(firstInput, { now: "2026-08-02T01:10:00.000Z" });
+    await d1.enqueue(secondInput, { now: "2026-08-02T01:10:00.010Z" });
+
+    for (const [index, input] of [firstInput, secondInput].entries()) {
+      await d1.claim({ connectorId: "connector-a", now: `2026-08-02T01:10:0${index}.100Z` });
+      await d1.complete({
+        jobId: input.jobId,
+        connectorId: "connector-a",
+        currentDocumentHash: input.document.hash,
+        result: {
+          ...resultFor(input),
+          relations: [{
+            source: "node-1",
+            target: "node-2",
+            type: "supports",
+            confidence: index === 0 ? 0.72 : 0.94,
+            note: index === 0 ? "첫 청크" : "두 번째 청크의 더 자세한 관계 설명",
+            evidence: [{
+              blockId: `block:${input.document.id}:${index}`,
+              explanation: `청크 ${index + 1} 근거`,
+            }],
+          }],
+        },
+        now: `2026-08-02T01:10:0${index}.200Z`,
+      });
+    }
+
+    const rows = sqlite.database.prepare("SELECT * FROM relations").all();
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].confidence, 0.94);
+    assert.equal(rows[0].note, "두 번째 청크의 더 자세한 관계 설명");
+    assert.deepEqual(JSON.parse(rows[0].evidence_json).map((item) => item.explanation), [
+      "청크 1 근거",
+      "청크 2 근거",
+    ]);
+  } finally {
+    sqlite.close();
+  }
+});
+
 test("D1 warning retry atomically removes the previous Codex relations", async () => {
   const { contracts, repository } = await enrichmentModules();
   const sqlite = new SqliteD1Database();
@@ -505,10 +558,23 @@ async function exerciseManualRetryAndHeartbeat(repository, contracts) {
     connectorId: "connector-heartbeat",
     status: "offline",
     version: "test-v1",
+    runMode: "bounded",
+    maxJobs: 2,
+    maxRuntimeMs: 300_000,
+    processedJobs: 2,
+    succeededJobs: 1,
+    warningJobs: 1,
+    failedJobs: 0,
+    stopReason: "job_limit",
     now: "2026-08-02T02:01:10.000Z",
   });
   assert.equal(offline.status, "offline");
   assert.equal(offline.startedAt, "2026-08-02T02:01:00.000Z");
+  assert.equal(offline.runMode, "bounded");
+  assert.equal(offline.maxJobs, 2);
+  assert.equal(offline.processedJobs, 2);
+  assert.equal(offline.warningJobs, 1);
+  assert.equal(offline.stopReason, "job_limit");
   const heartbeats = await repository.listConnectorHeartbeats();
   assert.equal(heartbeats.length, 1);
   assert.equal(heartbeats[0].lastSeenAt, "2026-08-02T02:01:10.000Z");

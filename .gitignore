@@ -43,3 +43,10 @@ next-env.d.ts
 /.connector-dist/
 /outputs/
 /work/
+
+# Local corpus receipts can contain private repository metadata and evidence.
+/docs/github-full-*.json
+/docs/github-full-*.md
+/docs/github-noop-*
+/docs/knowledge-graph-corpus-analysis.*
+/docs/knowledge-graph-corpus-snapshot-*.json

@@ -2,7 +2,8 @@ import type { KnowledgeEdge, KnowledgeNode, RelationKind } from "../../graph-dat
 import type { DocumentBlock } from "../markdown/extract-graph";
 
 export const ENRICHMENT_PROVIDER = "codex" as const;
-export const ENRICHMENT_PROMPT_VERSION = "atlas-relations-v1";
+export const ENRICHMENT_PROMPT_VERSION = "atlas-relations-v2-chunked";
+export const ENRICHMENT_ONTOLOGY_VERSION = "knowledge-graph-ontology-v1";
 
 export const ENRICHMENT_INPUT_LIMITS = Object.freeze({
   maxNodes: 220,
@@ -11,6 +12,8 @@ export const ENRICHMENT_INPUT_LIMITS = Object.freeze({
   maxEvidenceBlockCharacters: 1_200,
   maxEvidenceCharacters: 48_000,
   maxCandidateRelations: 96,
+  evidenceBlocksPerChunk: 16,
+  evidenceBlockOverlap: 2,
 });
 
 export const ENRICHMENT_JOB_STATUSES = [
@@ -65,6 +68,22 @@ export type EnrichmentRelationCandidate = {
   evidence: RelationEvidence[];
 };
 
+export type EnrichmentEntityMentionCandidate = {
+  nodeId: string;
+  confidence: number;
+  evidence: RelationEvidence[];
+};
+
+export type EnrichmentChunkDescriptor = {
+  index: number;
+  count: number;
+  key: string;
+  startOrdinal: number;
+  endOrdinal: number;
+  overlapBefore: number;
+  overlapAfter: number;
+};
+
 export type EnrichmentJobInput = {
   jobId: string;
   idempotencyKey: string;
@@ -77,6 +96,8 @@ export type EnrichmentJobInput = {
   provider: typeof ENRICHMENT_PROVIDER;
   providerVersion: string;
   promptVersion: string;
+  ontologyVersion: string;
+  chunk: EnrichmentChunkDescriptor;
   nodes: KnowledgeNode[];
   existingRelations: KnowledgeEdge[];
   evidenceBlocks: EnrichmentEvidenceBlock[];
@@ -95,6 +116,7 @@ export type EnrichmentResult = {
   providerVersion: string;
   promptVersion: string;
   status: "completed" | "warning";
+  entityMentions: EnrichmentEntityMentionCandidate[];
   relations: EnrichmentRelationCandidate[];
   warnings: string[];
   usage?: {
@@ -135,7 +157,32 @@ export type EnrichmentJobRecord = {
 export const CONNECTOR_HEARTBEAT_STATUSES = ["online", "offline"] as const;
 export type ConnectorHeartbeatStatus = (typeof CONNECTOR_HEARTBEAT_STATUSES)[number];
 
-export type ConnectorHeartbeatRecord = {
+export const CONNECTOR_RUN_MODES = ["continuous", "bounded"] as const;
+export type ConnectorRunMode = (typeof CONNECTOR_RUN_MODES)[number];
+
+export const CONNECTOR_RUN_STOP_REASONS = [
+  "dry_run",
+  "job_limit",
+  "runtime_limit",
+  "idle",
+  "once",
+  "signal",
+  "fatal",
+] as const;
+export type ConnectorRunStopReason = (typeof CONNECTOR_RUN_STOP_REASONS)[number];
+
+export type ConnectorRunTelemetry = {
+  runMode?: ConnectorRunMode;
+  maxJobs?: number;
+  maxRuntimeMs?: number;
+  processedJobs?: number;
+  succeededJobs?: number;
+  warningJobs?: number;
+  failedJobs?: number;
+  stopReason?: ConnectorRunStopReason;
+};
+
+export type ConnectorHeartbeatRecord = ConnectorRunTelemetry & {
   connectorId: string;
   status: ConnectorHeartbeatStatus;
   version: string;
@@ -198,6 +245,8 @@ export async function createEnrichmentIdempotencyKey(input: {
   parserVersion: string;
   promptVersion: string;
   providerVersion: string;
+  ontologyVersion?: string;
+  chunkKey?: string;
   reprocessNonce?: string;
 }) {
   const canonicalParts = [
@@ -205,6 +254,8 @@ export async function createEnrichmentIdempotencyKey(input: {
     input.parserVersion,
     input.promptVersion,
     input.providerVersion,
+    input.ontologyVersion ?? ENRICHMENT_ONTOLOGY_VERSION,
+    input.chunkKey ?? "chunk:0:1",
   ];
   if (input.reprocessNonce) canonicalParts.push(input.reprocessNonce);
   const canonical = JSON.stringify(canonicalParts);
@@ -215,6 +266,23 @@ export async function createEnrichmentIdempotencyKey(input: {
 }
 
 const relationTypes: RelationKind[] = [
+  "documents",
+  "plans",
+  "contains",
+  "implements",
+  "depends_on",
+  "calls",
+  "reads_from",
+  "writes_to",
+  "produces",
+  "tests",
+  "references",
+  "precedes",
+  "blocks",
+  "supersedes",
+  "same_as",
+  "mentions",
+  "related_to",
   "supports",
   "extends",
   "requires",
@@ -225,6 +293,7 @@ const relationTypes: RelationKind[] = [
 ];
 
 export type CodexEnrichmentOutput = {
+  entityMentions: EnrichmentEntityMentionCandidate[];
   relations: EnrichmentRelationCandidate[];
   warnings: string[];
 };
@@ -232,8 +301,35 @@ export type CodexEnrichmentOutput = {
 export const ENRICHMENT_OUTPUT_SCHEMA = Object.freeze({
   type: "object",
   additionalProperties: false,
-  required: ["relations", "warnings"],
+  required: ["entityMentions", "relations", "warnings"],
   properties: {
+    entityMentions: {
+      type: "array",
+      maxItems: ENRICHMENT_INPUT_LIMITS.maxNodes,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["nodeId", "confidence", "evidence"],
+        properties: {
+          nodeId: { type: "string", minLength: 1, maxLength: 240 },
+          confidence: { type: "number", minimum: 0, maximum: 1 },
+          evidence: {
+            type: "array",
+            minItems: 1,
+            maxItems: 4,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["blockId", "explanation"],
+              properties: {
+                blockId: { type: "string", minLength: 1, maxLength: 240 },
+                explanation: { type: "string", minLength: 1, maxLength: 500 },
+              },
+            },
+          },
+        },
+      },
+    },
     relations: {
       type: "array",
       maxItems: ENRICHMENT_INPUT_LIMITS.maxCandidateRelations,
@@ -272,7 +368,7 @@ export const ENRICHMENT_OUTPUT_SCHEMA = Object.freeze({
   },
 });
 
-export async function buildEnrichmentJobInput(input: {
+export type BuildEnrichmentJobInput = {
   jobId?: string;
   reprocessNonce?: string;
   document: EnrichmentJobInput["document"];
@@ -281,33 +377,150 @@ export async function buildEnrichmentJobInput(input: {
   nodes: KnowledgeNode[];
   existingRelations: KnowledgeEdge[];
   blocks: DocumentBlock[];
-}): Promise<EnrichmentJobInput> {
-  const promptVersion = input.promptVersion ?? ENRICHMENT_PROMPT_VERSION;
-  const idempotencyKey = await createEnrichmentIdempotencyKey({
-    documentHash: input.document.hash,
-    parserVersion: input.document.parserVersion,
-    promptVersion,
-    providerVersion: input.providerVersion,
-    reprocessNonce: input.reprocessNonce,
-  });
+  nodeBlockIds?: Record<string, string>;
+  ontologyVersion?: string;
+  chunkSize?: number;
+  chunkOverlap?: number;
+};
 
-  return {
-    jobId: input.jobId ?? `enrichment:${idempotencyKey.slice(0, 40)}`,
-    idempotencyKey,
-    document: input.document,
-    provider: ENRICHMENT_PROVIDER,
-    providerVersion: input.providerVersion,
-    promptVersion,
-    nodes: input.nodes.slice(0, ENRICHMENT_INPUT_LIMITS.maxNodes),
-    existingRelations: input.existingRelations.slice(
-      0,
-      ENRICHMENT_INPUT_LIMITS.maxExistingRelations,
-    ),
-    evidenceBlocks: serializeEvidenceBlocks(input.blocks),
-    constraints: {
-      allowedRelationTypes: relationTypes,
-      maxCandidateRelations: ENRICHMENT_INPUT_LIMITS.maxCandidateRelations,
-      evidenceRequired: true,
-    },
-  };
+export function createEvidenceBlockChunks(
+  blocks: DocumentBlock[],
+  options: { size?: number; overlap?: number } = {},
+) {
+  const normalized = [...blocks]
+    .filter((block) => cleanText(block.text))
+    .sort((left, right) => left.ordinal - right.ordinal || left.id.localeCompare(right.id));
+  const size = Math.max(
+    10,
+    Math.min(20, Math.floor(options.size ?? ENRICHMENT_INPUT_LIMITS.evidenceBlocksPerChunk)),
+  );
+  const overlap = Math.max(
+    0,
+    Math.min(size - 1, Math.floor(options.overlap ?? ENRICHMENT_INPUT_LIMITS.evidenceBlockOverlap)),
+  );
+  if (!normalized.length) return [] as DocumentBlock[][];
+  const chunks: DocumentBlock[][] = [];
+  const step = size - overlap;
+  for (let start = 0; start < normalized.length; start += step) {
+    const finalStart = start + size >= normalized.length
+      ? Math.max(0, normalized.length - size)
+      : start;
+    const chunk = normalized.slice(finalStart, finalStart + size);
+    if (!chunk.length) break;
+    if (chunks.at(-1)?.at(0)?.id === chunk[0]?.id) break;
+    chunks.push(chunk);
+    if (finalStart + size >= normalized.length) break;
+  }
+  return chunks;
+}
+
+/**
+ * Returns the exact number of chunks produced by createEvidenceBlockChunks
+ * without materializing document text. This is used by the dashboard preview
+ * before a repository-wide reprocess is started.
+ */
+export function estimateEvidenceChunkCount(
+  evidenceBlockCount: number,
+  options: { size?: number; overlap?: number } = {},
+) {
+  const count = Math.max(0, Math.floor(evidenceBlockCount));
+  if (count === 0) return 1;
+  const size = Math.max(
+    10,
+    Math.min(20, Math.floor(options.size ?? ENRICHMENT_INPUT_LIMITS.evidenceBlocksPerChunk)),
+  );
+  const overlap = Math.max(
+    0,
+    Math.min(size - 1, Math.floor(options.overlap ?? ENRICHMENT_INPUT_LIMITS.evidenceBlockOverlap)),
+  );
+  if (count <= size) return 1;
+  return 1 + Math.ceil((count - size) / (size - overlap));
+}
+
+const selectNodesForChunk = (
+  nodes: KnowledgeNode[],
+  nodeBlockIds: Record<string, string> | undefined,
+  chunkBlockIds: Set<string>,
+) => {
+  if (!nodeBlockIds) return nodes.slice(0, ENRICHMENT_INPUT_LIMITS.maxNodes);
+  return nodes.filter((node) =>
+    chunkBlockIds.has(nodeBlockIds[node.id])
+    || node.tags.some((tag) => ["repository", "document", "plan", "shared"].includes(tag)))
+    .sort((left, right) => {
+      const leftLocal = chunkBlockIds.has(nodeBlockIds[left.id]) ? 1 : 0;
+      const rightLocal = chunkBlockIds.has(nodeBlockIds[right.id]) ? 1 : 0;
+      return rightLocal - leftLocal || left.id.localeCompare(right.id);
+    })
+    .slice(0, ENRICHMENT_INPUT_LIMITS.maxNodes);
+};
+
+export async function buildEnrichmentJobInputs(
+  input: BuildEnrichmentJobInput,
+): Promise<EnrichmentJobInput[]> {
+  const promptVersion = input.promptVersion ?? ENRICHMENT_PROMPT_VERSION;
+  const ontologyVersion = input.ontologyVersion ?? ENRICHMENT_ONTOLOGY_VERSION;
+  const chunks = createEvidenceBlockChunks(input.blocks, {
+    size: input.chunkSize,
+    overlap: input.chunkOverlap,
+  });
+  const effectiveChunks = chunks.length ? chunks : [input.blocks.slice(0, 1)];
+  return Promise.all(effectiveChunks.map(async (chunkBlocks, index) => {
+    const startOrdinal = chunkBlocks.at(0)?.ordinal ?? 0;
+    const endOrdinal = chunkBlocks.at(-1)?.ordinal ?? startOrdinal;
+    const chunkKey = `chunk:${index + 1}:${effectiveChunks.length}:${startOrdinal}-${endOrdinal}`;
+    const idempotencyKey = await createEnrichmentIdempotencyKey({
+      documentHash: input.document.hash,
+      parserVersion: input.document.parserVersion,
+      promptVersion,
+      providerVersion: input.providerVersion,
+      ontologyVersion,
+      chunkKey,
+      reprocessNonce: input.reprocessNonce,
+    });
+    const chunkBlockIds = new Set(chunkBlocks.map((block) => block.id));
+    const nodes = selectNodesForChunk(input.nodes, input.nodeBlockIds, chunkBlockIds);
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const existingRelations = input.existingRelations
+      .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+      .slice(0, ENRICHMENT_INPUT_LIMITS.maxExistingRelations);
+    const overlap = Math.max(0, Math.min(
+      Math.floor(input.chunkOverlap ?? ENRICHMENT_INPUT_LIMITS.evidenceBlockOverlap),
+      Math.max(0, chunkBlocks.length - 1),
+    ));
+    return {
+      jobId: input.jobId
+        ? `${input.jobId}:chunk-${index + 1}`
+        : `enrichment:${idempotencyKey.slice(0, 40)}`,
+      idempotencyKey,
+      document: input.document,
+      provider: ENRICHMENT_PROVIDER,
+      providerVersion: input.providerVersion,
+      promptVersion,
+      ontologyVersion,
+      chunk: {
+        index,
+        count: effectiveChunks.length,
+        key: chunkKey,
+        startOrdinal,
+        endOrdinal,
+        overlapBefore: index === 0 ? 0 : overlap,
+        overlapAfter: index === effectiveChunks.length - 1 ? 0 : overlap,
+      },
+      nodes,
+      existingRelations,
+      evidenceBlocks: serializeEvidenceBlocks(chunkBlocks),
+      constraints: {
+        allowedRelationTypes: relationTypes,
+        maxCandidateRelations: ENRICHMENT_INPUT_LIMITS.maxCandidateRelations,
+        evidenceRequired: true as const,
+      },
+    };
+  }));
+}
+
+export async function buildEnrichmentJobInput(
+  input: BuildEnrichmentJobInput,
+): Promise<EnrichmentJobInput> {
+  const jobs = await buildEnrichmentJobInputs(input);
+  return jobs[0];
 }

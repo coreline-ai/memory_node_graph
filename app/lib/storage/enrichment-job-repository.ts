@@ -2,6 +2,7 @@ import {
   canTransitionEnrichmentJob,
   type ConnectorHeartbeatRecord,
   type ConnectorHeartbeatStatus,
+  type ConnectorRunTelemetry,
   type EnrichmentErrorCode,
   type EnrichmentJobInput,
   type EnrichmentJobRecord,
@@ -46,7 +47,7 @@ type FailInput = LeaseMutation & {
   retryable: boolean;
 };
 
-type ConnectorHeartbeatInput = {
+type ConnectorHeartbeatInput = ConnectorRunTelemetry & {
   connectorId: string;
   status: ConnectorHeartbeatStatus;
   version: string;
@@ -59,10 +60,24 @@ export type EnqueueEnrichmentJobResult = {
   created: boolean;
 };
 
+export type EnrichmentJobStatusCounts = Record<EnrichmentJobStatus, number>;
+
+const emptyStatusCounts = (): EnrichmentJobStatusCounts => ({
+  queued: 0,
+  leased: 0,
+  running: 0,
+  completed: 0,
+  warning: 0,
+  failed: 0,
+  stale: 0,
+  cancelled: 0,
+});
+
 export interface EnrichmentJobRepository {
   enqueue(input: EnrichmentJobInput, options?: EnqueueOptions): Promise<EnqueueEnrichmentJobResult>;
   get(jobId: string): Promise<EnrichmentJobRecord | null>;
-  list(documentId?: string): Promise<EnrichmentJobRecord[]>;
+  list(documentId?: string, limit?: number): Promise<EnrichmentJobRecord[]>;
+  statusCounts(): Promise<EnrichmentJobStatusCounts>;
   claim(options: ClaimOptions): Promise<EnrichmentJobRecord | null>;
   renewLease(input: RenewLeaseInput): Promise<EnrichmentJobRecord>;
   markRunning(input: LeaseMutation): Promise<EnrichmentJobRecord>;
@@ -168,11 +183,18 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
     return job ? clone(job) : null;
   }
 
-  async list(documentId?: string) {
-    return [...this.jobs.values()]
+  async list(documentId?: string, limit?: number) {
+    const rows = [...this.jobs.values()]
       .filter((job) => !documentId || job.documentId === documentId)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       .map(clone);
+    return limit ? rows.slice(-Math.max(1, Math.floor(limit))) : rows;
+  }
+
+  async statusCounts() {
+    const counts = emptyStatusCounts();
+    for (const job of this.jobs.values()) counts[job.status] += 1;
+    return counts;
   }
 
   async claim(options: ClaimOptions) {
@@ -317,6 +339,14 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
       status: input.status,
       version: input.version,
       currentJobId: input.currentJobId,
+      runMode: input.runMode,
+      maxJobs: input.maxJobs,
+      maxRuntimeMs: input.maxRuntimeMs,
+      processedJobs: input.processedJobs,
+      succeededJobs: input.succeededJobs,
+      warningJobs: input.warningJobs,
+      failedJobs: input.failedJobs,
+      stopReason: input.stopReason,
       startedAt: previous?.startedAt ?? now,
       lastSeenAt: now,
     };
@@ -378,6 +408,19 @@ const parseJson = <T>(value: unknown): T | undefined => {
   }
 };
 
+const mergeRelationEvidence = (
+  existing: EnrichmentResult["relations"][number]["evidence"] | undefined,
+  incoming: EnrichmentResult["relations"][number]["evidence"],
+) => [...new Map([...(existing ?? []), ...incoming]
+  .map((item) => [`${item.blockId}\u0000${item.explanation}`, item] as const)).values()]
+  .sort((left, right) => left.blockId.localeCompare(right.blockId)
+    || left.explanation.localeCompare(right.explanation));
+
+const mergeRelationNote = (existing: string | undefined, incoming: string) => {
+  const notes = [...new Set([existing?.trim(), incoming.trim()].filter(Boolean) as string[])];
+  return notes.sort((left, right) => right.length - left.length || left.localeCompare(right))[0] ?? "";
+};
+
 const asD1Job = (row: D1Row): EnrichmentJobRecord => ({
   id: String(row.id),
   idempotencyKey: String(row.idempotency_key),
@@ -409,13 +452,35 @@ const asD1Heartbeat = (row: D1Row): ConnectorHeartbeatRecord => ({
   status: String(row.status) as ConnectorHeartbeatStatus,
   version: String(row.version),
   currentJobId: row.current_job_id ? String(row.current_job_id) : undefined,
+  runMode: row.run_mode === "continuous" || row.run_mode === "bounded"
+    ? row.run_mode
+    : undefined,
+  maxJobs: row.max_jobs === null || row.max_jobs === undefined ? undefined : Number(row.max_jobs),
+  maxRuntimeMs: row.max_runtime_ms === null || row.max_runtime_ms === undefined
+    ? undefined
+    : Number(row.max_runtime_ms),
+  processedJobs: row.processed_jobs === null || row.processed_jobs === undefined
+    ? undefined
+    : Number(row.processed_jobs),
+  succeededJobs: row.succeeded_jobs === null || row.succeeded_jobs === undefined
+    ? undefined
+    : Number(row.succeeded_jobs),
+  warningJobs: row.warning_jobs === null || row.warning_jobs === undefined
+    ? undefined
+    : Number(row.warning_jobs),
+  failedJobs: row.failed_jobs === null || row.failed_jobs === undefined
+    ? undefined
+    : Number(row.failed_jobs),
+  stopReason: typeof row.stop_reason === "string"
+    ? row.stop_reason as ConnectorHeartbeatRecord["stopReason"]
+    : undefined,
   startedAt: String(row.started_at),
   lastSeenAt: String(row.last_seen_at),
 });
 
 export const enrichmentSchemaStatements = [
   `CREATE TABLE IF NOT EXISTS enrichment_jobs (id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, document_id TEXT NOT NULL, document_hash TEXT NOT NULL, parser_version TEXT NOT NULL, provider TEXT NOT NULL, provider_version TEXT NOT NULL, prompt_version TEXT NOT NULL, status TEXT NOT NULL, input_json TEXT NOT NULL, result_json TEXT, attempt_count INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3, lease_owner TEXT, lease_expires_at TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT)`,
-  `CREATE TABLE IF NOT EXISTS connector_heartbeats (connector_id TEXT PRIMARY KEY, status TEXT NOT NULL, version TEXT NOT NULL, current_job_id TEXT, started_at TEXT NOT NULL, last_seen_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS connector_heartbeats (connector_id TEXT PRIMARY KEY, status TEXT NOT NULL, version TEXT NOT NULL, current_job_id TEXT, run_mode TEXT, max_jobs INTEGER, max_runtime_ms INTEGER, processed_jobs INTEGER, succeeded_jobs INTEGER, warning_jobs INTEGER, failed_jobs INTEGER, stop_reason TEXT, started_at TEXT NOT NULL, last_seen_at TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS enrichment_jobs_claim_idx ON enrichment_jobs(status, lease_expires_at, created_at)`,
   `CREATE INDEX IF NOT EXISTS enrichment_jobs_document_idx ON enrichment_jobs(document_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS connector_heartbeats_seen_idx ON connector_heartbeats(last_seen_at)`,
@@ -439,6 +504,26 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
       }
       if (!columns.has("last_manual_retry_at")) {
         await this.db.prepare("ALTER TABLE enrichment_jobs ADD COLUMN last_manual_retry_at TEXT").run()
+          .catch((error) => {
+            if (!String(error).toLowerCase().includes("duplicate column")) throw error;
+          });
+      }
+      const heartbeatInfo = await this.db.prepare("PRAGMA table_info(connector_heartbeats)")
+        .all<{ name: string }>();
+      const heartbeatColumns = new Set(heartbeatInfo.results.map((column) => String(column.name)));
+      const telemetryColumns = [
+        ["run_mode", "TEXT"],
+        ["max_jobs", "INTEGER"],
+        ["max_runtime_ms", "INTEGER"],
+        ["processed_jobs", "INTEGER"],
+        ["succeeded_jobs", "INTEGER"],
+        ["warning_jobs", "INTEGER"],
+        ["failed_jobs", "INTEGER"],
+        ["stop_reason", "TEXT"],
+      ] as const;
+      for (const [name, type] of telemetryColumns) {
+        if (heartbeatColumns.has(name)) continue;
+        await this.db.prepare(`ALTER TABLE connector_heartbeats ADD COLUMN ${name} ${type}`).run()
           .catch((error) => {
             if (!String(error).toLowerCase().includes("duplicate column")) throw error;
           });
@@ -475,13 +560,32 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     return row ? asD1Job(row) : null;
   }
 
-  async list(documentId?: string) {
+  async list(documentId?: string, limit?: number) {
     await this.ready();
+    const safeLimit = limit ? Math.max(1, Math.floor(limit)) : undefined;
     const result = documentId
-      ? await this.db.prepare("SELECT * FROM enrichment_jobs WHERE document_id = ? ORDER BY created_at")
-        .bind(documentId).all<D1Row>()
-      : await this.db.prepare("SELECT * FROM enrichment_jobs ORDER BY created_at").all<D1Row>();
-    return result.results.map(asD1Job);
+      ? safeLimit
+        ? await this.db.prepare("SELECT * FROM enrichment_jobs WHERE document_id = ? ORDER BY created_at DESC LIMIT ?")
+          .bind(documentId, safeLimit).all<D1Row>()
+        : await this.db.prepare("SELECT * FROM enrichment_jobs WHERE document_id = ? ORDER BY created_at")
+          .bind(documentId).all<D1Row>()
+      : safeLimit
+        ? await this.db.prepare("SELECT * FROM enrichment_jobs ORDER BY created_at DESC LIMIT ?")
+          .bind(safeLimit).all<D1Row>()
+        : await this.db.prepare("SELECT * FROM enrichment_jobs ORDER BY created_at").all<D1Row>();
+    const jobs = result.results.map(asD1Job);
+    return safeLimit ? jobs.sort((left, right) => left.createdAt.localeCompare(right.createdAt)) : jobs;
+  }
+
+  async statusCounts() {
+    await this.ready();
+    const counts = emptyStatusCounts();
+    const result = await this.db.prepare("SELECT status, COUNT(*) AS count FROM enrichment_jobs GROUP BY status")
+      .all<{ status: string; count: number }>();
+    for (const row of result.results) {
+      if (row.status in counts) counts[row.status as EnrichmentJobStatus] = Number(row.count);
+    }
+    return counts;
   }
 
   async claim(options: ClaimOptions) {
@@ -547,33 +651,53 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     const nextStatus: EnrichmentJobStatus =
       input.currentDocumentHash === job.documentHash ? input.result.status : "stale";
     assertTransition(job.status, nextStatus);
-    const relationStatements = input.result.relations.map((relation) =>
-      this.db.prepare(`INSERT OR IGNORE INTO relations
+    const existingResult = await this.db.prepare(`SELECT id, confidence, note, evidence_json
+      FROM relations WHERE document_id = ? AND origin = 'codex'`)
+      .bind(job.documentId).all<D1Row>();
+    const existingById = new Map(existingResult.results.map((row) => [String(row.id), row]));
+    const relationStatements = input.result.relations.map((relation) => {
+      const relationId = `relation:${stableKey(`${job.documentId}:${relation.source}:${relation.target}:${relation.type}`)}`;
+      const existing = existingById.get(relationId);
+      const confidence = Math.max(Number(existing?.confidence ?? 0), relation.confidence);
+      const note = mergeRelationNote(existing?.note ? String(existing.note) : undefined, relation.note);
+      const evidence = mergeRelationEvidence(
+        parseJson<EnrichmentResult["relations"][number]["evidence"]>(existing?.evidence_json),
+        relation.evidence,
+      );
+      return this.db.prepare(`INSERT INTO relations
         (id, document_id, source_id, target_id, type, confidence, note, origin, provider, provider_version, prompt_version, evidence_json, created_at)
         SELECT ?, ?, ?, ?, ?, ?, ?, 'codex', ?, ?, ?, ?, ?
         WHERE EXISTS (
           SELECT 1 FROM enrichment_jobs j INNER JOIN documents d ON d.id = j.document_id
           WHERE j.id = ? AND j.lease_owner = ? AND j.status IN ('leased', 'running')
             AND j.lease_expires_at > ? AND d.hash = j.document_hash
-        )`)
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          confidence=excluded.confidence,
+          note=excluded.note,
+          provider=excluded.provider,
+          provider_version=excluded.provider_version,
+          prompt_version=excluded.prompt_version,
+          evidence_json=excluded.evidence_json,
+          created_at=excluded.created_at`)
         .bind(
-          `relation:${stableKey(`${job.documentId}:${relation.source}:${relation.target}:${relation.type}`)}`,
+          relationId,
           job.documentId,
           relation.source,
           relation.target,
           relation.type,
-          relation.confidence,
-          relation.note,
+          confidence,
+          note,
           input.result.provider,
           input.result.providerVersion,
           input.result.promptVersion,
-          JSON.stringify(relation.evidence),
+          JSON.stringify(evidence),
           now,
           input.jobId,
           input.connectorId,
           now,
-        ),
-    );
+        );
+    });
     const completionStatement = this.db.prepare(`UPDATE enrichment_jobs
       SET status = CASE WHEN EXISTS (SELECT 1 FROM documents d WHERE d.id = document_id AND d.hash = document_hash) THEN ? ELSE 'stale' END,
           result_json = CASE WHEN EXISTS (SELECT 1 FROM documents d WHERE d.id = document_id AND d.hash = document_hash) THEN ? ELSE NULL END,
@@ -665,11 +789,31 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     await this.ready();
     const now = timestamp(input.now);
     await this.db.prepare(`INSERT INTO connector_heartbeats
-      (connector_id, status, version, current_job_id, started_at, last_seen_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      (connector_id, status, version, current_job_id, run_mode, max_jobs, max_runtime_ms,
+       processed_jobs, succeeded_jobs, warning_jobs, failed_jobs, stop_reason, started_at, last_seen_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(connector_id) DO UPDATE SET status=excluded.status, version=excluded.version,
-        current_job_id=excluded.current_job_id, last_seen_at=excluded.last_seen_at`)
-      .bind(input.connectorId, input.status, input.version, input.currentJobId ?? null, now, now)
+        current_job_id=excluded.current_job_id, run_mode=excluded.run_mode,
+        max_jobs=excluded.max_jobs, max_runtime_ms=excluded.max_runtime_ms,
+        processed_jobs=excluded.processed_jobs, succeeded_jobs=excluded.succeeded_jobs,
+        warning_jobs=excluded.warning_jobs, failed_jobs=excluded.failed_jobs,
+        stop_reason=excluded.stop_reason, last_seen_at=excluded.last_seen_at`)
+      .bind(
+        input.connectorId,
+        input.status,
+        input.version,
+        input.currentJobId ?? null,
+        input.runMode ?? null,
+        input.maxJobs ?? null,
+        input.maxRuntimeMs ?? null,
+        input.processedJobs ?? null,
+        input.succeededJobs ?? null,
+        input.warningJobs ?? null,
+        input.failedJobs ?? null,
+        input.stopReason ?? null,
+        now,
+        now,
+      )
       .run();
     const row = await this.db.prepare("SELECT * FROM connector_heartbeats WHERE connector_id = ?")
       .bind(input.connectorId).first<D1Row>();
@@ -708,6 +852,7 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
 }
 
 const memoryKey = "__AI_ATLAS_ENRICHMENT_JOB_STORE__";
+const testDatabaseKey = "__AI_ATLAS_TEST_D1__";
 
 function defaultMemoryRepository() {
   const root = globalThis as typeof globalThis & {
@@ -719,6 +864,12 @@ function defaultMemoryRepository() {
 
 async function database() {
   if (process.env.ATLAS_MEMORY_STORAGE === "true") return null;
+  if (process.env.ATLAS_TEST_MODE === "true") {
+    const testDatabase = (globalThis as typeof globalThis & {
+      [testDatabaseKey]?: D1Database;
+    })[testDatabaseKey];
+    if (testDatabase) return testDatabase;
+  }
   try {
     const { env } = await import("cloudflare:workers");
     const candidate = env.DB;

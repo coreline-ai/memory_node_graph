@@ -1,0 +1,90 @@
+{
+  "version": "1.0.0",
+  "ontologyVersion": "knowledge-graph-ontology-v1",
+  "scope": "confirmed-technology-and-tool-aliases",
+  "canonicalEntities": [
+    {
+      "canonicalId": "technology:openai-codex-sdk",
+      "type": "technology",
+      "label": "OpenAI Codex SDK",
+      "aliases": [
+        "Codex SDK",
+        "공식 Codex SDK",
+        "@openai/codex-sdk"
+      ],
+      "caseSensitive": false,
+      "evidence": [
+        "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L37",
+        "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L299"
+      ]
+    },
+    {
+      "canonicalId": "technology:github-cli",
+      "type": "technology",
+      "label": "GitHub CLI",
+      "aliases": [
+        "gh"
+      ],
+      "caseSensitive": true,
+      "evidence": [
+        "https://github.com/coreline-ai/CoreMCP-personal-gateway/blob/92d1d330dd14878b846b2a5b72cdff460a172c4d/dev-plan/implement_20260521_210004.md#L22",
+        "https://github.com/coreline-ai/improvement_loop_harness/blob/ecaa7cec0491b2a669de50cb8b0f27b75620848d/dev-plan/implement_20260617_211537.md#L415"
+      ]
+    },
+    {
+      "canonicalId": "technology:cloudflare-d1",
+      "type": "storage",
+      "label": "Cloudflare D1",
+      "aliases": [
+        "D1"
+      ],
+      "caseSensitive": true,
+      "evidence": [
+        "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+        "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L63"
+      ]
+    },
+    {
+      "canonicalId": "technology:three-js",
+      "type": "technology",
+      "label": "Three.js",
+      "aliases": [
+        "ThreeJS",
+        "Three JS"
+      ],
+      "caseSensitive": false,
+      "evidence": [
+        "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L3",
+        "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43"
+      ]
+    }
+  ],
+  "protectedAmbiguities": [
+    {
+      "token": "OpenAI",
+      "reason": "회사·API·모델 Provider를 구분할 수 없으므로 OpenAI Codex SDK로 자동 통합하지 않는다."
+    },
+    {
+      "token": "Codex",
+      "reason": "CLI·SDK·제품·에이전트를 구분할 수 없으므로 단독 표현은 자동 통합하지 않는다."
+    },
+    {
+      "token": "GitHub",
+      "reason": "서비스·REST API·CLI·저장소를 구분할 수 없으므로 GitHub CLI로 자동 통합하지 않는다."
+    },
+    {
+      "token": "D1",
+      "reason": "storage 타입과 기술 mention에서만 Cloudflare D1로 해석하며 일반 식별자에는 적용하지 않는다."
+    }
+  ],
+  "excludedTemplateLabels": [
+    "구현 태스크",
+    "자체 테스트",
+    "목표",
+    "완료 조건",
+    "이슈 및 수정",
+    "발견 이슈 없음",
+    "QA 관점",
+    "Phase 상태 요약"
+  ]
+}

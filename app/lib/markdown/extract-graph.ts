@@ -16,6 +16,12 @@ export type DocumentBlock = {
   depth: number;
   text: string;
   ordinal: number;
+  sourceUrl?: string;
+};
+
+export type NodeEvidence = {
+  blockId: string;
+  sourceUrl?: string;
 };
 
 export type ExtractedGraph = {
@@ -23,6 +29,7 @@ export type ExtractedGraph = {
   edges: KnowledgeEdge[];
   blocks: DocumentBlock[];
   nodeBlockIds: Record<string, string>;
+  nodeEvidence?: Record<string, NodeEvidence>;
 };
 
 const textOf = (node: unknown): string => {

@@ -74,9 +74,13 @@ export async function requireAtlasConnectorAccess(
   const now = Date.now();
   const limit = Math.max(1, options.limitPerMinute ?? 180);
   const store = rateStore();
-  const entry = store.get(connectorId);
+  // Each API route declares its own rate budget. Keying only by Connector ID
+  // made claim, heartbeat, capability, stage and result requests consume one
+  // shared counter and could throttle a healthy sequential source sync.
+  const rateLimitKey = `${connectorId}:${request.method}:${url.pathname}`;
+  const entry = store.get(rateLimitKey);
   if (!entry || now - entry.startedAt >= rateWindowMs) {
-    store.set(connectorId, { startedAt: now, count: 1 });
+    store.set(rateLimitKey, { startedAt: now, count: 1 });
   } else {
     entry.count += 1;
     if (entry.count > limit) {

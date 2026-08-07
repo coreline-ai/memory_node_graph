@@ -15,6 +15,23 @@ export type Domain =
   | "infrastructure";
 
 export type RelationKind =
+  | "documents"
+  | "plans"
+  | "contains"
+  | "implements"
+  | "depends_on"
+  | "calls"
+  | "reads_from"
+  | "writes_to"
+  | "produces"
+  | "tests"
+  | "references"
+  | "precedes"
+  | "blocks"
+  | "supersedes"
+  | "same_as"
+  | "mentions"
+  | "related_to"
   | "supports"
   | "extends"
   | "requires"
@@ -22,6 +39,18 @@ export type RelationKind =
   | "mitigates"
   | "risks"
   | "contradicts";
+
+export type RelationLayer = "structural" | "explicit" | "inferred" | "display";
+
+export type GitHubNodeSource = {
+  provider: "github";
+  repositoryId: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  relativePath: string;
+  commitSha: string;
+  sourceUrl: string;
+};
 
 export type KnowledgeNode = {
   id: string;
@@ -32,11 +61,19 @@ export type KnowledgeNode = {
   summary: string;
   insight: string;
   tags: string[];
+  metrics?: {
+    communityId: string;
+    centrality: number;
+    degree: number;
+    bridge: boolean;
+  };
+  source?: GitHubNodeSource;
 };
 
 export type RelationEvidence = {
   blockId: string;
   explanation: string;
+  sourceUrl?: string;
 };
 
 export type KnowledgeEdge = {
@@ -46,6 +83,9 @@ export type KnowledgeEdge = {
   confidence: number;
   note: string;
   evidence?: RelationEvidence[];
+  layer?: RelationLayer;
+  origin?: "rule" | "codex" | "display";
+  provider?: string;
 };
 
 const node = (
@@ -589,6 +629,23 @@ export const domainLabels: Record<Domain, string> = {
 };
 
 export const relationLabels: Record<RelationKind, string> = {
+  documents: "문서화",
+  plans: "계획",
+  contains: "포함",
+  implements: "구현",
+  depends_on: "의존",
+  calls: "호출",
+  reads_from: "조회",
+  writes_to: "저장",
+  produces: "생성",
+  tests: "검증",
+  references: "참조",
+  precedes: "선행",
+  blocks: "차단",
+  supersedes: "대체",
+  same_as: "동일",
+  mentions: "언급",
+  related_to: "연관",
   supports: "지지",
   extends: "확장",
   requires: "전제",

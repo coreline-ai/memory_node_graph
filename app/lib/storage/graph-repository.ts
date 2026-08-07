@@ -5,14 +5,44 @@ import {
   type KnowledgeNode,
   type RelationEvidence,
 } from "../../graph-data";
-import type { DashboardEnrichmentJob, DashboardSnapshot, DocumentRecord, GraphSnapshot, IngestionJob } from "../graph/model";
+import type {
+  DashboardEnrichmentJob,
+  DashboardSnapshot,
+  DocumentRecord,
+  DocumentSourceDescriptor,
+  DocumentSourceKey,
+  GitHubRepositoryStorageSummary,
+  GraphSnapshot,
+  IngestionJob,
+} from "../graph/model";
 import type { EnrichmentResult } from "../llm/enrichment-contracts";
 import { getEnrichmentJobRepository } from "./enrichment-job-repository";
 import type { DocumentBlock, ExtractedGraph } from "../markdown/extract-graph";
-import { stableKey } from "../markdown/normalize";
+import {
+  parseGitHubApplyReceipt,
+  type GitHubApplyReceipt,
+} from "../github/source-job-contracts";
+import {
+  createGitHubDocumentSourceDescriptor,
+  createManualDocumentSourceDescriptor,
+  documentSourceKey,
+} from "../ingestion/document-source";
+import {
+  assertD1AtomicBatchLimit,
+  chunkD1Statements,
+} from "./d1-batch-policy";
+import { createGraphSnapshotCache } from "../graph/snapshot-cache";
+import {
+  graphNodeLexicalMatch,
+  type GraphRetrievalCitation,
+  type GraphRetrievalSource,
+  type NormalizedGraphQuestion,
+} from "../graph/graph-retrieval";
 
 type StoredDocument = DocumentRecord & {
   source: string;
+  sourceKey: DocumentSourceKey;
+  sourceDescriptor: DocumentSourceDescriptor;
   graph: ExtractedGraph;
 };
 
@@ -20,19 +50,56 @@ type MemoryStore = {
   documents: Map<string, StoredDocument>;
   jobs: Map<string, IngestionJob>;
   enrichmentEdges: Map<string, string[]>;
+  githubApplyReceipts: Map<string, GitHubApplyReceipt>;
 };
 
 const memoryKey = "__AI_ATLAS_DOCUMENT_STORE__";
+const testDatabaseKey = "__AI_ATLAS_TEST_D1__";
+
+// Persistence IDs must not use the 32-bit UI/layout hash. With tens of
+// thousands of mentions, FNV-1a collisions are realistic and can abort an
+// otherwise valid repository-wide atomic Apply. Length-prefixed components
+// preserve the complete identity tuple without relying on a probabilistic hash.
+const graphStorageId = (prefix: string, parts: readonly string[]) =>
+  `${prefix}:${parts.map((part) => `${part.length}:${part}`).join("")}`;
+
+export const entityMentionStorageId = (documentId: string, entityId: string) =>
+  graphStorageId("mention", [documentId, entityId]);
+
+export const relationStorageId = (
+  documentId: string,
+  sourceId: string,
+  targetId: string,
+  type: string,
+) => graphStorageId("relation", [documentId, sourceId, targetId, type]);
 
 const memoryStore = () => {
   const root = globalThis as typeof globalThis & { [memoryKey]?: MemoryStore };
-  root[memoryKey] ??= { documents: new Map(), jobs: new Map(), enrichmentEdges: new Map() };
+  root[memoryKey] ??= {
+    documents: new Map(),
+    jobs: new Map(),
+    enrichmentEdges: new Map(),
+    githubApplyReceipts: new Map(),
+  };
   root[memoryKey].enrichmentEdges ??= new Map();
+  root[memoryKey].githubApplyReceipts ??= new Map();
+  for (const document of root[memoryKey].documents.values()) {
+    if (!document.sourceDescriptor) {
+      document.sourceDescriptor = createManualDocumentSourceDescriptor(document.fileName);
+    }
+    if (!document.sourceKey) document.sourceKey = documentSourceKey(document.sourceDescriptor);
+  }
   return root[memoryKey];
 };
 
 const database = async () => {
   if (process.env.ATLAS_MEMORY_STORAGE === "true") return null;
+  if (process.env.ATLAS_TEST_MODE === "true") {
+    const testDatabase = (globalThis as typeof globalThis & {
+      [testDatabaseKey]?: D1Database;
+    })[testDatabaseKey];
+    if (testDatabase) return testDatabase;
+  }
   try {
     const { env } = await import("cloudflare:workers");
     const candidate = env.DB;
@@ -43,23 +110,54 @@ const database = async () => {
 };
 
 let schemaReady: Promise<void> | null = null;
+const graphSearchReadyByDatabase = new WeakMap<object, Promise<boolean>>();
+const corpusSnapshotCaches = new WeakMap<object, ReturnType<typeof createGraphSnapshotCache>>();
+
+const corpusSnapshotCacheFor = (db: D1Database) => {
+  const key = db as unknown as object;
+  const existing = corpusSnapshotCaches.get(key);
+  if (existing) return existing;
+  const created = createGraphSnapshotCache();
+  corpusSnapshotCaches.set(key, created);
+  return created;
+};
+
+const documentsTableSql = (table: string, ifNotExists = false) =>
+  `CREATE TABLE ${ifNotExists ? "IF NOT EXISTS " : ""}${table} (` +
+  "id TEXT PRIMARY KEY, file_name TEXT NOT NULL, normalized_name TEXT NOT NULL, source TEXT NOT NULL, " +
+  "source_type TEXT NOT NULL DEFAULT 'manual', source_key TEXT NOT NULL, repository_id TEXT, " +
+  "repository_owner TEXT, repository_name TEXT, relative_path TEXT, source_ref TEXT, commit_sha TEXT, " +
+  "blob_sha TEXT, source_url TEXT, last_seen_sync_id TEXT, size INTEGER NOT NULL, hash TEXT NOT NULL, " +
+  "status TEXT NOT NULL, node_count INTEGER NOT NULL DEFAULT 0, edge_count INTEGER NOT NULL DEFAULT 0, " +
+  "parser_version TEXT NOT NULL, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)";
 
 const schemaStatements = [
-  `CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, file_name TEXT NOT NULL, normalized_name TEXT NOT NULL UNIQUE, source TEXT NOT NULL, size INTEGER NOT NULL, hash TEXT NOT NULL, status TEXT NOT NULL, node_count INTEGER NOT NULL DEFAULT 0, edge_count INTEGER NOT NULL DEFAULT 0, parser_version TEXT NOT NULL, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS document_blocks (id TEXT PRIMARY KEY, document_id TEXT NOT NULL, type TEXT NOT NULL, depth INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL, ordinal INTEGER NOT NULL)`,
+  documentsTableSql("documents", true),
+  `CREATE TABLE IF NOT EXISTS document_blocks (id TEXT PRIMARY KEY, document_id TEXT NOT NULL, type TEXT NOT NULL, depth INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL, ordinal INTEGER NOT NULL, source_url TEXT)`,
   `CREATE TABLE IF NOT EXISTS entities (id TEXT PRIMARY KEY, label TEXT NOT NULL, short_label TEXT NOT NULL, kind TEXT NOT NULL, domain TEXT NOT NULL, summary TEXT NOT NULL, insight TEXT NOT NULL, tags_json TEXT NOT NULL, updated_at TEXT NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS entity_mentions (id TEXT PRIMARY KEY, document_id TEXT NOT NULL, entity_id TEXT NOT NULL, block_id TEXT, origin TEXT NOT NULL DEFAULT 'rule')`,
+  `CREATE TABLE IF NOT EXISTS entity_mentions (id TEXT PRIMARY KEY, document_id TEXT NOT NULL, entity_id TEXT NOT NULL, block_id TEXT, source_url TEXT, origin TEXT NOT NULL DEFAULT 'rule')`,
   `CREATE TABLE IF NOT EXISTS relations (id TEXT PRIMARY KEY, document_id TEXT NOT NULL, source_id TEXT NOT NULL, target_id TEXT NOT NULL, type TEXT NOT NULL, confidence REAL NOT NULL, note TEXT NOT NULL, origin TEXT NOT NULL DEFAULT 'rule', provider TEXT, provider_version TEXT, prompt_version TEXT, evidence_json TEXT, created_at TEXT)`,
   `CREATE TABLE IF NOT EXISTS ingestion_jobs (id TEXT PRIMARY KEY, document_id TEXT NOT NULL, file_name TEXT NOT NULL, status TEXT NOT NULL, progress INTEGER NOT NULL DEFAULT 0, message TEXT NOT NULL, created_at TEXT NOT NULL, completed_at TEXT)`,
-  `CREATE TABLE IF NOT EXISTS staged_document_blocks (stage_id TEXT NOT NULL, id TEXT NOT NULL, document_id TEXT NOT NULL, type TEXT NOT NULL, depth INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL, ordinal INTEGER NOT NULL, PRIMARY KEY (stage_id, id))`,
+  `CREATE TABLE IF NOT EXISTS staged_document_blocks (stage_id TEXT NOT NULL, id TEXT NOT NULL, document_id TEXT NOT NULL, type TEXT NOT NULL, depth INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL, ordinal INTEGER NOT NULL, source_url TEXT, PRIMARY KEY (stage_id, id))`,
+  `CREATE TABLE IF NOT EXISTS staged_documents (stage_id TEXT NOT NULL, id TEXT NOT NULL, file_name TEXT NOT NULL, normalized_name TEXT NOT NULL, source TEXT NOT NULL, source_type TEXT NOT NULL, source_key TEXT NOT NULL, repository_id TEXT, repository_owner TEXT, repository_name TEXT, relative_path TEXT, source_ref TEXT, commit_sha TEXT, blob_sha TEXT, source_url TEXT, last_seen_sync_id TEXT, size INTEGER NOT NULL, hash TEXT NOT NULL, status TEXT NOT NULL, node_count INTEGER NOT NULL, edge_count INTEGER NOT NULL, parser_version TEXT NOT NULL, error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (stage_id, id))`,
+  `CREATE TABLE IF NOT EXISTS staged_ingestion_jobs (stage_id TEXT NOT NULL, id TEXT NOT NULL, document_id TEXT NOT NULL, file_name TEXT NOT NULL, status TEXT NOT NULL, progress INTEGER NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL, completed_at TEXT, PRIMARY KEY (stage_id, id))`,
+  `CREATE TABLE IF NOT EXISTS staged_github_document_targets (stage_id TEXT NOT NULL, source_key TEXT NOT NULL, mode TEXT NOT NULL, repository_owner TEXT NOT NULL, repository_name TEXT NOT NULL, relative_path TEXT NOT NULL, source_ref TEXT NOT NULL, commit_sha TEXT NOT NULL, blob_sha TEXT NOT NULL, source_url TEXT NOT NULL, PRIMARY KEY (stage_id, source_key))`,
   `CREATE TABLE IF NOT EXISTS staged_entities (stage_id TEXT NOT NULL, id TEXT NOT NULL, label TEXT NOT NULL, short_label TEXT NOT NULL, kind TEXT NOT NULL, domain TEXT NOT NULL, summary TEXT NOT NULL, insight TEXT NOT NULL, tags_json TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (stage_id, id))`,
-  `CREATE TABLE IF NOT EXISTS staged_entity_mentions (stage_id TEXT NOT NULL, id TEXT NOT NULL, document_id TEXT NOT NULL, entity_id TEXT NOT NULL, block_id TEXT, origin TEXT NOT NULL DEFAULT 'rule', PRIMARY KEY (stage_id, id))`,
+  `CREATE TABLE IF NOT EXISTS staged_entity_mentions (stage_id TEXT NOT NULL, id TEXT NOT NULL, document_id TEXT NOT NULL, entity_id TEXT NOT NULL, block_id TEXT, source_url TEXT, origin TEXT NOT NULL DEFAULT 'rule', PRIMARY KEY (stage_id, id))`,
   `CREATE TABLE IF NOT EXISTS staged_relations (stage_id TEXT NOT NULL, id TEXT NOT NULL, document_id TEXT NOT NULL, source_id TEXT NOT NULL, target_id TEXT NOT NULL, type TEXT NOT NULL, confidence REAL NOT NULL, note TEXT NOT NULL, origin TEXT NOT NULL DEFAULT 'rule', provider TEXT, provider_version TEXT, prompt_version TEXT, evidence_json TEXT, created_at TEXT, PRIMARY KEY (stage_id, id))`,
   `CREATE TABLE IF NOT EXISTS enrichment_jobs (id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, document_id TEXT NOT NULL, document_hash TEXT NOT NULL, parser_version TEXT NOT NULL, provider TEXT NOT NULL, provider_version TEXT NOT NULL, prompt_version TEXT NOT NULL, status TEXT NOT NULL, input_json TEXT NOT NULL, result_json TEXT, attempt_count INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3, lease_owner TEXT, lease_expires_at TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT)`,
-  `CREATE TABLE IF NOT EXISTS connector_heartbeats (connector_id TEXT PRIMARY KEY, status TEXT NOT NULL, version TEXT NOT NULL, current_job_id TEXT, started_at TEXT NOT NULL, last_seen_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS connector_heartbeats (connector_id TEXT PRIMARY KEY, status TEXT NOT NULL, version TEXT NOT NULL, current_job_id TEXT, run_mode TEXT, max_jobs INTEGER, max_runtime_ms INTEGER, processed_jobs INTEGER, succeeded_jobs INTEGER, warning_jobs INTEGER, failed_jobs INTEGER, stop_reason TEXT, started_at TEXT NOT NULL, last_seen_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS github_repositories (repository_id TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL, visibility TEXT NOT NULL, is_private INTEGER NOT NULL DEFAULT 0, is_fork INTEGER NOT NULL DEFAULT 0, is_archived INTEGER NOT NULL DEFAULT 0, is_template INTEGER NOT NULL DEFAULT 0, default_branch TEXT NOT NULL, sync_enabled INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'discovered', last_seen_at TEXT NOT NULL, last_synced_at TEXT, error_code TEXT, error_message TEXT)`,
+  `CREATE TABLE IF NOT EXISTS github_sync_runs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, selection_digest TEXT, manifest_digest TEXT, discovered_count INTEGER NOT NULL DEFAULT 0, selected_count INTEGER NOT NULL DEFAULT 0, changed_count INTEGER NOT NULL DEFAULT 0, unchanged_count INTEGER NOT NULL DEFAULT 0, deleted_count INTEGER NOT NULL DEFAULT 0, failed_count INTEGER NOT NULL DEFAULT 0, receipt_json TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT)`,
   `CREATE INDEX IF NOT EXISTS enrichment_jobs_claim_idx ON enrichment_jobs(status, lease_expires_at, created_at)`,
   `CREATE INDEX IF NOT EXISTS enrichment_jobs_document_idx ON enrichment_jobs(document_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS connector_heartbeats_seen_idx ON connector_heartbeats(last_seen_at)`,
+  `CREATE INDEX IF NOT EXISTS github_repositories_selection_idx ON github_repositories(sync_enabled, status)`,
+  `CREATE INDEX IF NOT EXISTS github_sync_runs_status_idx ON github_sync_runs(status, created_at)`,
+  `CREATE INDEX IF NOT EXISTS relations_source_idx ON relations(source_id)`,
+  `CREATE INDEX IF NOT EXISTS relations_target_idx ON relations(target_id)`,
+  `CREATE INDEX IF NOT EXISTS relations_document_idx ON relations(document_id)`,
+  `CREATE INDEX IF NOT EXISTS entity_mentions_document_idx ON entity_mentions(document_id)`,
 ];
 
 const relationMetadataColumns = [
@@ -78,11 +176,58 @@ async function ensureRelationMetadataColumns(db: D1Database, table: "relations" 
   }
 }
 
+async function ensureSourceUrlColumn(
+  db: D1Database,
+  table: "document_blocks" | "entity_mentions" | "staged_document_blocks" | "staged_entity_mentions",
+) {
+  const result = await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>();
+  if (!result.results.some((column) => String(column.name) === "source_url")) {
+    await db.prepare(`ALTER TABLE ${table} ADD COLUMN source_url TEXT`).run();
+  }
+}
+
+async function ensureDocumentSourceSchema(db: D1Database) {
+  const result = await db.prepare("PRAGMA table_info(documents)").all<{ name: string }>();
+  const columns = new Set(result.results.map((column) => String(column.name)));
+  if (!columns.has("source_key")) {
+    const migrationTable = "documents_source_migration";
+    await db.batch([
+      db.prepare(`DROP TABLE IF EXISTS ${migrationTable}`),
+      db.prepare(documentsTableSql(migrationTable)),
+      db.prepare(`INSERT INTO ${migrationTable} (
+        id, file_name, normalized_name, source, source_type, source_key,
+        size, hash, status, node_count, edge_count, parser_version, error, created_at, updated_at
+      ) SELECT
+        id, file_name, normalized_name, source, 'manual', 'manual:' || normalized_name,
+        size, hash, status, node_count, edge_count, parser_version, error, created_at, updated_at
+      FROM documents`),
+      db.prepare("DROP TABLE documents"),
+      db.prepare(`ALTER TABLE ${migrationTable} RENAME TO documents`),
+    ]);
+  }
+  await db.batch([
+    db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS documents_source_key_unique ON documents(source_key)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS documents_repository_idx ON documents(repository_id, relative_path)"),
+  ]);
+}
+
 async function ensureSchema(db: D1Database) {
   schemaReady ??= (async () => {
     await db.batch(schemaStatements.map((statement) => db.prepare(statement)));
+    await ensureDocumentSourceSchema(db);
     await ensureRelationMetadataColumns(db, "relations");
     await ensureRelationMetadataColumns(db, "staged_relations");
+    await ensureSourceUrlColumn(db, "document_blocks");
+    await ensureSourceUrlColumn(db, "entity_mentions");
+    await ensureSourceUrlColumn(db, "staged_document_blocks");
+    await ensureSourceUrlColumn(db, "staged_entity_mentions");
+    const syncRunInfo = await db.prepare("PRAGMA table_info(github_sync_runs)").all<{ name: string }>();
+    if (!syncRunInfo.results.some((column) => String(column.name) === "receipt_json")) {
+      await db.prepare("ALTER TABLE github_sync_runs ADD COLUMN receipt_json TEXT").run()
+        .catch((error) => {
+          if (!String(error).toLowerCase().includes("duplicate column")) throw error;
+        });
+    }
     const enrichmentInfo = await db.prepare("PRAGMA table_info(enrichment_jobs)").all<{ name: string }>();
     const enrichmentColumns = new Set(enrichmentInfo.results.map((column) => String(column.name)));
     if (!enrichmentColumns.has("manual_retry_count")) {
@@ -101,6 +246,75 @@ async function ensureSchema(db: D1Database) {
   await schemaReady;
 }
 
+async function ensureGraphSearchSchema(db: D1Database) {
+  const key = db as unknown as object;
+  const existing = graphSearchReadyByDatabase.get(key);
+  if (existing) return existing;
+  const ready = (async () => {
+    try {
+      const statements = [
+        `CREATE VIRTUAL TABLE IF NOT EXISTS graph_entity_fts USING fts5(
+          entity_id UNINDEXED, label, summary, tags, tokenize='unicode61'
+        )`,
+        `CREATE VIRTUAL TABLE IF NOT EXISTS graph_block_fts USING fts5(
+          block_id UNINDEXED, text, tokenize='unicode61'
+        )`,
+        `CREATE TRIGGER IF NOT EXISTS graph_entity_fts_insert AFTER INSERT ON entities BEGIN
+          DELETE FROM graph_entity_fts WHERE entity_id = NEW.id;
+          INSERT INTO graph_entity_fts(entity_id, label, summary, tags)
+          VALUES (NEW.id, NEW.label, NEW.summary, NEW.tags_json);
+        END`,
+        `CREATE TRIGGER IF NOT EXISTS graph_entity_fts_update AFTER UPDATE ON entities BEGIN
+          DELETE FROM graph_entity_fts WHERE entity_id = OLD.id;
+          INSERT INTO graph_entity_fts(entity_id, label, summary, tags)
+          VALUES (NEW.id, NEW.label, NEW.summary, NEW.tags_json);
+        END`,
+        `CREATE TRIGGER IF NOT EXISTS graph_entity_fts_delete AFTER DELETE ON entities BEGIN
+          DELETE FROM graph_entity_fts WHERE entity_id = OLD.id;
+        END`,
+        `CREATE TRIGGER IF NOT EXISTS graph_block_fts_insert AFTER INSERT ON document_blocks BEGIN
+          DELETE FROM graph_block_fts WHERE block_id = NEW.id;
+          INSERT INTO graph_block_fts(block_id, text) VALUES (NEW.id, NEW.text);
+        END`,
+        `CREATE TRIGGER IF NOT EXISTS graph_block_fts_update AFTER UPDATE ON document_blocks BEGIN
+          DELETE FROM graph_block_fts WHERE block_id = OLD.id;
+          INSERT INTO graph_block_fts(block_id, text) VALUES (NEW.id, NEW.text);
+        END`,
+        `CREATE TRIGGER IF NOT EXISTS graph_block_fts_delete AFTER DELETE ON document_blocks BEGIN
+          DELETE FROM graph_block_fts WHERE block_id = OLD.id;
+        END`,
+      ];
+      await db.batch(statements.map((statement) => db.prepare(statement)));
+      const [entityCount, entitySearchCount, blockCount, blockSearchCount] = await Promise.all([
+        db.prepare("SELECT COUNT(*) AS count FROM entities").first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) AS count FROM graph_entity_fts").first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) AS count FROM document_blocks").first<{ count: number }>(),
+        db.prepare("SELECT COUNT(*) AS count FROM graph_block_fts").first<{ count: number }>(),
+      ]);
+      if (Number(entityCount?.count ?? 0) !== Number(entitySearchCount?.count ?? 0)) {
+        await db.batch([
+          db.prepare("DELETE FROM graph_entity_fts"),
+          db.prepare(`INSERT INTO graph_entity_fts(entity_id, label, summary, tags)
+            SELECT id, label, summary, tags_json FROM entities`),
+        ]);
+      }
+      if (Number(blockCount?.count ?? 0) !== Number(blockSearchCount?.count ?? 0)) {
+        await db.batch([
+          db.prepare("DELETE FROM graph_block_fts"),
+          db.prepare("INSERT INTO graph_block_fts(block_id, text) SELECT id, text FROM document_blocks"),
+        ]);
+      }
+      return true;
+    } catch {
+      // Older or reduced SQLite environments may omit FTS5. Bound LIKE
+      // queries remain a functional, injection-safe fallback.
+      return false;
+    }
+  })();
+  graphSearchReadyByDatabase.set(key, ready);
+  return ready;
+}
+
 const asDocument = (row: Record<string, unknown>): DocumentRecord => ({
   id: String(row.id),
   fileName: String(row.file_name),
@@ -111,9 +325,69 @@ const asDocument = (row: Record<string, unknown>): DocumentRecord => ({
   nodeCount: Number(row.node_count),
   edgeCount: Number(row.edge_count),
   parserVersion: String(row.parser_version),
+  sourceType: row.source_type === "github" ? "github" : "manual",
+  sourceLabel: row.source_type === "github"
+    ? `${String(row.repository_name ?? "GitHub")} · ${String(row.relative_path ?? "")}`
+    : "수동 업로드",
   createdAt: String(row.created_at),
   updatedAt: String(row.updated_at),
   error: row.error ? String(row.error) : undefined,
+});
+
+const asStoredDocument = (row: Record<string, unknown>) => {
+  const document = asDocument(row);
+  const sourceType = String(row.source_type);
+  if (sourceType !== "manual" && sourceType !== "github") {
+    throw new Error(`지원하지 않는 문서 source type입니다: ${sourceType}`);
+  }
+  const sourceDescriptor: DocumentSourceDescriptor = sourceType === "github"
+    ? createGitHubDocumentSourceDescriptor({
+      repositoryId: String(row.repository_id),
+      repositoryOwner: String(row.repository_owner),
+      repositoryName: String(row.repository_name),
+      relativePath: String(row.relative_path),
+      ref: String(row.source_ref),
+      commitSha: String(row.commit_sha),
+      blobSha: String(row.blob_sha),
+      sourceUrl: String(row.source_url),
+    })
+    : createManualDocumentSourceDescriptor(document.normalizedName);
+  const computedSourceKey = documentSourceKey(sourceDescriptor);
+  const storedSourceKey = String(row.source_key);
+  if (storedSourceKey !== computedSourceKey) {
+    throw new Error(`문서 source key가 메타데이터와 일치하지 않습니다: ${document.id}`);
+  }
+  return {
+    ...document,
+    sourceType: sourceDescriptor.type,
+    sourceLabel: sourceDescriptor.type === "github"
+      ? `${sourceDescriptor.repositoryName} · ${sourceDescriptor.relativePath}`
+      : "수동 업로드",
+    source: String(row.source),
+    sourceKey: computedSourceKey,
+    sourceDescriptor,
+  };
+};
+
+export const toPublicDocumentRecord = (
+  document: StoredDocument | ReturnType<typeof asStoredDocument>,
+): DocumentRecord => ({
+  id: document.id,
+  fileName: document.fileName,
+  normalizedName: document.normalizedName,
+  size: document.size,
+  hash: document.hash,
+  status: document.status,
+  nodeCount: document.nodeCount,
+  edgeCount: document.edgeCount,
+  parserVersion: document.parserVersion,
+  sourceType: document.sourceDescriptor.type,
+  sourceLabel: document.sourceDescriptor.type === "github"
+    ? `${document.sourceDescriptor.repositoryName} · ${document.sourceDescriptor.relativePath}`
+    : "수동 업로드",
+  createdAt: document.createdAt,
+  updatedAt: document.updatedAt,
+  error: document.error,
 });
 
 const asJob = (row: Record<string, unknown>): IngestionJob => ({
@@ -134,9 +408,13 @@ const asRelationEvidence = (value: unknown): RelationEvidence[] | undefined => {
     if (!Array.isArray(parsed)) return undefined;
     const evidence = parsed.flatMap((item) => {
       if (!item || typeof item !== "object") return [];
-      const { blockId, explanation } = item as Record<string, unknown>;
+      const { blockId, explanation, sourceUrl } = item as Record<string, unknown>;
       return typeof blockId === "string" && typeof explanation === "string"
-        ? [{ blockId, explanation }]
+        ? [{
+            blockId,
+            explanation,
+            ...(typeof sourceUrl === "string" ? { sourceUrl } : {}),
+          }]
         : [];
     });
     return evidence.length ? evidence : undefined;
@@ -145,19 +423,21 @@ const asRelationEvidence = (value: unknown): RelationEvidence[] | undefined => {
   }
 };
 
-export async function findDocumentByName(normalizedName: string) {
+export async function findDocumentBySourceKey(sourceKey: DocumentSourceKey) {
   const db = await database();
   if (!db) {
-    return [...memoryStore().documents.values()].find(
-      (document) => document.normalizedName === normalizedName,
-    );
+    return [...memoryStore().documents.values()].find((document) => document.sourceKey === sourceKey);
   }
   await ensureSchema(db);
   const row = await db
-    .prepare("SELECT * FROM documents WHERE normalized_name = ? LIMIT 1")
-    .bind(normalizedName)
+    .prepare("SELECT * FROM documents WHERE source_key = ? LIMIT 1")
+    .bind(sourceKey)
     .first<Record<string, unknown>>();
-  return row ? { ...asDocument(row), source: String(row.source) } : null;
+  return row ? asStoredDocument(row) : null;
+}
+
+export async function findDocumentByName(normalizedName: string) {
+  return findDocumentBySourceKey(documentSourceKey({ type: "manual", normalizedName }));
 }
 
 export async function findDocumentById(id: string) {
@@ -168,15 +448,85 @@ export async function findDocumentById(id: string) {
     .prepare("SELECT * FROM documents WHERE id = ? LIMIT 1")
     .bind(id)
     .first<Record<string, unknown>>();
-  return row ? { ...asDocument(row), source: String(row.source) } : null;
+  return row ? asStoredDocument(row) : null;
+}
+
+export type DocumentReprocessCandidate = {
+  documentId: string;
+  fileName: string;
+  sourceType: DocumentSourceDescriptor["type"];
+  repositoryId?: string;
+  repositoryName?: string;
+  relativePath?: string;
+  parserVersion: string;
+  blockCount: number;
+};
+
+export async function listDocumentReprocessCandidates(input: {
+  documentIds?: string[];
+  repositoryId?: string;
+} = {}): Promise<DocumentReprocessCandidate[]> {
+  const requestedIds = new Set((input.documentIds ?? []).filter(Boolean));
+  const db = await database();
+  if (!db) {
+    return [...memoryStore().documents.values()]
+      .filter((document) => !requestedIds.size || requestedIds.has(document.id))
+      .filter((document) => document.sourceDescriptor.type !== "github"
+        || !input.repositoryId
+        || document.sourceDescriptor.repositoryId === input.repositoryId)
+      .map((document) => ({
+        documentId: document.id,
+        fileName: document.fileName,
+        sourceType: document.sourceDescriptor.type,
+        repositoryId: document.sourceDescriptor.type === "github"
+          ? document.sourceDescriptor.repositoryId
+          : undefined,
+        repositoryName: document.sourceDescriptor.type === "github"
+          ? document.sourceDescriptor.repositoryName
+          : undefined,
+        relativePath: document.sourceDescriptor.type === "github"
+          ? document.sourceDescriptor.relativePath
+          : undefined,
+        parserVersion: document.parserVersion,
+        blockCount: document.graph.blocks.length,
+      }))
+      .sort((left, right) => left.documentId.localeCompare(right.documentId));
+  }
+
+  await ensureSchema(db);
+  const result = input.repositoryId
+    ? await db.prepare(`SELECT d.id, d.file_name, d.source_type, d.repository_id,
+        d.repository_name, d.relative_path, d.parser_version, COUNT(b.id) AS block_count
+        FROM documents d LEFT JOIN document_blocks b ON b.document_id = d.id
+        WHERE d.repository_id = ?
+        GROUP BY d.id ORDER BY d.id`).bind(input.repositoryId).all<Record<string, unknown>>()
+    : await db.prepare(`SELECT d.id, d.file_name, d.source_type, d.repository_id,
+        d.repository_name, d.relative_path, d.parser_version, COUNT(b.id) AS block_count
+        FROM documents d LEFT JOIN document_blocks b ON b.document_id = d.id
+        GROUP BY d.id ORDER BY d.id`).all<Record<string, unknown>>();
+  return result.results
+    .filter((row) => !requestedIds.size || requestedIds.has(String(row.id)))
+    .map((row) => ({
+      documentId: String(row.id),
+      fileName: String(row.file_name),
+      sourceType: String(row.source_type) as DocumentSourceDescriptor["type"],
+      repositoryId: row.repository_id ? String(row.repository_id) : undefined,
+      repositoryName: row.repository_name ? String(row.repository_name) : undefined,
+      relativePath: row.relative_path ? String(row.relative_path) : undefined,
+      parserVersion: String(row.parser_version),
+      blockCount: Number(row.block_count ?? 0),
+    }));
 }
 
 export async function saveDocument(input: {
   document: DocumentRecord;
   source: string;
+  sourceDescriptor: DocumentSourceDescriptor;
+  lastSeenSyncId?: string;
   graph: ExtractedGraph;
   job: IngestionJob;
 }) {
+  const sourceKey = documentSourceKey(input.sourceDescriptor);
   const db = await database();
   if (!db) {
     if (
@@ -188,20 +538,23 @@ export async function saveDocument(input: {
     memoryStore().documents.set(input.document.id, {
       ...input.document,
       source: input.source,
+      sourceKey,
+      sourceDescriptor: input.sourceDescriptor,
       graph: input.graph,
     });
     memoryStore().jobs.set(input.job.id, input.job);
     return;
   }
   await ensureSchema(db);
-  const { document, source, graph, job } = input;
+  const { document, source, sourceDescriptor, graph, job } = input;
+  const githubSource = sourceDescriptor.type === "github" ? sourceDescriptor : null;
   const stageId = job.id;
   const statements: D1PreparedStatement[] = [];
 
   graph.blocks.forEach((block: DocumentBlock) => {
     statements.push(
-      db.prepare("INSERT OR REPLACE INTO staged_document_blocks (stage_id, id, document_id, type, depth, text, ordinal) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(stageId, block.id, document.id, block.type, block.depth, block.text, block.ordinal),
+      db.prepare("INSERT OR REPLACE INTO staged_document_blocks (stage_id, id, document_id, type, depth, text, ordinal, source_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(stageId, block.id, document.id, block.type, block.depth, block.text, block.ordinal, block.sourceUrl ?? null),
     );
   });
   graph.nodes.forEach((node) => {
@@ -210,20 +563,21 @@ export async function saveDocument(input: {
         .bind(stageId, node.id, node.label, node.shortLabel, node.kind, node.domain, node.summary, node.insight, JSON.stringify(node.tags), document.updatedAt),
     );
     statements.push(
-      db.prepare("INSERT OR REPLACE INTO staged_entity_mentions (stage_id, id, document_id, entity_id, block_id, origin) VALUES (?, ?, ?, ?, ?, 'rule')")
+      db.prepare("INSERT OR REPLACE INTO staged_entity_mentions (stage_id, id, document_id, entity_id, block_id, source_url, origin) VALUES (?, ?, ?, ?, ?, ?, 'rule')")
         .bind(
           stageId,
-          `mention:${stableKey(`${document.id}:${node.id}`)}`,
+          entityMentionStorageId(document.id, node.id),
           document.id,
           node.id,
           graph.nodeBlockIds[node.id] ?? graph.blocks[0]?.id ?? null,
+          graph.nodeEvidence?.[node.id]?.sourceUrl ?? null,
         ),
     );
   });
   graph.edges.forEach((edge) => {
     statements.push(
       db.prepare("INSERT OR REPLACE INTO staged_relations (stage_id, id, document_id, source_id, target_id, type, confidence, note, origin, provider, provider_version, prompt_version, evidence_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'rule', 'markdown-ast', ?, NULL, ?, ?)")
-        .bind(stageId, `relation:${stableKey(`${document.id}:${edge.source}:${edge.target}:${edge.type}`)}`, document.id, edge.source, edge.target, edge.type, edge.confidence, edge.note, document.parserVersion, JSON.stringify(edge.evidence ?? []), document.updatedAt),
+        .bind(stageId, relationStorageId(document.id, edge.source, edge.target, edge.type), document.id, edge.source, edge.target, edge.type, edge.confidence, edge.note, document.parserVersion, JSON.stringify(edge.evidence ?? []), document.updatedAt),
     );
   });
 
@@ -235,9 +589,7 @@ export async function saveDocument(input: {
   ]);
 
   try {
-    for (let index = 0; index < statements.length; index += 90) {
-      await db.batch(statements.slice(index, index + 90));
-    }
+    for (const batch of chunkD1Statements(statements)) await db.batch(batch);
 
     await db.batch([
       db.prepare(`INSERT INTO entities (id, label, short_label, kind, domain, summary, insight, tags_json, updated_at)
@@ -247,13 +599,51 @@ export async function saveDocument(input: {
       db.prepare("DELETE FROM relations WHERE document_id = ?").bind(document.id),
       db.prepare("DELETE FROM entity_mentions WHERE document_id = ?").bind(document.id),
       db.prepare("DELETE FROM document_blocks WHERE document_id = ?").bind(document.id),
-      db.prepare("INSERT INTO document_blocks (id, document_id, type, depth, text, ordinal) SELECT id, document_id, type, depth, text, ordinal FROM staged_document_blocks WHERE stage_id = ?").bind(stageId),
-      db.prepare("INSERT INTO entity_mentions (id, document_id, entity_id, block_id, origin) SELECT id, document_id, entity_id, block_id, origin FROM staged_entity_mentions WHERE stage_id = ?").bind(stageId),
+      db.prepare("INSERT INTO document_blocks (id, document_id, type, depth, text, ordinal, source_url) SELECT id, document_id, type, depth, text, ordinal, source_url FROM staged_document_blocks WHERE stage_id = ?").bind(stageId),
+      db.prepare("INSERT INTO entity_mentions (id, document_id, entity_id, block_id, source_url, origin) SELECT id, document_id, entity_id, block_id, source_url, origin FROM staged_entity_mentions WHERE stage_id = ?").bind(stageId),
       db.prepare("INSERT INTO relations (id, document_id, source_id, target_id, type, confidence, note, origin, provider, provider_version, prompt_version, evidence_json, created_at) SELECT id, document_id, source_id, target_id, type, confidence, note, origin, provider, provider_version, prompt_version, evidence_json, created_at FROM staged_relations WHERE stage_id = ?").bind(stageId),
-      db.prepare(`INSERT INTO documents (id, file_name, normalized_name, source, size, hash, status, node_count, edge_count, parser_version, error, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET file_name=excluded.file_name, normalized_name=excluded.normalized_name, source=excluded.source, size=excluded.size, hash=excluded.hash, status=excluded.status, node_count=excluded.node_count, edge_count=excluded.edge_count, parser_version=excluded.parser_version, error=excluded.error, updated_at=excluded.updated_at`)
-        .bind(document.id, document.fileName, document.normalizedName, source, document.size, document.hash, document.status, document.nodeCount, document.edgeCount, document.parserVersion, document.error ?? null, document.createdAt, document.updatedAt),
+      db.prepare(`INSERT INTO documents (
+          id, file_name, normalized_name, source, source_type, source_key,
+          repository_id, repository_owner, repository_name, relative_path, source_ref,
+          commit_sha, blob_sha, source_url, last_seen_sync_id,
+          size, hash, status, node_count, edge_count, parser_version, error, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          file_name=excluded.file_name, normalized_name=excluded.normalized_name, source=excluded.source,
+          source_type=excluded.source_type, source_key=excluded.source_key,
+          repository_id=excluded.repository_id, repository_owner=excluded.repository_owner,
+          repository_name=excluded.repository_name, relative_path=excluded.relative_path,
+          source_ref=excluded.source_ref, commit_sha=excluded.commit_sha, blob_sha=excluded.blob_sha,
+          source_url=excluded.source_url, last_seen_sync_id=excluded.last_seen_sync_id,
+          size=excluded.size, hash=excluded.hash, status=excluded.status,
+          node_count=excluded.node_count, edge_count=excluded.edge_count,
+          parser_version=excluded.parser_version, error=excluded.error, updated_at=excluded.updated_at`)
+        .bind(
+          document.id,
+          document.fileName,
+          document.normalizedName,
+          source,
+          sourceDescriptor.type,
+          sourceKey,
+          githubSource?.repositoryId ?? null,
+          githubSource?.repositoryOwner ?? null,
+          githubSource?.repositoryName ?? null,
+          githubSource?.relativePath ?? null,
+          githubSource?.ref ?? null,
+          githubSource?.commitSha ?? null,
+          githubSource?.blobSha ?? null,
+          githubSource?.sourceUrl ?? null,
+          input.lastSeenSyncId ?? null,
+          document.size,
+          document.hash,
+          document.status,
+          document.nodeCount,
+          document.edgeCount,
+          document.parserVersion,
+          document.error ?? null,
+          document.createdAt,
+          document.updatedAt,
+        ),
       db.prepare("INSERT OR REPLACE INTO ingestion_jobs (id, document_id, file_name, status, progress, message, created_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(job.id, job.documentId, job.fileName, job.status, job.progress, job.message, job.createdAt, job.completedAt ?? null),
       db.prepare("DELETE FROM staged_relations WHERE stage_id = ?").bind(stageId),
@@ -266,6 +656,392 @@ export async function saveDocument(input: {
     await cleanupStage().catch(() => undefined);
     throw error;
   }
+}
+
+export type GitHubRepositoryPreparedDocument = {
+  document: DocumentRecord;
+  source: string;
+  sourceDescriptor: Extract<DocumentSourceDescriptor, { type: "github" }>;
+  graph: ExtractedGraph;
+  job: IngestionJob;
+};
+
+export type GitHubRepositoryUnchangedDocument = {
+  sourceDescriptor: Extract<DocumentSourceDescriptor, { type: "github" }>;
+};
+
+export type GitHubRepositoryDocumentState = {
+  id: string;
+  sourceKey: DocumentSourceKey;
+  sourceDescriptor: Extract<DocumentSourceDescriptor, { type: "github" }>;
+  hash: string;
+  parserVersion: string;
+  size: number;
+  nodeCount: number;
+  edgeCount: number;
+};
+
+export async function listGitHubRepositoryDocuments(
+  repositoryId: string,
+): Promise<GitHubRepositoryDocumentState[]> {
+  const db = await database();
+  if (!db) {
+    return [...memoryStore().documents.values()].flatMap((document) => {
+      const sourceDescriptor = document.sourceDescriptor;
+      if (sourceDescriptor.type !== "github" || sourceDescriptor.repositoryId !== repositoryId) return [];
+      return [{
+        id: document.id,
+        sourceKey: document.sourceKey,
+        sourceDescriptor,
+        hash: document.hash,
+        parserVersion: document.parserVersion,
+        size: document.size,
+        nodeCount: document.nodeCount,
+        edgeCount: document.edgeCount,
+      }];
+    });
+  }
+  await ensureSchema(db);
+  const result = await db.prepare(
+    "SELECT * FROM documents WHERE source_type = 'github' AND repository_id = ? ORDER BY relative_path",
+  ).bind(repositoryId).all<Record<string, unknown>>();
+  return result.results.map((row) => {
+    const document = asStoredDocument(row);
+    if (document.sourceDescriptor.type !== "github") throw new Error("GitHub 문서 상태가 잘못되었습니다.");
+    return {
+      id: document.id,
+      sourceKey: document.sourceKey,
+      sourceDescriptor: document.sourceDescriptor,
+      hash: document.hash,
+      parserVersion: document.parserVersion,
+      size: document.size,
+      nodeCount: document.nodeCount,
+      edgeCount: document.edgeCount,
+    };
+  });
+}
+
+export async function findGitHubApplyReceipt(syncId: string): Promise<GitHubApplyReceipt | null> {
+  const db = await database();
+  if (!db) return memoryStore().githubApplyReceipts.get(syncId) ?? null;
+  await ensureSchema(db);
+  const row = await db.prepare(
+    "SELECT receipt_json FROM github_sync_runs WHERE id = ? AND kind = 'apply' AND status = 'completed' LIMIT 1",
+  ).bind(syncId).first<{ receipt_json?: unknown }>();
+  if (!row?.receipt_json) return null;
+  try {
+    return parseGitHubApplyReceipt(JSON.parse(String(row.receipt_json)));
+  } catch {
+    throw new Error("저장된 GitHub apply 영수증이 손상되었습니다.");
+  }
+}
+
+export async function replaceGitHubRepositoryDocuments(input: {
+  repositoryId: string;
+  syncId: string;
+  documents: GitHubRepositoryPreparedDocument[];
+  unchangedDocuments?: GitHubRepositoryUnchangedDocument[];
+  receipt: {
+    repositoryName: string;
+    commitSha: string;
+    manifestDigest: string;
+    appliedAt: string;
+  };
+}): Promise<GitHubApplyReceipt> {
+  const unchangedDocuments = input.unchangedDocuments ?? [];
+  const sourceKeys = new Set<string>();
+  for (const sourceDescriptor of [
+    ...input.documents.map((item) => item.sourceDescriptor),
+    ...unchangedDocuments.map((item) => item.sourceDescriptor),
+  ]) {
+    if (sourceDescriptor.repositoryId !== input.repositoryId) {
+      throw new Error("저장소 apply 문서의 repositoryId가 일치하지 않습니다.");
+    }
+    const sourceKey = documentSourceKey(sourceDescriptor);
+    if (sourceKeys.has(sourceKey)) throw new Error(`저장소 apply 문서가 중복되었습니다: ${sourceKey}`);
+    sourceKeys.add(sourceKey);
+  }
+
+  const db = await database();
+  if (!db) {
+    const store = memoryStore();
+    const existing = [...store.documents.values()].filter((document) =>
+      document.sourceDescriptor.type === "github"
+      && document.sourceDescriptor.repositoryId === input.repositoryId,
+    );
+    const existingBySource = new Map(existing.map((document) => [document.sourceKey, document]));
+    for (const item of unchangedDocuments) {
+      const sourceKey = documentSourceKey(item.sourceDescriptor);
+      const current = existingBySource.get(sourceKey);
+      if (
+        !current
+        || current.sourceDescriptor.type !== "github"
+        || current.sourceDescriptor.blobSha !== item.sourceDescriptor.blobSha
+      ) throw new Error(`unchanged 문서 상태가 apply 준비 이후 변경되었습니다: ${sourceKey}`);
+    }
+    const createdCount = input.documents.filter((item) =>
+      !existingBySource.has(documentSourceKey(item.sourceDescriptor))).length;
+    const unchangedCount = unchangedDocuments.length;
+    const updatedCount = input.documents.length - createdCount;
+    const deletedCount = existing.filter((document) => !sourceKeys.has(document.sourceKey)).length;
+    const receipt: GitHubApplyReceipt = {
+      repositoryId: input.repositoryId,
+      repositoryName: input.receipt.repositoryName,
+      commitSha: input.receipt.commitSha,
+      manifestDigest: input.receipt.manifestDigest,
+      fileCount: sourceKeys.size,
+      createdCount,
+      updatedCount,
+      unchangedCount,
+      deletedCount,
+      nodeCount: input.documents.reduce((sum, item) => sum + item.document.nodeCount, 0)
+        + unchangedDocuments.reduce((sum, item) =>
+          sum + (existingBySource.get(documentSourceKey(item.sourceDescriptor))?.nodeCount ?? 0), 0),
+      edgeCount: input.documents.reduce((sum, item) => sum + item.document.edgeCount, 0)
+        + unchangedDocuments.reduce((sum, item) =>
+          sum + (existingBySource.get(documentSourceKey(item.sourceDescriptor))?.edgeCount ?? 0), 0),
+      appliedAt: input.receipt.appliedAt,
+    };
+    if (
+      process.env.ATLAS_TEST_MODE === "true"
+      && process.env.ATLAS_TEST_FAIL_REPOSITORY_APPLY === input.repositoryId
+    ) throw new Error("테스트용 저장소 apply 실패");
+
+    const nextDocuments = new Map(store.documents);
+    const nextJobs = new Map(store.jobs);
+    const affectedDocumentIds = new Set(existing
+      .filter((document) =>
+        !sourceKeys.has(document.sourceKey)
+        || input.documents.some((item) => documentSourceKey(item.sourceDescriptor) === document.sourceKey))
+      .map((document) => document.id));
+    for (const documentId of affectedDocumentIds) nextDocuments.delete(documentId);
+    for (const [jobId, job] of nextJobs) {
+      if (affectedDocumentIds.has(job.documentId)) nextJobs.delete(jobId);
+    }
+    for (const item of input.documents) {
+      nextDocuments.set(item.document.id, {
+        ...item.document,
+        source: item.source,
+        sourceKey: documentSourceKey(item.sourceDescriptor),
+        sourceDescriptor: item.sourceDescriptor,
+        graph: item.graph,
+      });
+      nextJobs.set(item.job.id, item.job);
+    }
+    for (const item of unchangedDocuments) {
+      const sourceKey = documentSourceKey(item.sourceDescriptor);
+      const current = existingBySource.get(sourceKey)!;
+      nextDocuments.set(current.id, { ...current, sourceDescriptor: item.sourceDescriptor });
+    }
+    store.documents = nextDocuments;
+    store.jobs = nextJobs;
+    store.githubApplyReceipts.set(input.syncId, receipt);
+    return receipt;
+  }
+
+  await ensureSchema(db);
+  const existingResult = await db.prepare(
+    "SELECT id, source_key, hash, blob_sha, node_count, edge_count FROM documents WHERE source_type = 'github' AND repository_id = ?",
+  ).bind(input.repositoryId).all<Record<string, unknown>>();
+  const existingBySource = new Map(existingResult.results.map((row) => [String(row.source_key), row]));
+  for (const item of unchangedDocuments) {
+    const sourceKey = documentSourceKey(item.sourceDescriptor);
+    const current = existingBySource.get(sourceKey);
+    if (!current || String(current.blob_sha) !== item.sourceDescriptor.blobSha) {
+      throw new Error(`unchanged 문서 상태가 apply 준비 이후 변경되었습니다: ${sourceKey}`);
+    }
+  }
+  const createdCount = input.documents.filter((item) =>
+    !existingBySource.has(documentSourceKey(item.sourceDescriptor))).length;
+  const unchangedCount = unchangedDocuments.length;
+  const updatedCount = input.documents.length - createdCount;
+  const deletedCount = existingResult.results.filter((row) => !sourceKeys.has(String(row.source_key))).length;
+  const receipt: GitHubApplyReceipt = {
+    repositoryId: input.repositoryId,
+    repositoryName: input.receipt.repositoryName,
+    commitSha: input.receipt.commitSha,
+    manifestDigest: input.receipt.manifestDigest,
+    fileCount: sourceKeys.size,
+    createdCount,
+    updatedCount,
+    unchangedCount,
+    deletedCount,
+    nodeCount: input.documents.reduce((sum, item) => sum + item.document.nodeCount, 0)
+      + unchangedDocuments.reduce((sum, item) =>
+        sum + Number(existingBySource.get(documentSourceKey(item.sourceDescriptor))?.node_count ?? 0), 0),
+    edgeCount: input.documents.reduce((sum, item) => sum + item.document.edgeCount, 0)
+      + unchangedDocuments.reduce((sum, item) =>
+        sum + Number(existingBySource.get(documentSourceKey(item.sourceDescriptor))?.edge_count ?? 0), 0),
+    appliedAt: input.receipt.appliedAt,
+  };
+  const stageId = input.syncId;
+  const stageStatements: D1PreparedStatement[] = [];
+  for (const { document, source, sourceDescriptor, graph, job } of input.documents) {
+    stageStatements.push(
+      db.prepare(`INSERT OR REPLACE INTO staged_documents (
+        stage_id, id, file_name, normalized_name, source, source_type, source_key,
+        repository_id, repository_owner, repository_name, relative_path, source_ref,
+        commit_sha, blob_sha, source_url, last_seen_sync_id, size, hash, status,
+        node_count, edge_count, parser_version, error, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, 'github', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(
+          stageId, document.id, document.fileName, document.normalizedName, source,
+          documentSourceKey(sourceDescriptor), sourceDescriptor.repositoryId,
+          sourceDescriptor.repositoryOwner, sourceDescriptor.repositoryName,
+          sourceDescriptor.relativePath, sourceDescriptor.ref, sourceDescriptor.commitSha,
+          sourceDescriptor.blobSha, sourceDescriptor.sourceUrl, input.syncId,
+          document.size, document.hash, document.status, document.nodeCount,
+          document.edgeCount, document.parserVersion, document.error ?? null,
+          document.createdAt, document.updatedAt,
+        ),
+      db.prepare(`INSERT OR REPLACE INTO staged_ingestion_jobs
+        (stage_id, id, document_id, file_name, status, progress, message, created_at, completed_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(stageId, job.id, job.documentId, job.fileName, job.status, job.progress, job.message, job.createdAt, job.completedAt ?? null),
+      db.prepare(`INSERT OR REPLACE INTO staged_github_document_targets
+        (stage_id, source_key, mode, repository_owner, repository_name, relative_path,
+         source_ref, commit_sha, blob_sha, source_url)
+        VALUES (?, ?, 'prepared', ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(
+          stageId, documentSourceKey(sourceDescriptor), sourceDescriptor.repositoryOwner,
+          sourceDescriptor.repositoryName, sourceDescriptor.relativePath, sourceDescriptor.ref,
+          sourceDescriptor.commitSha, sourceDescriptor.blobSha, sourceDescriptor.sourceUrl,
+        ),
+    );
+    for (const block of graph.blocks) {
+      stageStatements.push(
+        db.prepare("INSERT OR REPLACE INTO staged_document_blocks (stage_id, id, document_id, type, depth, text, ordinal, source_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(stageId, block.id, document.id, block.type, block.depth, block.text, block.ordinal, block.sourceUrl ?? null),
+      );
+    }
+    for (const node of graph.nodes) {
+      stageStatements.push(
+        db.prepare("INSERT OR REPLACE INTO staged_entities (stage_id, id, label, short_label, kind, domain, summary, insight, tags_json, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(stageId, node.id, node.label, node.shortLabel, node.kind, node.domain, node.summary, node.insight, JSON.stringify(node.tags), document.updatedAt),
+        db.prepare("INSERT OR REPLACE INTO staged_entity_mentions (stage_id, id, document_id, entity_id, block_id, source_url, origin) VALUES (?, ?, ?, ?, ?, ?, 'rule')")
+          .bind(
+            stageId,
+            entityMentionStorageId(document.id, node.id),
+            document.id,
+            node.id,
+            graph.nodeBlockIds[node.id] ?? graph.blocks[0]?.id ?? null,
+            graph.nodeEvidence?.[node.id]?.sourceUrl ?? null,
+          ),
+      );
+    }
+    for (const edge of graph.edges) {
+      stageStatements.push(
+        db.prepare("INSERT OR REPLACE INTO staged_relations (stage_id, id, document_id, source_id, target_id, type, confidence, note, origin, provider, provider_version, prompt_version, evidence_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'rule', 'markdown-ast', ?, NULL, ?, ?)")
+          .bind(stageId, relationStorageId(document.id, edge.source, edge.target, edge.type), document.id, edge.source, edge.target, edge.type, edge.confidence, edge.note, document.parserVersion, JSON.stringify(edge.evidence ?? []), document.updatedAt),
+      );
+    }
+  }
+  for (const { sourceDescriptor } of unchangedDocuments) {
+    stageStatements.push(
+      db.prepare(`INSERT OR REPLACE INTO staged_github_document_targets
+        (stage_id, source_key, mode, repository_owner, repository_name, relative_path,
+         source_ref, commit_sha, blob_sha, source_url)
+        VALUES (?, ?, 'unchanged', ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(
+          stageId, documentSourceKey(sourceDescriptor), sourceDescriptor.repositoryOwner,
+          sourceDescriptor.repositoryName, sourceDescriptor.relativePath, sourceDescriptor.ref,
+          sourceDescriptor.commitSha, sourceDescriptor.blobSha, sourceDescriptor.sourceUrl,
+        ),
+    );
+  }
+  const cleanupStage = () => db.batch([
+    db.prepare("DELETE FROM staged_relations WHERE stage_id = ?").bind(stageId),
+    db.prepare("DELETE FROM staged_entity_mentions WHERE stage_id = ?").bind(stageId),
+    db.prepare("DELETE FROM staged_document_blocks WHERE stage_id = ?").bind(stageId),
+    db.prepare("DELETE FROM staged_entities WHERE stage_id = ?").bind(stageId),
+    db.prepare("DELETE FROM staged_ingestion_jobs WHERE stage_id = ?").bind(stageId),
+    db.prepare("DELETE FROM staged_documents WHERE stage_id = ?").bind(stageId),
+    db.prepare("DELETE FROM staged_github_document_targets WHERE stage_id = ?").bind(stageId),
+  ]);
+
+  try {
+    await cleanupStage();
+    for (const batch of chunkD1Statements(stageStatements)) await db.batch(batch);
+    const commit: D1PreparedStatement[] = [
+      db.prepare(`INSERT INTO entities (id, label, short_label, kind, domain, summary, insight, tags_json, updated_at)
+        SELECT id, label, short_label, kind, domain, summary, insight, tags_json, updated_at FROM staged_entities WHERE stage_id = ?
+        ON CONFLICT(id) DO UPDATE SET label=excluded.label, short_label=excluded.short_label, kind=excluded.kind, domain=excluded.domain, summary=excluded.summary, insight=excluded.insight, tags_json=excluded.tags_json, updated_at=excluded.updated_at`).bind(stageId),
+    ];
+    const affectedDocumentIds = `SELECT id FROM documents
+      WHERE source_type = 'github' AND repository_id = ? AND (
+        source_key NOT IN (SELECT source_key FROM staged_github_document_targets WHERE stage_id = ?)
+        OR source_key IN (SELECT source_key FROM staged_github_document_targets WHERE stage_id = ? AND mode = 'prepared')
+      )`;
+    commit.push(
+      db.prepare(`DELETE FROM relations WHERE document_id IN (${affectedDocumentIds})`).bind(input.repositoryId, stageId, stageId),
+      db.prepare(`DELETE FROM entity_mentions WHERE document_id IN (${affectedDocumentIds})`).bind(input.repositoryId, stageId, stageId),
+      db.prepare(`DELETE FROM document_blocks WHERE document_id IN (${affectedDocumentIds})`).bind(input.repositoryId, stageId, stageId),
+      db.prepare(`DELETE FROM ingestion_jobs WHERE document_id IN (${affectedDocumentIds})`).bind(input.repositoryId, stageId, stageId),
+      db.prepare(`DELETE FROM enrichment_jobs WHERE document_id IN (${affectedDocumentIds})`).bind(input.repositoryId, stageId, stageId),
+      db.prepare(`DELETE FROM documents WHERE id IN (${affectedDocumentIds})`).bind(input.repositoryId, stageId, stageId),
+    );
+    commit.push(
+      db.prepare("INSERT INTO document_blocks (id, document_id, type, depth, text, ordinal, source_url) SELECT id, document_id, type, depth, text, ordinal, source_url FROM staged_document_blocks WHERE stage_id = ?").bind(stageId),
+      db.prepare("INSERT INTO entity_mentions (id, document_id, entity_id, block_id, source_url, origin) SELECT id, document_id, entity_id, block_id, source_url, origin FROM staged_entity_mentions WHERE stage_id = ?").bind(stageId),
+      db.prepare("INSERT INTO relations (id, document_id, source_id, target_id, type, confidence, note, origin, provider, provider_version, prompt_version, evidence_json, created_at) SELECT id, document_id, source_id, target_id, type, confidence, note, origin, provider, provider_version, prompt_version, evidence_json, created_at FROM staged_relations WHERE stage_id = ?").bind(stageId),
+      db.prepare(`INSERT INTO documents (
+        id, file_name, normalized_name, source, source_type, source_key,
+        repository_id, repository_owner, repository_name, relative_path, source_ref,
+        commit_sha, blob_sha, source_url, last_seen_sync_id,
+        size, hash, status, node_count, edge_count, parser_version, error, created_at, updated_at
+      ) SELECT id, file_name, normalized_name, source, source_type, source_key,
+        repository_id, repository_owner, repository_name, relative_path, source_ref,
+        commit_sha, blob_sha, source_url, last_seen_sync_id,
+        size, hash, status, node_count, edge_count, parser_version, error, created_at, updated_at
+        FROM staged_documents WHERE stage_id = ?`).bind(stageId),
+      db.prepare(`INSERT INTO ingestion_jobs
+        (id, document_id, file_name, status, progress, message, created_at, completed_at)
+        SELECT id, document_id, file_name, status, progress, message, created_at, completed_at
+        FROM staged_ingestion_jobs WHERE stage_id = ?`).bind(stageId),
+      db.prepare(`UPDATE documents SET
+        (repository_owner, repository_name, relative_path, source_ref, commit_sha, blob_sha, source_url, last_seen_sync_id) = (
+          SELECT repository_owner, repository_name, relative_path, source_ref, commit_sha, blob_sha, source_url, ?
+          FROM staged_github_document_targets target
+          WHERE target.stage_id = ? AND target.source_key = documents.source_key
+        )
+        WHERE source_type = 'github' AND repository_id = ? AND source_key IN (
+          SELECT source_key FROM staged_github_document_targets WHERE stage_id = ? AND mode = 'unchanged'
+        )`).bind(input.syncId, stageId, input.repositoryId, stageId),
+    );
+    commit.push(
+      db.prepare(`INSERT OR REPLACE INTO github_sync_runs (
+        id, kind, status, manifest_digest, discovered_count, selected_count,
+        changed_count, unchanged_count, deleted_count, failed_count, receipt_json,
+        created_at, updated_at, started_at, completed_at
+      ) VALUES (?, 'apply', 'completed', ?, 1, 1, ?, ?, ?, 0, ?, ?, ?, ?, ?)`)
+        .bind(
+          input.syncId,
+          receipt.manifestDigest,
+          receipt.createdCount + receipt.updatedCount,
+          receipt.unchangedCount,
+          receipt.deletedCount,
+          JSON.stringify(receipt),
+          receipt.appliedAt,
+          receipt.appliedAt,
+          receipt.appliedAt,
+          receipt.appliedAt,
+        ),
+      db.prepare("DELETE FROM staged_relations WHERE stage_id = ?").bind(stageId),
+      db.prepare("DELETE FROM staged_entity_mentions WHERE stage_id = ?").bind(stageId),
+      db.prepare("DELETE FROM staged_document_blocks WHERE stage_id = ?").bind(stageId),
+      db.prepare("DELETE FROM staged_entities WHERE stage_id = ?").bind(stageId),
+      db.prepare("DELETE FROM staged_ingestion_jobs WHERE stage_id = ?").bind(stageId),
+      db.prepare("DELETE FROM staged_documents WHERE stage_id = ?").bind(stageId),
+      db.prepare("DELETE FROM staged_github_document_targets WHERE stage_id = ?").bind(stageId),
+      db.prepare("DELETE FROM entities WHERE id NOT IN (SELECT DISTINCT entity_id FROM entity_mentions)"),
+    );
+    assertD1AtomicBatchLimit(commit, "GitHub 저장소 Graph commit");
+    await db.batch(commit);
+  } catch (error) {
+    await cleanupStage().catch(() => undefined);
+    throw error;
+  }
+  return receipt;
 }
 
 export async function saveUnchangedJob(job: IngestionJob) {
@@ -305,7 +1081,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   let documents: DocumentRecord[];
   let jobs: IngestionJob[];
   if (!db) {
-    documents = [...memoryStore().documents.values()];
+    documents = [...memoryStore().documents.values()].map(toPublicDocumentRecord);
     jobs = [...memoryStore().jobs.values()];
   } else {
     await ensureSchema(db);
@@ -313,13 +1089,14 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       db.prepare("SELECT * FROM documents ORDER BY updated_at DESC").all<Record<string, unknown>>(),
       db.prepare("SELECT * FROM ingestion_jobs ORDER BY created_at DESC LIMIT 20").all<Record<string, unknown>>(),
     ]);
-    documents = documentResult.results.map(asDocument);
+    documents = documentResult.results.map(asStoredDocument).map(toPublicDocumentRecord);
     jobs = jobResult.results.map(asJob);
   }
   const enrichmentRepository = await getEnrichmentJobRepository();
-  const [enrichmentRecords, heartbeats] = await Promise.all([
-    enrichmentRepository.list(),
+  const [enrichmentRecords, heartbeats, enrichmentCounts] = await Promise.all([
+    enrichmentRepository.list(undefined, 50),
     enrichmentRepository.listConnectorHeartbeats(),
+    enrichmentRepository.statusCounts(),
   ]);
   const recentJobs = [...jobs].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 20);
   const enrichmentJobs: DashboardEnrichmentJob[] = enrichmentRecords
@@ -335,6 +1112,9 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       maxManualRetries: 2,
       providerVersion: job.providerVersion,
       promptVersion: job.promptVersion,
+      ontologyVersion: job.input.ontologyVersion,
+      chunkIndex: job.input.chunk ? job.input.chunk.index + 1 : undefined,
+      chunkCount: job.input.chunk?.count,
       relationCount: job.result?.relations.length ?? 0,
       warningCount: job.result?.warnings.length ?? 0,
       inputTokens: job.result?.usage?.inputTokens,
@@ -350,8 +1130,8 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     heartbeat.status === "online" && now - Date.parse(heartbeat.lastSeenAt) <= 45_000,
   );
   const latestHeartbeat = heartbeats[0];
-  const queuedJobs = enrichmentRecords.filter((job) => job.status === "queued").length;
-  const activeJobs = enrichmentRecords.filter((job) => job.status === "leased" || job.status === "running").length;
+  const queuedJobs = enrichmentCounts.queued;
+  const activeJobs = enrichmentCounts.leased + enrichmentCounts.running;
   return {
     documents: [...documents].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     jobs: recentJobs,
@@ -363,6 +1143,14 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       activeJobs,
       lastSeenAt: latestHeartbeat?.lastSeenAt,
       currentJobId: onlineHeartbeats.find((heartbeat) => heartbeat.currentJobId)?.currentJobId,
+      runMode: latestHeartbeat?.runMode,
+      maxJobs: latestHeartbeat?.maxJobs,
+      maxRuntimeMs: latestHeartbeat?.maxRuntimeMs,
+      processedJobs: latestHeartbeat?.processedJobs,
+      succeededJobs: latestHeartbeat?.succeededJobs,
+      warningJobs: latestHeartbeat?.warningJobs,
+      failedJobs: latestHeartbeat?.failedJobs,
+      stopReason: latestHeartbeat?.stopReason,
     },
     totals: {
       documents: documents.length,
@@ -372,10 +1160,95 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       failed: documents.filter((document) => document.status === "failed").length,
       enrichmentQueued: queuedJobs,
       enrichmentActive: activeJobs,
-      enrichmentWarnings: enrichmentRecords.filter((job) => job.status === "warning" || job.status === "failed").length,
+      enrichmentWarnings: enrichmentCounts.warning + enrichmentCounts.failed,
     },
     storage: db ? "d1" : "memory",
   };
+}
+
+export async function getGitHubRepositoryStorageSummaries(): Promise<GitHubRepositoryStorageSummary[]> {
+  const summaries = new Map<string, GitHubRepositoryStorageSummary>();
+  const applyReceipt = (receipt: GitHubApplyReceipt) => {
+    const current = summaries.get(receipt.repositoryId);
+    if (current && current.lastSyncedAt > receipt.appliedAt) return;
+    summaries.set(receipt.repositoryId, {
+      repositoryId: receipt.repositoryId,
+      repositoryOwner: current?.repositoryOwner ?? "coreline-ai",
+      repositoryName: receipt.repositoryName,
+      documentCount: receipt.fileCount,
+      nodeCount: receipt.nodeCount,
+      edgeCount: receipt.edgeCount,
+      commitSha: receipt.commitSha,
+      manifestDigest: receipt.manifestDigest,
+      lastSyncedAt: receipt.appliedAt,
+    });
+  };
+
+  const db = await database();
+  if (!db) {
+    for (const document of memoryStore().documents.values()) {
+      if (document.sourceDescriptor.type !== "github") continue;
+      const source = document.sourceDescriptor;
+      const current = summaries.get(source.repositoryId);
+      summaries.set(source.repositoryId, {
+        repositoryId: source.repositoryId,
+        repositoryOwner: source.repositoryOwner,
+        repositoryName: source.repositoryName,
+        documentCount: (current?.documentCount ?? 0) + 1,
+        nodeCount: (current?.nodeCount ?? 0) + document.nodeCount,
+        edgeCount: (current?.edgeCount ?? 0) + document.edgeCount,
+        commitSha: document.updatedAt >= (current?.lastSyncedAt ?? "")
+          ? source.commitSha
+          : current?.commitSha,
+        lastSyncedAt: current && current.lastSyncedAt > document.updatedAt
+          ? current.lastSyncedAt
+          : document.updatedAt,
+      });
+    }
+    for (const receipt of memoryStore().githubApplyReceipts.values()) applyReceipt(receipt);
+  } else {
+    await ensureSchema(db);
+    const [documentResult, receiptResult] = await Promise.all([
+      db.prepare(`SELECT repository_id, repository_owner, repository_name, commit_sha,
+        node_count, edge_count, updated_at FROM documents
+        WHERE source_type = 'github' AND repository_id IS NOT NULL
+        ORDER BY repository_id, updated_at`).all<Record<string, unknown>>(),
+      db.prepare(`SELECT receipt_json FROM github_sync_runs
+        WHERE kind = 'apply' AND status = 'completed' AND receipt_json IS NOT NULL
+        ORDER BY completed_at`).all<Record<string, unknown>>(),
+    ]);
+    for (const row of documentResult.results) {
+      const repositoryId = String(row.repository_id);
+      const updatedAt = String(row.updated_at);
+      const current = summaries.get(repositoryId);
+      summaries.set(repositoryId, {
+        repositoryId,
+        repositoryOwner: String(row.repository_owner ?? current?.repositoryOwner ?? "coreline-ai"),
+        repositoryName: String(row.repository_name ?? current?.repositoryName ?? repositoryId),
+        documentCount: (current?.documentCount ?? 0) + 1,
+        nodeCount: (current?.nodeCount ?? 0) + Number(row.node_count ?? 0),
+        edgeCount: (current?.edgeCount ?? 0) + Number(row.edge_count ?? 0),
+        commitSha: updatedAt >= (current?.lastSyncedAt ?? "")
+          ? String(row.commit_sha ?? "") || undefined
+          : current?.commitSha,
+        lastSyncedAt: current && current.lastSyncedAt > updatedAt
+          ? current.lastSyncedAt
+          : updatedAt,
+      });
+    }
+    for (const row of receiptResult.results) {
+      try {
+        applyReceipt(parseGitHubApplyReceipt(JSON.parse(String(row.receipt_json))));
+      } catch {
+        // 손상된 과거 영수증 하나가 나머지 저장소 상태 조회를 막지 않게 격리한다.
+      }
+    }
+  }
+
+  return [...summaries.values()].sort((left, right) =>
+    right.lastSyncedAt.localeCompare(left.lastSyncedAt)
+    || left.repositoryName.localeCompare(right.repositoryName)
+    || left.repositoryId.localeCompare(right.repositoryId));
 }
 
 export async function getGraphSnapshot(): Promise<GraphSnapshot> {
@@ -399,7 +1272,7 @@ export async function getGraphSnapshot(): Promise<GraphSnapshot> {
     const [documentResult, nodeResult, edgeResult] = await Promise.all([
       db.prepare("SELECT COUNT(*) AS count FROM documents WHERE status IN ('completed', 'unchanged')").first<{ count: number }>(),
       db.prepare("SELECT DISTINCT e.* FROM entities e INNER JOIN entity_mentions m ON m.entity_id = e.id").all<Record<string, unknown>>(),
-      db.prepare("SELECT DISTINCT source_id, target_id, type, confidence, note, evidence_json FROM relations").all<Record<string, unknown>>(),
+      db.prepare("SELECT DISTINCT source_id, target_id, type, confidence, note, evidence_json, origin, provider FROM relations").all<Record<string, unknown>>(),
     ]);
     documentCount = Number(documentResult?.count ?? 0);
     nodes = nodeResult.results.map((row) => ({
@@ -419,6 +1292,13 @@ export async function getGraphSnapshot(): Promise<GraphSnapshot> {
       confidence: Number(row.confidence),
       note: String(row.note),
       evidence: asRelationEvidence(row.evidence_json),
+      layer: row.origin === "codex"
+        ? "inferred"
+        : ["documents", "plans", "contains"].includes(String(row.type))
+          ? "structural"
+          : "explicit",
+      origin: row.origin === "codex" ? "codex" : "rule",
+      provider: row.provider ? String(row.provider) : undefined,
     }));
   }
 
@@ -448,6 +1328,416 @@ export async function getGraphSnapshot(): Promise<GraphSnapshot> {
   };
 }
 
+const knowledgeNodeFromRow = (row: Record<string, unknown>): KnowledgeNode => ({
+  id: String(row.id),
+  label: String(row.label),
+  shortLabel: String(row.short_label),
+  kind: String(row.kind) as KnowledgeNode["kind"],
+  domain: String(row.domain) as KnowledgeNode["domain"],
+  summary: String(row.summary),
+  insight: String(row.insight),
+  tags: JSON.parse(String(row.tags_json)) as string[],
+});
+
+const knowledgeEdgeFromRow = (row: Record<string, unknown>): KnowledgeEdge => ({
+  source: String(row.source_id),
+  target: String(row.target_id),
+  type: String(row.type) as KnowledgeEdge["type"],
+  confidence: Number(row.confidence),
+  note: String(row.note),
+  evidence: asRelationEvidence(row.evidence_json),
+  layer: row.origin === "codex"
+    ? "inferred"
+    : ["documents", "plans", "contains"].includes(String(row.type))
+      ? "structural"
+      : "explicit",
+  origin: row.origin === "codex" ? "codex" : "rule",
+  provider: row.provider ? String(row.provider) : undefined,
+});
+
+const graphQueryLikePattern = (term: string) =>
+  `%${term.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+
+const graphQueryClause = (terms: readonly string[], columns: readonly string[]) => ({
+  sql: terms.map(() => `(${columns.map((column) => `LOWER(${column}) LIKE ? ESCAPE '\\'`).join(" OR ")})`).join(" OR "),
+  bindings: terms.flatMap((term) => columns.map(() => graphQueryLikePattern(term))),
+});
+
+const graphFtsQuery = (terms: readonly string[]) => terms
+  .map((term) => `"${term.replace(/"/g, '""')}"*`)
+  .join(" OR ");
+
+const safeGraphCitationUrl = (value: unknown) => {
+  if (typeof value !== "string" || !value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname.toLowerCase() === "github.com"
+      ? value
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const graphCitationFromRows = (
+  rows: readonly Record<string, unknown>[],
+  endpointIds = new Map<string, Set<string>>(),
+) => {
+  const citations = new Map<string, GraphRetrievalCitation>();
+  for (const row of rows) {
+    const id = String(row.block_id ?? "");
+    if (!id) continue;
+    const existing = citations.get(id);
+    const nodeIds = new Set(existing?.nodeIds ?? endpointIds.get(id) ?? []);
+    if (row.entity_id) nodeIds.add(String(row.entity_id));
+    citations.set(id, {
+      id,
+      documentId: row.document_id ? String(row.document_id) : undefined,
+      fileName: row.file_name ? String(row.file_name) : undefined,
+      repositoryOwner: row.repository_owner ? String(row.repository_owner) : undefined,
+      repositoryName: row.repository_name ? String(row.repository_name) : undefined,
+      relativePath: row.relative_path ? String(row.relative_path) : undefined,
+      text: String(row.block_text ?? row.explanation ?? "문서 근거").slice(0, 800),
+      sourceUrl: safeGraphCitationUrl(row.source_url),
+      nodeIds: [...nodeIds].sort(),
+    });
+  }
+  return [...citations.values()].sort((left, right) => left.id.localeCompare(right.id));
+};
+
+const graphRelationQuery = async (db: D1Database, nodeIds: readonly string[], limit: number) => {
+  if (!nodeIds.length) return [] as KnowledgeEdge[];
+  const placeholders = nodeIds.map(() => "?").join(",");
+  const result = await db.prepare(`SELECT DISTINCT source_id, target_id, type, confidence, note,
+      evidence_json, origin, provider
+    FROM relations
+    WHERE source_id IN (${placeholders}) OR target_id IN (${placeholders})
+    ORDER BY confidence DESC, source_id, target_id, type
+    LIMIT ?`)
+    .bind(...nodeIds, ...nodeIds, limit)
+    .all<Record<string, unknown>>();
+  return result.results.map(knowledgeEdgeFromRow);
+};
+
+const loadGraphNodesById = async (db: D1Database, nodeIds: readonly string[]) => {
+  const uniqueIds = [...new Set(nodeIds)];
+  const rows: Record<string, unknown>[] = [];
+  for (let index = 0; index < uniqueIds.length; index += 80) {
+    const chunk = uniqueIds.slice(index, index + 80);
+    const result = await db.prepare(`SELECT * FROM entities WHERE id IN (${chunk.map(() => "?").join(",")})`)
+      .bind(...chunk)
+      .all<Record<string, unknown>>();
+    rows.push(...result.results);
+  }
+  return rows.map(knowledgeNodeFromRow);
+};
+
+/**
+ * Builds a bounded retrieval slice instead of materializing the 90k-node
+ * corpus. SQL values remain bound parameters and LIKE wildcard characters are
+ * escaped before the graph neighborhood is expanded to at most two hops.
+ */
+export async function getGraphRetrievalSource(
+  query: NormalizedGraphQuestion,
+): Promise<GraphRetrievalSource> {
+  const db = await database();
+  if (!db) {
+    const snapshot = await getGraphSnapshot();
+    const citationRows = snapshot.edges.flatMap((edge) => (edge.evidence ?? []).map((evidence) => ({
+      block_id: evidence.blockId,
+      explanation: evidence.explanation,
+      source_url: evidence.sourceUrl,
+      entity_id: edge.source,
+    })).concat((edge.evidence ?? []).map((evidence) => ({
+      block_id: evidence.blockId,
+      explanation: evidence.explanation,
+      source_url: evidence.sourceUrl,
+      entity_id: edge.target,
+    }))));
+    return {
+      nodes: snapshot.nodes,
+      edges: snapshot.edges,
+      citations: graphCitationFromRows(citationRows),
+    };
+  }
+
+  await ensureSchema(db);
+  const graphFtsAvailable = await ensureGraphSearchSchema(db);
+  const entityMatch = graphQueryClause(query.terms, [
+    "entity.label",
+    "entity.short_label",
+    "entity.summary",
+    "entity.insight",
+    "entity.tags_json",
+  ]);
+  const blockMatch = graphQueryClause(query.terms, ["block.text"]);
+  const ftsQuery = graphFtsQuery(query.terms);
+  const [entityResult, blockResult] = await Promise.all([
+    graphFtsAvailable
+      ? db.prepare(`WITH matches AS (
+          SELECT entity_id, bm25(graph_entity_fts) AS search_rank
+          FROM graph_entity_fts
+          WHERE graph_entity_fts MATCH ?
+          ORDER BY search_rank, entity_id
+          LIMIT 80
+        )
+        SELECT entity.*, matches.search_rank
+        FROM matches INNER JOIN entities entity ON entity.id = matches.entity_id
+        ORDER BY matches.search_rank, entity.id`).bind(ftsQuery).all<Record<string, unknown>>()
+      : db.prepare(`SELECT entity.* FROM entities entity
+          WHERE ${entityMatch.sql}
+          ORDER BY entity.id
+          LIMIT 80`).bind(...entityMatch.bindings).all<Record<string, unknown>>(),
+    graphFtsAvailable
+      ? db.prepare(`WITH matches AS (
+          SELECT block_id, bm25(graph_block_fts) AS search_rank
+          FROM graph_block_fts
+          WHERE graph_block_fts MATCH ?
+          ORDER BY search_rank, block_id
+          LIMIT 48
+        )
+        SELECT block.id AS block_id, block.document_id, block.text AS block_text,
+          COALESCE(mention.source_url, block.source_url, document.source_url) AS source_url,
+          mention.entity_id, document.file_name, document.repository_owner,
+          document.repository_name, document.relative_path, matches.search_rank
+        FROM matches
+        INNER JOIN document_blocks block ON block.id = matches.block_id
+        INNER JOIN documents document ON document.id = block.document_id
+        LEFT JOIN entity_mentions mention ON mention.block_id = block.id
+        WHERE document.status IN ('completed', 'unchanged')
+        ORDER BY matches.search_rank, block.document_id, block.ordinal, mention.entity_id
+        LIMIT 120`).bind(ftsQuery).all<Record<string, unknown>>()
+      : db.prepare(`SELECT block.id AS block_id, block.document_id, block.text AS block_text,
+          COALESCE(mention.source_url, block.source_url, document.source_url) AS source_url,
+          mention.entity_id, document.file_name, document.repository_owner,
+          document.repository_name, document.relative_path
+        FROM document_blocks block
+        INNER JOIN documents document ON document.id = block.document_id
+        LEFT JOIN entity_mentions mention ON mention.block_id = block.id
+        WHERE document.status IN ('completed', 'unchanged') AND (${blockMatch.sql})
+        ORDER BY block.document_id, block.ordinal, mention.entity_id
+        LIMIT 120`).bind(...blockMatch.bindings).all<Record<string, unknown>>(),
+  ]);
+
+  const candidateNodes = entityResult.results.map(knowledgeNodeFromRow);
+  const matchingCitations = graphCitationFromRows(blockResult.results);
+  const blockNodeIds = matchingCitations.flatMap((citation) => citation.nodeIds);
+  const missingBlockNodes = await loadGraphNodesById(
+    db,
+    blockNodeIds.filter((id) => !candidateNodes.some((node) => node.id === id)),
+  );
+  const initialNodes = [...new Map([...candidateNodes, ...missingBlockNodes].map((node) => [node.id, node])).values()];
+  const lexicalSeeds = initialNodes
+    .map((node) => ({ node, score: graphNodeLexicalMatch(node, query).score }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score || left.node.id.localeCompare(right.node.id))
+    .slice(0, 18)
+    .map((item) => item.node.id);
+  const seedIds = [...new Set([...lexicalSeeds, ...blockNodeIds])].slice(0, 24);
+  if (!seedIds.length) return { nodes: initialNodes, edges: [], citations: matchingCitations };
+
+  const firstHopEdges = await graphRelationQuery(db, seedIds, 240);
+  const firstHopIds = [...new Set(firstHopEdges.flatMap((edge) => [edge.source, edge.target]))]
+    .filter((id) => !seedIds.includes(id))
+    .slice(0, 48);
+  const secondHopEdges = await graphRelationQuery(db, firstHopIds, 320);
+  const secondHopIds = [...new Set(secondHopEdges.flatMap((edge) => [edge.source, edge.target]))]
+    .filter((id) => !seedIds.includes(id) && !firstHopIds.includes(id))
+    .slice(0, 72);
+  const allowedIds = new Set([...seedIds, ...firstHopIds, ...secondHopIds]);
+  const edgeMap = new Map<string, KnowledgeEdge>();
+  for (const edge of [...firstHopEdges, ...secondHopEdges]) {
+    if (!allowedIds.has(edge.source) || !allowedIds.has(edge.target)) continue;
+    edgeMap.set(`${edge.source}|${edge.target}|${edge.type}`, edge);
+  }
+  const edges = [...edgeMap.values()];
+  const nodes = await loadGraphNodesById(db, [...allowedIds]);
+
+  const relationEvidenceNodes = new Map<string, Set<string>>();
+  for (const edge of edges) {
+    for (const evidence of edge.evidence ?? []) {
+      const nodeIds = relationEvidenceNodes.get(evidence.blockId) ?? new Set<string>();
+      nodeIds.add(edge.source);
+      nodeIds.add(edge.target);
+      relationEvidenceNodes.set(evidence.blockId, nodeIds);
+    }
+  }
+  const knownCitationIds = new Set(matchingCitations.map((citation) => citation.id));
+  const evidenceBlockIds = [...relationEvidenceNodes.keys()]
+    .filter((id) => !knownCitationIds.has(id))
+    .slice(0, 80);
+  const evidenceRows: Record<string, unknown>[] = [];
+  for (let index = 0; index < evidenceBlockIds.length; index += 60) {
+    const chunk = evidenceBlockIds.slice(index, index + 60);
+    const result = await db.prepare(`SELECT block.id AS block_id, block.document_id,
+        block.text AS block_text, COALESCE(mention.source_url, block.source_url, document.source_url) AS source_url,
+        mention.entity_id, document.file_name, document.repository_owner,
+        document.repository_name, document.relative_path
+      FROM document_blocks block
+      INNER JOIN documents document ON document.id = block.document_id
+      LEFT JOIN entity_mentions mention ON mention.block_id = block.id
+      WHERE block.id IN (${chunk.map(() => "?").join(",")})
+      ORDER BY block.id, mention.entity_id`).bind(...chunk).all<Record<string, unknown>>();
+    evidenceRows.push(...result.results);
+  }
+  const evidenceCitations = graphCitationFromRows(evidenceRows, relationEvidenceNodes);
+  return {
+    nodes,
+    edges,
+    citations: [...matchingCitations, ...evidenceCitations]
+      .filter((citation, index, all) => all.findIndex((item) => item.id === citation.id) === index),
+  };
+}
+
+/**
+ * Loads only the graph slice required by the public projection. The previous
+ * implementation loaded the complete corpus for every overview/repository
+ * request, making the 853-document corpus pay the 90k-node cost before it was
+ * reduced to at most 500 nodes.
+ */
+export async function getGraphSnapshotForScope(input: {
+  scope: "corpus" | "overview" | "repository";
+  repositoryId?: string;
+}): Promise<GraphSnapshot> {
+  const db = await database();
+  if (!db) return getGraphSnapshot();
+  await ensureSchema(db);
+  const [documentResult, corpusNodeResult, corpusEdgeResult, repositoryCountResult] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) AS count, COALESCE(MAX(updated_at), '') AS version
+      FROM documents WHERE status IN ('completed', 'unchanged')`)
+      .first<{ count: number; version: string }>(),
+    db.prepare(`SELECT COUNT(*) AS count, COALESCE(MAX(rowid), 0) AS version
+      FROM entities`).first<{ count: number; version: number }>(),
+    db.prepare(`SELECT COUNT(*) AS count, COALESCE(MAX(rowid), 0) AS version
+      FROM relations`).first<{ count: number; version: number }>(),
+    db.prepare("SELECT COUNT(*) AS count FROM entities WHERE id LIKE 'repository:github:%'")
+      .first<{ count: number }>(),
+  ]);
+  const snapshotFromResults = (
+    nodeResult: D1Result<Record<string, unknown>>,
+    edgeResult: D1Result<Record<string, unknown>>,
+  ): GraphSnapshot => {
+    const nodes = nodeResult.results.map(knowledgeNodeFromRow);
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    return {
+      nodes,
+      edges: edgeResult.results.map(knowledgeEdgeFromRow)
+        .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)),
+      meta: {
+        source: "documents",
+        provider: "markdown-ast",
+        generatedAt: new Date().toISOString(),
+        documentCount: Number(documentResult?.count ?? 0),
+        repositoryCount: Number(repositoryCountResult?.count ?? 0),
+        corpusNodeCount: Number(corpusNodeResult?.count ?? 0),
+        corpusEdgeCount: Number(corpusEdgeResult?.count ?? 0),
+      },
+    };
+  };
+
+  if (input.scope === "corpus") {
+    const fingerprint = [
+      documentResult?.count ?? 0,
+      documentResult?.version ?? "",
+      corpusNodeResult?.count ?? 0,
+      corpusNodeResult?.version ?? 0,
+      corpusEdgeResult?.count ?? 0,
+      corpusEdgeResult?.version ?? 0,
+      repositoryCountResult?.count ?? 0,
+    ].join(":");
+    const corpusSelectionCte = `WITH degree AS (
+      SELECT id, COUNT(*) AS degree FROM (
+        SELECT source_id AS id FROM relations
+        UNION ALL
+        SELECT target_id AS id FROM relations
+      ) GROUP BY id
+    ), repositories AS (
+      SELECT entity.id FROM entities entity
+      LEFT JOIN degree ON degree.id = entity.id
+      WHERE entity.id LIKE 'repository:github:%'
+      ORDER BY COALESCE(degree.degree, 0) DESC, entity.id
+      LIMIT 24
+    ), anchors AS (
+      SELECT degree.id FROM degree
+      WHERE degree.id NOT IN (SELECT id FROM repositories)
+        AND degree.id NOT LIKE 'repository:github:%'
+      ORDER BY degree.degree DESC, degree.id
+      LIMIT 40
+    ), seeds AS (
+      SELECT id FROM repositories
+      UNION
+      SELECT id FROM anchors
+    ), candidates AS (
+      SELECT id FROM seeds
+      UNION
+      SELECT relation.source_id FROM relations relation
+      WHERE relation.target_id IN (SELECT id FROM seeds)
+      UNION
+      SELECT relation.target_id FROM relations relation
+      WHERE relation.source_id IN (SELECT id FROM seeds)
+    )`;
+    return corpusSnapshotCacheFor(db).get(fingerprint, async () => {
+      const [nodeResult, edgeResult] = await Promise.all([
+        db.prepare(`${corpusSelectionCte}
+          SELECT entity.* FROM entities entity
+          INNER JOIN candidates ON candidates.id = entity.id
+          ORDER BY entity.id`).all<Record<string, unknown>>(),
+        db.prepare(`${corpusSelectionCte}
+          SELECT DISTINCT relation.source_id, relation.target_id, relation.type,
+            relation.confidence, relation.note, relation.evidence_json, relation.origin, relation.provider
+          FROM relations relation
+          INNER JOIN candidates source ON source.id = relation.source_id
+          INNER JOIN candidates target ON target.id = relation.target_id
+          ORDER BY relation.confidence DESC, relation.source_id, relation.target_id, relation.type
+          LIMIT 12000`).all<Record<string, unknown>>(),
+      ]);
+      return snapshotFromResults(nodeResult, edgeResult);
+    });
+  }
+
+  let nodeResult: D1Result<Record<string, unknown>>;
+  let edgeResult: D1Result<Record<string, unknown>>;
+  if (input.scope === "overview") {
+    const eligibleNode = `(id LIKE 'repository:github:%'
+      OR (tags_json LIKE '%"technology"%' AND tags_json LIKE '%"shared"%'))`;
+    nodeResult = await db.prepare(`SELECT * FROM entities WHERE ${eligibleNode} ORDER BY id`)
+      .all<Record<string, unknown>>();
+    edgeResult = await db.prepare(`SELECT DISTINCT r.source_id, r.target_id, r.type,
+        r.confidence, r.note, r.evidence_json, r.origin, r.provider
+      FROM relations r
+      INNER JOIN entities source ON source.id = r.source_id
+      INNER JOIN entities target ON target.id = r.target_id
+      WHERE (source.id LIKE 'repository:github:%'
+          OR (source.tags_json LIKE '%"technology"%' AND source.tags_json LIKE '%"shared"%'))
+        AND (target.id LIKE 'repository:github:%'
+          OR (target.tags_json LIKE '%"technology"%' AND target.tags_json LIKE '%"shared"%'))
+      ORDER BY r.source_id, r.target_id, r.type`).all<Record<string, unknown>>();
+  } else {
+    const repositoryNodeId = `repository:github:${input.repositoryId ?? ""}`;
+    const reachableCte = `WITH RECURSIVE reachable(id) AS (
+      SELECT ?
+      UNION
+      SELECT relation.target_id
+      FROM relations relation
+      INNER JOIN reachable parent ON parent.id = relation.source_id
+      WHERE relation.target_id = ? OR relation.target_id NOT LIKE 'repository:github:%'
+    )`;
+    nodeResult = await db.prepare(`${reachableCte}
+      SELECT entity.* FROM entities entity INNER JOIN reachable ON reachable.id = entity.id
+      ORDER BY entity.id`).bind(repositoryNodeId, repositoryNodeId).all<Record<string, unknown>>();
+    edgeResult = await db.prepare(`${reachableCte}
+      SELECT DISTINCT relation.source_id, relation.target_id, relation.type,
+        relation.confidence, relation.note, relation.evidence_json, relation.origin, relation.provider
+      FROM relations relation
+      INNER JOIN reachable source ON source.id = relation.source_id
+      INNER JOIN reachable target ON target.id = relation.target_id
+      ORDER BY relation.source_id, relation.target_id, relation.type`)
+      .bind(repositoryNodeId, repositoryNodeId).all<Record<string, unknown>>();
+  }
+
+  return snapshotFromResults(nodeResult, edgeResult);
+}
+
 export async function mergeMemoryEnrichmentResult(
   documentId: string,
   result: EnrichmentResult,
@@ -463,7 +1753,24 @@ export async function mergeMemoryEnrichmentResult(
   const addedKeys: string[] = [];
   result.relations.forEach((relation) => {
     const key = `${relation.source}|${relation.target}|${relation.type}`;
-    if (keys.has(key)) return;
+    if (keys.has(key)) {
+      const existing = document.graph.edges.find((edge) =>
+        edge.source === relation.source
+        && edge.target === relation.target
+        && edge.type === relation.type);
+      if (existing) {
+        existing.confidence = Math.max(existing.confidence, relation.confidence);
+        if (relation.note.length > existing.note.length) existing.note = relation.note;
+        const evidence = [...(existing.evidence ?? []), ...relation.evidence];
+        existing.evidence = [...new Map(evidence.map((item) => [
+          `${item.blockId}\u0000${item.explanation}`,
+          item,
+        ] as const)).values()].sort((left, right) =>
+          left.blockId.localeCompare(right.blockId)
+          || left.explanation.localeCompare(right.explanation));
+      }
+      return;
+    }
     keys.add(key);
     document.graph.edges.push({
       source: relation.source,
@@ -472,6 +1779,9 @@ export async function mergeMemoryEnrichmentResult(
       confidence: relation.confidence,
       note: relation.note,
       evidence: relation.evidence,
+      layer: "inferred",
+      origin: "codex",
+      provider: result.provider,
     });
     addedKeys.push(key);
     added += 1;

@@ -76,7 +76,7 @@ test("500-node and 2,000-edge fixture is deterministic and layouts stay within C
 });
 
 test("Markdown validation enforces the 2MB boundary without allocating a multipart payload", async () => {
-  const { MAX_MARKDOWN_FILE_SIZE, validateDecodedMarkdown } = await importTypeScript(
+  const { MAX_MARKDOWN_FILE_SIZE, decodeMarkdownBytes, validateDecodedMarkdown } = await importTypeScript(
     "../app/lib/markdown/validate-markdown.ts",
   );
   assert.throws(
@@ -85,6 +85,14 @@ test("Markdown validation enforces the 2MB boundary without allocating a multipa
   );
   assert.doesNotThrow(() =>
     validateDecodedMarkdown("within-limit.md", "# valid", MAX_MARKDOWN_FILE_SIZE),
+  );
+  assert.equal(
+    decodeMarkdownBytes("literal-replacement.md", new TextEncoder().encode("# valid � fixture").buffer),
+    "# valid � fixture",
+  );
+  assert.throws(
+    () => decodeMarkdownBytes("invalid-utf8.md", Uint8Array.from([0x23, 0x20, 0xc3, 0x28]).buffer),
+    /UTF-8/,
   );
 });
 
@@ -347,4 +355,19 @@ test("dust, nebula, and photons share one circular soft-glow texture", async () 
   assert.equal(source.match(/alphaTest: 0\.012/g)?.length, 3);
   assert.match(source, /gradient\.addColorStop\(1, "rgba\(255, 255, 255, 0\)"\)/);
   assert.match(source, /particleGlowTexture\.dispose\(\)/);
+});
+
+test("initial graph loading is Strict Mode safe and the relation shader enables vertex colors", async () => {
+  const source = await readFile(
+    new URL("../app/knowledge-graph.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /dataSourceInitializedRef/);
+  assert.match(source, />\s*다시 시도\s*</);
+  const materialStart = source.indexOf("const edgeMaterial = new THREE.ShaderMaterial");
+  const materialEnd = source.indexOf("const edgeLines =", materialStart);
+  assert.ok(materialStart > 0 && materialEnd > materialStart);
+  const materialSource = source.slice(materialStart, materialEnd);
+  assert.match(materialSource, /vertexColors:\s*true/);
+  assert.match(materialSource, /vColor = color/);
 });

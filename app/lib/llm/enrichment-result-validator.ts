@@ -1,6 +1,7 @@
 import {
   ENRICHMENT_INPUT_LIMITS,
   type CodexEnrichmentOutput,
+  type EnrichmentEntityMentionCandidate,
   type EnrichmentJobRecord,
   type EnrichmentRelationCandidate,
   type EnrichmentResult,
@@ -84,6 +85,9 @@ export function parseCodexEnrichmentOutput(value: unknown): CodexEnrichmentOutpu
     throw new EnrichmentValidationError("Codex 관계 후보 수가 상한을 초과했습니다.");
   }
   return {
+    entityMentions: Array.isArray(row.entityMentions)
+      ? row.entityMentions as EnrichmentEntityMentionCandidate[]
+      : [],
     relations: row.relations as EnrichmentRelationCandidate[],
     warnings: row.warnings.flatMap((warning) => {
       const text = limitedText(warning, 500);
@@ -124,6 +128,38 @@ export function validateEnrichmentResult(
   const existing = new Set(job.input.existingRelations.map(
     (edge) => `${edge.source}|${edge.target}|${edge.type}`,
   ));
+  const nodeIds = new Set(job.input.nodes.map((node) => node.id));
+  const blockIds = new Set(job.input.evidenceBlocks.map((block) => block.id));
+  const entityMentions = new Map<string, EnrichmentEntityMentionCandidate>();
+  if (Array.isArray(row.entityMentions)) {
+    row.entityMentions.forEach((candidate, index) => {
+      const item = object(candidate);
+      const nodeId = limitedText(item?.nodeId, 240);
+      const confidence = Number(item?.confidence);
+      const evidenceRows = Array.isArray(item?.evidence) ? item.evidence : [];
+      const evidence = evidenceRows.flatMap((value) => {
+        const evidenceItem = object(value);
+        const blockId = limitedText(evidenceItem?.blockId, 240);
+        const explanation = limitedText(evidenceItem?.explanation, 500);
+        return blockIds.has(blockId) && explanation ? [{ blockId, explanation }] : [];
+      });
+      if (
+        !nodeIds.has(nodeId)
+        || !Number.isFinite(confidence)
+        || confidence < 0
+        || confidence > 1
+        || evidence.length === 0
+        || evidence.length !== evidenceRows.length
+      ) {
+        warnings.push(`엔티티 mention ${index + 1}: 허용되지 않은 노드·신뢰도·근거라 제외했습니다.`);
+        return;
+      }
+      const current = entityMentions.get(nodeId);
+      if (!current || confidence > current.confidence) {
+        entityMentions.set(nodeId, { nodeId, confidence, evidence });
+      }
+    });
+  }
   const accepted = new Map<string, EnrichmentRelationCandidate>();
   row.relations.forEach((candidate, index) => {
     const parsed = parseRelation(candidate, job, index);
@@ -159,6 +195,8 @@ export function validateEnrichmentResult(
     providerVersion: job.providerVersion,
     promptVersion: job.promptVersion,
     status: finalWarnings.length ? "warning" : row.status,
+    entityMentions: [...entityMentions.values()]
+      .sort((left, right) => left.nodeId.localeCompare(right.nodeId)),
     relations: [...accepted.values()],
     warnings: finalWarnings,
     usage,

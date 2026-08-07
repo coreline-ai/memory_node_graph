@@ -15,8 +15,28 @@
   "include": [
     "./**/*.ts",
     "../app/graph-data.ts",
+    "../app/lib/graph/model.ts",
+    "../app/lib/graph/scope-navigation.ts",
+    "../app/lib/graph/scope-projection.ts",
+    "../app/lib/graph/snapshot-cache.ts",
+    "../app/lib/graph/graph-retrieval.ts",
+    "../app/lib/graph/source-metadata.ts",
+    "../app/lib/dashboard/document-source-filter.ts",
+    "../app/lib/github/capability-guidance.ts",
+    "../app/lib/github/discovery-contracts.ts",
+    "../app/lib/github/dashboard-projection.ts",
+    "../app/lib/github/dashboard-dry-run.ts",
+    "../app/lib/github/apply-contracts.ts",
+    "../app/lib/github/apply-stage-contracts.ts",
+    "../app/lib/github/repository-manifest.ts",
+    "../app/lib/github/source-job-contracts.ts",
     "../app/lib/llm/enrichment-contracts.ts",
     "../app/lib/llm/enrichment-result-validator.ts",
-    "../app/lib/markdown/extract-graph.ts"
+    "../app/lib/llm/graph-answer-contracts.ts",
+    "../app/lib/llm/graph-answer-result-validator.ts",
+    "../app/lib/markdown/extract-graph.ts",
+    "../app/lib/markdown/normalize.ts",
+    "../app/lib/markdown/validate-markdown.ts",
+    "../app/lib/storage/d1-batch-policy.ts"
   ]
 }

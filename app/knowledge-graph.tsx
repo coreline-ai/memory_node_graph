@@ -16,17 +16,26 @@ import {
 } from "d3-force-3d";
 import {
   domainLabels,
-  knowledgeEdges as demoEdges,
-  knowledgeNodes as demoNodes,
   nodeKindLabels,
   relationLabels,
   type Domain,
   type KnowledgeEdge,
   type KnowledgeNode,
   type NodeKind,
+  type RelationLayer,
   type RelationKind,
 } from "./graph-data";
 import type { GraphSnapshot } from "./lib/graph/model";
+import {
+  graphApiRequestFromPageUrl,
+  graphScopeHistoryStateFromHistoryState,
+  historyStateWithGraphScopeState,
+  pageUrlForCurrentGraph,
+  pageUrlForGraphScope,
+  repositoryIdFromNodeId,
+  type GraphNavigationScope,
+  type GraphScopeHistoryState,
+} from "./lib/graph/scope-navigation";
 import {
   calculateLayout,
   mostConnectedNodeId,
@@ -69,6 +78,14 @@ import {
   orbitDepthDescriptors,
   type OrbitDepthKey,
 } from "./graph/orbit-depth";
+import {
+  autoRotateSpeed,
+  autoRotateStatusText,
+  initialAutoRotateIntent,
+  reconcileAutoRotateMotionPreference,
+  toggleAutoRotateIntent,
+  type AutoRotateIntent,
+} from "./graph/auto-rotate";
 
 type SimNode = KnowledgeNode & {
   x?: number;
@@ -98,7 +115,7 @@ type PerformanceMetrics = {
 type GraphApi = {
   reset: () => void;
   flyTo: (id: string) => void;
-  setAutoRotate: (value: boolean) => void;
+  setAutoRotate: (value: boolean, speed: number) => void;
   setLabelsVisible: (value: boolean) => void;
   setViewMode: (mode: GraphViewMode, selectedId?: string | null) => void;
   setLuminosity: (preset: LuminosityPreset) => void;
@@ -112,7 +129,7 @@ type ShowcaseState = {
   activeKinds: NodeKind[];
   activeRelations: RelationKind[];
   selectedId: string | null;
-  autoRotate: boolean;
+  autoRotateIntent: AutoRotateIntent;
   labelsVisible: boolean;
   luminosity: LuminosityPreset;
   luminosityControls: LuminosityControls;
@@ -163,6 +180,23 @@ const RELATION_STYLES: Record<
   RelationKind,
   { color: string; dash: string }
 > = {
+  documents: { color: "#f5e6b3", dash: "solid" },
+  plans: { color: "#d8a7ff", dash: "solid" },
+  contains: { color: "#a4c8ff", dash: "short" },
+  implements: { color: "#79d5c0", dash: "solid" },
+  depends_on: { color: "#65b5ff", dash: "short" },
+  calls: { color: "#70d7ff", dash: "short" },
+  reads_from: { color: "#8bbcff", dash: "short" },
+  writes_to: { color: "#f3b35b", dash: "short" },
+  produces: { color: "#9be1c7", dash: "solid" },
+  tests: { color: "#b9dc7a", dash: "solid" },
+  references: { color: "#b8bec8", dash: "short" },
+  precedes: { color: "#b99aff", dash: "solid" },
+  blocks: { color: "#ff6678", dash: "long" },
+  supersedes: { color: "#f29b67", dash: "long" },
+  same_as: { color: "#e8e4dc", dash: "short" },
+  mentions: { color: "#8f98a5", dash: "short" },
+  related_to: { color: "#a99ad8", dash: "short" },
   supports: { color: "#d8d1c1", dash: "solid" },
   extends: { color: "#9f7aea", dash: "solid" },
   requires: { color: "#65b5ff", dash: "short" },
@@ -171,6 +205,30 @@ const RELATION_STYLES: Record<
   risks: { color: "#ff6678", dash: "long" },
   contradicts: { color: "#ff473d", dash: "long" },
 };
+
+const RELATION_LAYER_LABELS: Record<RelationLayer, string> = {
+  structural: "구조",
+  explicit: "명시",
+  inferred: "추론",
+  display: "화면",
+};
+
+const RELATION_LAYER_STYLES: Record<RelationLayer, { color: string; dash: string }> = {
+  structural: { color: "#7186a3", dash: "solid" },
+  explicit: { color: "#d8f2ff", dash: "solid" },
+  inferred: { color: "#c7a5ff", dash: "short" },
+  display: { color: "#6c657c", dash: "long" },
+};
+
+const relationLayerForEdge = (edge: KnowledgeEdge): RelationLayer =>
+  edge.layer
+  ?? (edge.origin === "codex"
+    ? "inferred"
+    : edge.origin === "display"
+      ? "display"
+      : ["documents", "plans", "contains"].includes(edge.type)
+        ? "structural"
+        : "explicit");
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -237,7 +295,6 @@ export default function KnowledgeGraph() {
   const dataMenuButtonRef = useRef<HTMLButtonElement>(null);
   const dataMenuPanelRef = useRef<HTMLElement>(null);
   const urlInitializedRef = useRef(false);
-  const dataSourceInitializedRef = useRef(false);
   const showcaseStateRef = useRef<ShowcaseState | null>(null);
   const shouldFitShowcaseRef = useRef(false);
   const viewModeRef = useRef<GraphViewMode>("constellation");
@@ -247,6 +304,7 @@ export default function KnowledgeGraph() {
     ...luminosityPresetControls.bright,
   });
   const selectedIdRef = useRef<string | null>(null);
+  const autoRotateIntentRef = useRef<AutoRotateIntent>(initialAutoRotateIntent(false));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hovered, setHovered] = useState<{
     id: string;
@@ -255,7 +313,10 @@ export default function KnowledgeGraph() {
   } | null>(null);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [autoRotate, setAutoRotate] = useState(true);
+  const [autoRotateIntent, setAutoRotateIntent] = useState<AutoRotateIntent>(() =>
+    initialAutoRotateIntent(false),
+  );
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [labelsVisible, setLabelsVisible] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<GraphViewMode>("constellation");
@@ -270,13 +331,23 @@ export default function KnowledgeGraph() {
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
   const [dataMenuPosition, setDataMenuPosition] = useState({ left: 12, bottom: 82 });
   const [luminosityPreviewEnabled, setLuminosityPreviewEnabled] = useState(false);
-  const [graphLoading, setGraphLoading] = useState(false);
+  const [graphLoading, setGraphLoading] = useState(true);
   const [graphError, setGraphError] = useState("");
+  const [graphRequestedScope, setGraphRequestedScope] =
+    useState<GraphNavigationScope | null>(null);
   const [performanceEnabled, setPerformanceEnabled] = useState(false);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics | null>(null);
+  const autoRotate = autoRotateIntent.enabled;
+  const currentAutoRotateSpeed = autoRotateSpeed(prefersReducedMotion);
+  const autoRotateStatus = autoRotateStatusText(autoRotateIntent, prefersReducedMotion);
+
+  const updateAutoRotateIntent = useCallback((next: AutoRotateIntent) => {
+    autoRotateIntentRef.current = next;
+    setAutoRotateIntent(next);
+  }, []);
   const [graphData, setGraphData] = useState<GraphSnapshot>({
-    nodes: demoNodes,
-    edges: demoEdges,
+    nodes: [],
+    edges: [],
     meta: {
       source: "demo",
       provider: "built-in",
@@ -288,6 +359,7 @@ export default function KnowledgeGraph() {
   const [activeKinds, toggleKind, clearKinds, replaceKinds] = useSetToggle<NodeKind>();
   const [activeRelations, toggleRelation, clearRelations, replaceRelations] =
     useSetToggle<RelationKind>();
+  const [activeLayers, toggleLayer, clearLayers] = useSetToggle<RelationLayer>();
 
   const changeViewMode = useCallback(
     (nextMode: GraphViewMode) => {
@@ -312,30 +384,104 @@ export default function KnowledgeGraph() {
   const knowledgeNodes = graphData.nodes;
   const knowledgeEdges = graphData.edges;
 
+  const graphScopeState = useCallback(
+    (selectedNodeId = selectedId): GraphScopeHistoryState => ({
+      selectedNodeId,
+      activeLens,
+      activeDomains: [...activeDomains],
+      activeKinds: [...activeKinds],
+      activeRelations: [...activeRelations],
+    }),
+    [activeDomains, activeKinds, activeLens, activeRelations, selectedId],
+  );
+
+  const restoreGraphScopeState = useCallback((state: GraphScopeHistoryState) => {
+    const includesKey = <T extends string>(record: Record<T, unknown>, value: string): value is T =>
+      Object.hasOwn(record, value);
+    setActiveLens(state.activeLens);
+    replaceDomains(state.activeDomains.filter((value): value is Domain =>
+      includesKey(domainLabels, value),
+    ));
+    replaceKinds(state.activeKinds.filter((value): value is NodeKind =>
+      includesKey(nodeKindLabels, value),
+    ));
+    replaceRelations(state.activeRelations.filter((value): value is RelationKind =>
+      includesKey(relationLabels, value),
+    ));
+  }, [replaceDomains, replaceKinds, replaceRelations]);
+
   const loadGraph = useCallback(async () => {
     setGraphLoading(true);
     setGraphError("");
     try {
-      const graphUrl = new URL("/api/graph", window.location.origin);
-      const pageParams = new URL(window.location.href).searchParams;
-      const showcase = pageParams.get("showcase");
-      const fixture = pageParams.get("fixture");
-      if (showcase) graphUrl.searchParams.set("showcase", showcase);
-      if (fixture) graphUrl.searchParams.set("fixture", fixture);
-      const response = await fetch(`${graphUrl.pathname}${graphUrl.search}`, { cache: "no-store" });
+      const pageUrl = new URL(window.location.href);
+      const graphRequest = graphApiRequestFromPageUrl(pageUrl);
+      const presentationFixture = pageUrl.searchParams.has("showcase")
+        || pageUrl.searchParams.has("fixture");
+      const savedScopeState = presentationFixture
+        ? null
+        : graphScopeHistoryStateFromHistoryState(window.history.state);
+      setGraphRequestedScope(
+        pageUrl.searchParams.has("showcase") || pageUrl.searchParams.has("fixture")
+          ? null
+          : pageUrl.searchParams.get("scope") === "repository"
+            ? "repository"
+            : pageUrl.searchParams.get("scope") === "overview"
+              ? "overview"
+              : "corpus",
+      );
+      const response = await fetch(graphRequest.path, { cache: "no-store" });
       const payload = (await response.json()) as GraphSnapshot & { error?: string };
       if (!response.ok) throw new Error(payload.error || `그래프 요청 실패 (${response.status})`);
       if (!Array.isArray(payload.nodes) || !Array.isArray(payload.edges)) {
         throw new Error("그래프 응답 형식이 올바르지 않습니다.");
       }
-      setSelectedId(null);
+      if (graphRequest.implicitScope && payload.meta.scope) {
+        pageUrl.searchParams.set("scope", payload.meta.scope);
+        window.history.replaceState({}, "", pageUrl);
+      }
+      if (savedScopeState) restoreGraphScopeState(savedScopeState);
+      const requestedNode = pageUrl.searchParams.get("node") ?? savedScopeState?.selectedNodeId;
+      setSelectedId(
+        requestedNode && payload.nodes.some((node) => node.id === requestedNode)
+          ? requestedNode
+          : null,
+      );
+      setGraphRequestedScope(payload.meta.scope ?? null);
       setGraphData(payload);
     } catch (error) {
       setGraphError(error instanceof Error ? error.message : "그래프를 불러오지 못했습니다.");
     } finally {
       setGraphLoading(false);
     }
-  }, []);
+  }, [restoreGraphScopeState]);
+
+  const navigateGraphScope = useCallback(
+    async (scope: GraphNavigationScope, repositoryId?: string) => {
+      const nextUrl = pageUrlForGraphScope(
+        new URL(window.location.href),
+        scope,
+        repositoryId,
+      );
+      window.history.replaceState(
+        historyStateWithGraphScopeState(window.history.state, graphScopeState()),
+        "",
+        window.location.href,
+      );
+      window.history.pushState(
+        historyStateWithGraphScopeState(null, graphScopeState(null)),
+        "",
+        nextUrl,
+      );
+      setSelectedId(null);
+      setHovered(null);
+      setQuery("");
+      setSearchOpen(false);
+      setDataMenuOpen(false);
+      await loadGraph();
+    },
+    [graphScopeState, loadGraph],
+  );
 
   const positionDataMenu = useCallback(() => {
     const bounds = dataMenuButtonRef.current?.getBoundingClientRect();
@@ -364,7 +510,7 @@ export default function KnowledgeGraph() {
       activeKinds: [...activeKinds],
       activeRelations: [...activeRelations],
       selectedId,
-      autoRotate,
+      autoRotateIntent: { ...autoRotateIntent },
       labelsVisible,
       luminosity,
       luminosityControls: { ...luminosityControls },
@@ -376,7 +522,7 @@ export default function KnowledgeGraph() {
     activeKinds,
     activeLens,
     activeRelations,
-    autoRotate,
+    autoRotateIntent,
     labelsVisible,
     luminosity,
     luminosityControls,
@@ -393,7 +539,7 @@ export default function KnowledgeGraph() {
     clearRelations();
     setSelectedId(null);
     setViewMode("constellation");
-    setAutoRotate(true);
+    updateAutoRotateIntent(initialAutoRotateIntent(prefersReducedMotion));
     setLabelsVisible(false);
     setLuminosity("supernova");
     setLuminosityControls({ ...luminosityPresetControls.supernova });
@@ -401,7 +547,23 @@ export default function KnowledgeGraph() {
     setLuminosityCustom(false);
     setLuminosityPanelOpen(false);
     shouldFitShowcaseRef.current = true;
-  }, [clearDomains, clearKinds, clearRelations]);
+  }, [clearDomains, clearKinds, clearRelations, prefersReducedMotion, updateAutoRotateIntent]);
+
+  const applyGoldPresentation = useCallback(() => {
+    setActiveLens("all");
+    clearDomains();
+    clearKinds();
+    clearRelations();
+    setSelectedId(null);
+    setViewMode("constellation");
+    updateAutoRotateIntent(initialAutoRotateIntent(prefersReducedMotion));
+    setLabelsVisible(true);
+    setLuminosity("bright");
+    setLuminosityControls({ ...luminosityPresetControls.bright });
+    setLuminosityCustom(false);
+    setLuminosityPanelOpen(false);
+    shouldFitShowcaseRef.current = true;
+  }, [clearDomains, clearKinds, clearRelations, prefersReducedMotion, updateAutoRotateIntent]);
 
   const restoreShowcaseState = useCallback((state: ShowcaseState) => {
     setActiveLens(state.activeLens);
@@ -410,7 +572,7 @@ export default function KnowledgeGraph() {
     replaceRelations(state.activeRelations);
     setSelectedId(state.selectedId);
     setViewMode(state.viewMode);
-    setAutoRotate(state.autoRotate);
+    updateAutoRotateIntent({ ...state.autoRotateIntent });
     setLabelsVisible(state.labelsVisible);
     setLuminosity(state.luminosity);
     setLuminosityControls({ ...state.luminosityControls });
@@ -420,58 +582,87 @@ export default function KnowledgeGraph() {
     setLuminosityCustom(state.luminosityCustom);
     setLuminosityPanelOpen(false);
     showcaseStateRef.current = null;
-  }, [replaceDomains, replaceKinds, replaceRelations]);
+  }, [replaceDomains, replaceKinds, replaceRelations, updateAutoRotateIntent]);
 
   const selectDataSource = useCallback(
-    async (source: "current" | "max") => {
-      const url = new URL(window.location.href);
-      const wasShowcase = url.searchParams.get("showcase") === "max";
-      const restoreState = source === "current" && wasShowcase
+    async (source: "current" | "corpus" | "overview" | "gold" | "max") => {
+      let url = new URL(window.location.href);
+      const currentShowcase = url.searchParams.get("showcase");
+      const wasPresentation = currentShowcase === "max"
+        || currentShowcase === "gold"
+        || url.searchParams.has("fixture");
+      const restoreState = source === "current" && wasPresentation
         ? showcaseStateRef.current
         : null;
       if (source === "max") {
-        if (!wasShowcase) captureShowcaseState();
+        if (!wasPresentation) captureShowcaseState();
         applyShowcasePresentation();
         url.searchParams.set("showcase", "max");
         url.searchParams.set("view", "constellation");
+      } else if (source === "gold") {
+        if (!wasPresentation) captureShowcaseState();
+        applyGoldPresentation();
+        url.searchParams.set("showcase", "gold");
+        url.searchParams.set("view", "constellation");
+      } else if (source === "corpus" || source === "overview") {
+        url = pageUrlForGraphScope(url, source);
+        setSelectedId(null);
+        setHovered(null);
+        setQuery("");
+        setSearchOpen(false);
       } else {
-        url.searchParams.delete("showcase");
-        if (restoreState) {
-          url.searchParams.set("view", restoreState.viewMode);
-          if (restoreState.viewMode === "orbit" && restoreState.selectedId) {
-            url.searchParams.set("node", restoreState.selectedId);
-          } else {
-            url.searchParams.delete("node");
-          }
+        url = pageUrlForCurrentGraph(
+          url,
+          restoreState
+            ? { viewMode: restoreState.viewMode, selectedNodeId: restoreState.selectedId }
+            : null,
+        );
+        if (!restoreState && wasPresentation) {
+          setSelectedId(null);
+          setViewMode("constellation");
+          graphApiRef.current?.setViewMode("constellation", null);
         }
       }
       url.searchParams.delete("fixture");
-      if (source === "max") url.searchParams.delete("node");
+      if (source !== "current") url.searchParams.delete("node");
       window.history.replaceState({}, "", url);
       setDataMenuOpen(false);
       await loadGraph();
       if (restoreState) restoreShowcaseState(restoreState);
       dataMenuButtonRef.current?.focus();
     },
-    [applyShowcasePresentation, captureShowcaseState, loadGraph, restoreShowcaseState],
+    [applyGoldPresentation, applyShowcasePresentation, captureShowcaseState, loadGraph, restoreShowcaseState],
   );
 
   useEffect(() => {
-    if (dataSourceInitializedRef.current) return;
-    dataSourceInitializedRef.current = true;
     const previewEnabled =
       new URL(window.location.href).searchParams.get("preview") === "luminosity-v2";
-    const initialShowcase =
-      new URL(window.location.href).searchParams.get("showcase") === "max";
+    const initialShowcase = new URL(window.location.href).searchParams.get("showcase");
     luminosityPreviewRef.current = previewEnabled;
     const frame = window.requestAnimationFrame(() => {
-      if (initialShowcase) applyShowcasePresentation();
+      if (initialShowcase === "max") applyShowcasePresentation();
+      if (initialShowcase === "gold") applyGoldPresentation();
       setLuminosityPreviewEnabled(previewEnabled);
       setPerformanceEnabled(new URL(window.location.href).searchParams.get("perf") === "1");
       void loadGraph();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [applyShowcasePresentation, loadGraph]);
+  }, [applyGoldPresentation, applyShowcasePresentation, loadGraph]);
+
+  useEffect(() => {
+    const onPopState = () => void loadGraph();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [loadGraph]);
+
+  useEffect(() => {
+    if (!graphData.meta.generatedAt) return;
+    window.history.replaceState(
+      historyStateWithGraphScopeState(window.history.state, graphScopeState()),
+      "",
+      window.location.href,
+    );
+  }, [graphData.meta.generatedAt, graphScopeState]);
 
   const nodeMap = useMemo(
     () => new Map(knowledgeNodes.map((nodeItem) => [nodeItem.id, nodeItem])),
@@ -512,11 +703,40 @@ export default function KnowledgeGraph() {
     return counts;
   }, [knowledgeEdges]);
 
+  const relationLayerCounts = useMemo(() => {
+    const counts = new Map<RelationLayer, number>();
+    knowledgeEdges.forEach((edge) => {
+      const layer = relationLayerForEdge(edge);
+      counts.set(layer, (counts.get(layer) ?? 0) + 1);
+    });
+    return counts;
+  }, [knowledgeEdges]);
+
   const selectedNode = selectedId ? nodeMap.get(selectedId) ?? null : null;
   const showcaseActive = graphData.meta.provider === "performance-fixture";
+  const goldGraphActive = graphData.meta.provider === "gold-graph-fixture";
+  const presentationFixtureActive = showcaseActive || goldGraphActive;
+  const corpusScopeActive = !presentationFixtureActive && graphData.meta.scope === "corpus";
+  const overviewScopeActive = !presentationFixtureActive && graphData.meta.scope === "overview";
+  const repositoryScopeActive = !presentationFixtureActive && graphData.meta.scope === "repository";
+  const repositoryScopeContext = repositoryScopeActive
+    || (Boolean(graphError) && graphRequestedScope === "repository");
+  const currentRepositoryNode = graphData.meta.repositoryId
+    ? nodeMap.get(`repository:github:${graphData.meta.repositoryId}`) ?? null
+    : null;
+  const selectedRepositoryId = selectedNode
+    ? repositoryIdFromNodeId(selectedNode.id)
+    : null;
+  const selectedTaskStatus = selectedNode?.tags.includes("task")
+    ? selectedNode.tags.includes("completed")
+      ? "completed"
+      : selectedNode.tags.includes("pending")
+        ? "pending"
+        : "unknown"
+    : null;
 
   useEffect(() => {
-    if (!showcaseActive || !shouldFitShowcaseRef.current) return;
+    if (!presentationFixtureActive || !shouldFitShowcaseRef.current) return;
     let innerFrame: number | undefined;
     const outerFrame = window.requestAnimationFrame(() => {
       innerFrame = window.requestAnimationFrame(() => {
@@ -528,15 +748,25 @@ export default function KnowledgeGraph() {
       window.cancelAnimationFrame(outerFrame);
       if (innerFrame !== undefined) window.cancelAnimationFrame(innerFrame);
     };
-  }, [graphData, showcaseActive]);
+  }, [graphData, presentationFixtureActive]);
 
   const controlDataStatus = graphLoading
     ? "SYNC"
-    : showcaseActive
+    : graphError
+      ? "ERROR"
+      : goldGraphActive
+        ? `GOLD SAMPLE ${knowledgeNodes.length}N`
+      : showcaseActive
       ? `MAX ${knowledgeNodes.length}N`
-      : graphData.meta.source === "documents"
-      ? `DOCS ${graphData.meta.documentCount ?? 0}`
-      : `DEMO ${knowledgeNodes.length}N`;
+      : repositoryScopeActive
+        ? `REPO ${knowledgeNodes.length}N`
+        : corpusScopeActive
+          ? `D1 ${knowledgeNodes.length}N/${knowledgeEdges.length}E`
+        : overviewScopeActive
+          ? `MAP ${graphData.meta.repositoryCount ?? 0}R`
+          : graphData.meta.source === "documents"
+            ? `DOCS ${graphData.meta.documentCount ?? 0}`
+            : `DEMO ${knowledgeNodes.length}N`;
   const controlLuminosityStatus = luminosityCustom
     ? `커스텀 ${luminosityControls.overall}%`
     : LUMINOSITY_LABELS[luminosity];
@@ -581,6 +811,7 @@ export default function KnowledgeGraph() {
       clearDomains();
       clearKinds();
       clearRelations();
+      clearLayers();
       setSelectedId(null);
 
       const lensDomains: Record<string, Domain[]> = {
@@ -592,7 +823,7 @@ export default function KnowledgeGraph() {
 
       (lensDomains[lens] ?? []).forEach(toggleDomain);
     },
-    [clearDomains, clearKinds, clearRelations, toggleDomain],
+    [clearDomains, clearKinds, clearLayers, clearRelations, toggleDomain],
   );
 
   const selectNode = useCallback((id: string) => {
@@ -616,7 +847,8 @@ export default function KnowledgeGraph() {
     const hasFilters =
       activeDomains.size > 0 ||
       activeKinds.size > 0 ||
-      activeRelations.size > 0;
+      activeRelations.size > 0 ||
+      activeLayers.size > 0;
 
     if (selectedId) {
       focusRef.current = buildSelectionFocus(knowledgeEdges, selectedId);
@@ -634,8 +866,10 @@ export default function KnowledgeGraph() {
       knowledgeEdges.forEach((item) => {
         const relationMatch =
           activeRelations.size === 0 || activeRelations.has(item.type);
+        const layerMatch =
+          activeLayers.size === 0 || activeLayers.has(relationLayerForEdge(item));
         if (
-          relationMatch &&
+          relationMatch && layerMatch &&
           (nodeIds.has(item.source) || nodeIds.has(item.target))
         ) {
           edgeIds.add(edgeId(item));
@@ -648,11 +882,11 @@ export default function KnowledgeGraph() {
     }
 
     focusRef.current = emptyFocusState();
-  }, [activeDomains, activeKinds, activeRelations, knowledgeEdges, knowledgeNodes, selectedId, viewMode]);
+  }, [activeDomains, activeKinds, activeLayers, activeRelations, knowledgeEdges, knowledgeNodes, selectedId, viewMode]);
 
   useEffect(() => {
-    graphApiRef.current?.setAutoRotate(autoRotate);
-  }, [autoRotate]);
+    graphApiRef.current?.setAutoRotate(autoRotate, currentAutoRotateSpeed);
+  }, [autoRotate, currentAutoRotateSpeed]);
 
   useEffect(() => {
     graphApiRef.current?.setLabelsVisible(labelsVisible);
@@ -710,6 +944,7 @@ export default function KnowledgeGraph() {
 
   useEffect(() => {
     if (urlInitializedRef.current) return;
+    if (!graphData.meta.generatedAt) return;
     urlInitializedRef.current = true;
     const params = new URLSearchParams(window.location.search);
     const requestedView = params.get("view");
@@ -727,7 +962,7 @@ export default function KnowledgeGraph() {
       }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [graphData.nodes]);
+  }, [graphData.meta.generatedAt, graphData.nodes]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -759,6 +994,21 @@ export default function KnowledgeGraph() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [changeViewMode, dataMenuOpen, luminosityPanelOpen, viewMode]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncMotionPreference = () => {
+      const nextReducedMotion = mediaQuery.matches;
+      setPrefersReducedMotion(nextReducedMotion);
+      updateAutoRotateIntent(reconcileAutoRotateMotionPreference(
+        autoRotateIntentRef.current,
+        nextReducedMotion,
+      ));
+    };
+    syncMotionPreference();
+    mediaQuery.addEventListener("change", syncMotionPreference);
+    return () => mediaQuery.removeEventListener("change", syncMotionPreference);
+  }, [updateAutoRotateIntent]);
 
   useEffect(() => {
     const host = canvasHostRef.current;
@@ -835,8 +1085,8 @@ export default function KnowledgeGraph() {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.065;
-    controls.autoRotate = !reducedMotion;
-    controls.autoRotateSpeed = 0.32;
+    controls.autoRotate = autoRotateIntentRef.current.enabled;
+    controls.autoRotateSpeed = autoRotateSpeed(reducedMotion);
     controls.minDistance = graphRadius * 0.35;
     controls.maxDistance = graphRadius * 4.2;
 
@@ -1066,6 +1316,8 @@ export default function KnowledgeGraph() {
     const edgePositions = new Float32Array(edgeCount * 6);
     const edgeColors = new Float32Array(edgeCount * 6);
     const baseEdgeColors = new Float32Array(edgeCount * 6);
+    const edgeProgress = new Float32Array(edgeCount * 2);
+    const edgeLayers = new Float32Array(edgeCount * 2);
     const edgeIndexData = new Int32Array(edgeCount * 2);
     const edgePulse = new Float32Array(edgeCount * 2);
 
@@ -1080,6 +1332,12 @@ export default function KnowledgeGraph() {
       edgeIndexData[index * 2 + 1] = targetIndex;
       edgePulse[index * 2] = 0.34 + random() * 0.38;
       edgePulse[index * 2 + 1] = random() * Math.PI * 2;
+      edgeProgress[index * 2] = 0;
+      edgeProgress[index * 2 + 1] = 1;
+      const layer = relationLayerForEdge(knowledgeEdges[index]);
+      const layerCode = layer === "structural" ? 0 : layer === "explicit" ? 1 : layer === "inferred" ? 2 : 3;
+      edgeLayers[index * 2] = layerCode;
+      edgeLayers[index * 2 + 1] = layerCode;
 
       const sourceColor = new THREE.Color(
         NODE_COLORS[simNodes[sourceIndex].kind],
@@ -1087,6 +1345,9 @@ export default function KnowledgeGraph() {
       const targetColor = new THREE.Color(
         NODE_COLORS[simNodes[targetIndex].kind],
       ).lerp(new THREE.Color("#f2eee5"), 0.32);
+      const relationColor = new THREE.Color(RELATION_STYLES[knowledgeEdges[index].type].color);
+      sourceColor.lerp(relationColor, 0.58);
+      targetColor.lerp(relationColor, 0.58);
       baseEdgeColors.set(
         [
           sourceColor.r,
@@ -1109,12 +1370,62 @@ export default function KnowledgeGraph() {
       "color",
       new THREE.BufferAttribute(edgeColors, 3),
     );
-    const edgeMaterial = new THREE.LineBasicMaterial({
-      vertexColors: true,
+    edgeGeometry.setAttribute(
+      "segmentProgress",
+      new THREE.BufferAttribute(edgeProgress, 1),
+    );
+    edgeGeometry.setAttribute(
+      "relationLayer",
+      new THREE.BufferAttribute(edgeLayers, 1),
+    );
+    const edgeMaterial = new THREE.ShaderMaterial({
       transparent: true,
-      opacity: 0.54,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      vertexColors: true,
+      uniforms: {
+        uTime: { value: 0 },
+        uMotion: { value: reducedMotion ? 0 : 1 },
+      },
+      vertexShader: `
+        attribute float segmentProgress;
+        attribute float relationLayer;
+        varying vec3 vColor;
+        varying float vProgress;
+        varying float vLayer;
+
+        void main() {
+          vColor = color;
+          vProgress = segmentProgress;
+          vLayer = relationLayer;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vColor;
+        varying float vProgress;
+        varying float vLayer;
+        uniform float uTime;
+        uniform float uMotion;
+
+        void main() {
+          float alpha = 0.5;
+          if (vLayer < 0.5) {
+            alpha = 0.24;
+          } else if (vLayer < 1.5) {
+            alpha = 0.76;
+          } else if (vLayer < 2.5) {
+            float flow = fract(vProgress * 9.0 - uTime * 0.22 * uMotion);
+            if (flow > 0.66) discard;
+            alpha = 0.62;
+          } else {
+            float dash = fract(vProgress * 6.0);
+            if (dash > 0.46) discard;
+            alpha = 0.25;
+          }
+          gl_FragColor = vec4(vColor, alpha);
+        }
+      `,
     });
     const edgeLines = new THREE.LineSegments(edgeGeometry, edgeMaterial);
     scene.add(edgeLines);
@@ -1703,8 +2014,9 @@ export default function KnowledgeGraph() {
         animateReset();
       },
       flyTo,
-      setAutoRotate: (value) => {
-        controls.autoRotate = value && !reducedMotion;
+      setAutoRotate: (value, speed) => {
+        controls.autoRotate = value;
+        controls.autoRotateSpeed = speed;
       },
       setLabelsVisible: (value) => {
         labelLayer.style.display = value ? "" : "none";
@@ -1796,6 +2108,7 @@ export default function KnowledgeGraph() {
 
       const focus = focusRef.current;
       const selectedNodeId = selectedIdRef.current;
+      edgeMaterial.uniforms.uTime.value = time;
       const ambientNodeBoost = luminosityPreviewEnabled
         ? activeLuminositySettings.ambientNodeBoost
         : 1;
@@ -1900,6 +2213,14 @@ export default function KnowledgeGraph() {
                 : activeFocusContrastSettings.dimmedEdgeBrightness *
                   focusedEdgeIntensity
             : activeLuminositySettings.ambientEdgeBrightness;
+          if (focus.edgeIds) {
+            const relationLayer = relationLayerForEdge(knowledgeEdges[index]);
+            brightness *= relationLayer === "structural"
+              ? focus.directEdgeIds?.has(id) ? 0.78 : 0.58
+              : relationLayer === "display"
+                ? 0.5
+                : focus.directEdgeIds?.has(id) ? 1.18 : 1.04;
+          }
           if (!focus.edgeIds && !reducedMotion) {
             brightness *=
               1 +
@@ -1934,6 +2255,14 @@ export default function KnowledgeGraph() {
               selectedPathEdges.push({ index, expanded: true });
             }
           }
+          selectedPathEdges.sort((left, right) => {
+            if (left.expanded !== right.expanded) return left.expanded ? 1 : -1;
+            const priority = (edgeIndex: number) => {
+              const layer = relationLayerForEdge(knowledgeEdges[edgeIndex]);
+              return layer === "inferred" ? 0 : layer === "explicit" ? 1 : layer === "structural" ? 2 : 3;
+            };
+            return priority(left.index) - priority(right.index) || left.index - right.index;
+          });
         }
 
         const pointsPerPacket = reducedMotion ? 1 : 3;
@@ -2462,6 +2791,7 @@ export default function KnowledgeGraph() {
     clearDomains();
     clearKinds();
     clearRelations();
+    clearLayers();
   };
 
   const selectLuminosityPreset = (preset: LuminosityPreset) => {
@@ -2508,7 +2838,8 @@ export default function KnowledgeGraph() {
     selectedId ||
     activeDomains.size > 0 ||
     activeKinds.size > 0 ||
-    activeRelations.size > 0;
+    activeRelations.size > 0 ||
+    activeLayers.size > 0;
 
   return (
     <main
@@ -2527,7 +2858,15 @@ export default function KnowledgeGraph() {
             </div>
             <div>
               <p className="eyebrow">
-                KNOWLEDGE GRAPH · {graphData.meta.source === "documents" ? "DOCUMENTS LIVE" : "DEMO 01"}
+                KNOWLEDGE GRAPH · {repositoryScopeContext
+                  ? "REPOSITORY DETAIL"
+                  : corpusScopeActive
+                    ? "FULL D1 CORPUS"
+                  : overviewScopeActive
+                    ? "REPOSITORY MAP"
+                    : goldGraphActive
+                    ? "ONTOLOGY GOLD SAMPLE"
+                    : graphData.meta.source === "documents" ? "DOCUMENTS LIVE" : "DEMO 01"}
               </p>
               <h1>AI Systems Atlas</h1>
             </div>
@@ -2550,9 +2889,37 @@ export default function KnowledgeGraph() {
               <strong>{knowledgeEdges.length}</strong> 관계
             </span>
             <span className="live-indicator">
-              <i /> {graphLoading ? "SYNC" : graphData.meta.source === "documents" ? "DOCS" : "DEMO"}
+              <i /> {graphLoading
+                ? "SYNC"
+                : graphError
+                  ? "ERROR"
+                  : repositoryScopeActive
+                  ? "REPO"
+                  : corpusScopeActive
+                    ? "D1 MAP"
+                  : overviewScopeActive
+                    ? "MAP"
+                    : goldGraphActive
+                      ? "GOLD SAMPLE"
+                    : graphData.meta.source === "documents" ? "DOCS" : "DEMO"}
             </span>
           </div>
+          {graphData.meta.corpusNodeCount !== undefined && graphData.meta.corpusEdgeCount !== undefined && (
+            <div className="corpus-stats" aria-label="D1 전체 데이터 통계">
+              <span>D1 전체</span>
+              <strong>{graphData.meta.corpusNodeCount.toLocaleString()} 노드</strong>
+              <i aria-hidden="true" />
+              <strong>{graphData.meta.corpusEdgeCount.toLocaleString()} 관계</strong>
+              <small>화면 {knowledgeNodes.length.toLocaleString()} / {knowledgeEdges.length.toLocaleString()}</small>
+            </div>
+          )}
+          {graphData.meta.analytics && (
+            <div className="graph-quality-strip" aria-label="그래프 품질 지표">
+              <span>C {graphData.meta.analytics.communityCount}</span>
+              <span>비구조 {Math.round(graphData.meta.analytics.nonStructuralRatio * 100)}%</span>
+              <span>말단 {Math.round(graphData.meta.analytics.leafRatio * 100)}%</span>
+            </div>
+          )}
 
           <section className="filter-section">
             <div className="section-heading">
@@ -2632,11 +2999,34 @@ export default function KnowledgeGraph() {
 
           <section className="filter-section relation-section">
             <div className="section-heading">
+              <span>관계 계층</span>
+              <span>{activeLayers.size || "ALL"}</span>
+            </div>
+            <div className="relation-layer-pills">
+              {(Object.keys(RELATION_LAYER_LABELS) as RelationLayer[]).map((layer) => (
+                <button
+                  key={layer}
+                  type="button"
+                  className={activeLayers.has(layer) ? "is-active" : ""}
+                  aria-pressed={activeLayers.has(layer)}
+                  onClick={() => toggleLayer(layer)}
+                  style={{ "--layer-color": RELATION_LAYER_STYLES[layer].color } as React.CSSProperties}
+                >
+                  <i style={{ borderTopStyle: RELATION_LAYER_STYLES[layer].dash === "solid" ? "solid" : "dashed" }} />
+                  {RELATION_LAYER_LABELS[layer]}
+                  <small>{relationLayerCounts.get(layer) ?? 0}</small>
+                </button>
+              ))}
+            </div>
+            <div className="relation-layer-divider" />
+            <div className="section-heading">
               <span>관계 유형</span>
               <span>{activeRelations.size || "ALL"}</span>
             </div>
             <div className="relation-list">
-              {(Object.keys(relationLabels) as RelationKind[]).map((relation) => (
+              {(Object.keys(relationLabels) as RelationKind[])
+                .filter((relation) => (relationCounts.get(relation) ?? 0) > 0 || activeRelations.has(relation))
+                .map((relation) => (
                 <button
                   key={relation}
                   type="button"
@@ -2687,7 +3077,25 @@ export default function KnowledgeGraph() {
             <span className="context-dot" />
             <span>AI SYSTEMS</span>
             <i>/</i>
-            <span>{selectedNode?.shortLabel ?? "전체 지식 우주"}</span>
+            {repositoryScopeContext ? (
+              <>
+                <button
+                  type="button"
+                  disabled={graphLoading}
+                  onClick={() => void navigateGraphScope("overview")}
+                >
+                  전체 저장소
+                </button>
+                <i>/</i>
+                <span>{currentRepositoryNode?.shortLabel ?? graphData.meta.repositoryId}</span>
+              </>
+            ) : (
+              <span>{corpusScopeActive
+                ? "전체 D1 코퍼스"
+                : overviewScopeActive
+                  ? "전체 저장소"
+                  : selectedNode?.shortLabel ?? "전체 지식 우주"}</span>
+            )}
           </div>
           <div className="search-shell">
             <span className="search-icon" aria-hidden="true" />
@@ -2734,18 +3142,53 @@ export default function KnowledgeGraph() {
         </div>
 
         <div className="graph-title-block">
-          <p>INTERACTIVE KNOWLEDGE · {VIEW_LABELS[viewMode].toUpperCase()}</p>
+          <p>
+            INTERACTIVE KNOWLEDGE · {goldGraphActive
+              ? "ONTOLOGY V1 · REVIEW SAMPLE"
+              : repositoryScopeContext
+              ? "REPOSITORY DETAIL"
+              : corpusScopeActive
+                ? "FULL CORPUS PROJECTION"
+              : overviewScopeActive
+                ? "REPOSITORY OVERVIEW"
+                : VIEW_LABELS[viewMode].toUpperCase()}
+          </p>
           <h2>
-            {viewMode === "constellation" && <>AI가 작동하는 구조를<br />관계로 탐색합니다.</>}
-            {viewMode === "nebula" && <>지식의 밀도와 경계를<br />성운으로 조망합니다.</>}
-            {viewMode === "orbit" && <>선택한 지식 주변의<br />1·2단계 관계를 추적합니다.</>}
+            {goldGraphActive
+              ? <>검증된 프로젝트 구조 표본을<br />근거 관계로 탐색합니다.</>
+              : repositoryScopeContext
+              ? <>{currentRepositoryNode?.shortLabel ?? "선택 저장소"}의 문서와 계획을<br />관계로 추적합니다.</>
+              : corpusScopeActive
+                ? <>전체 문서의 핵심 지식을<br />관계 중심으로 조망합니다.</>
+              : overviewScopeActive
+                ? <>저장소와 공유 기술을<br />관계로 조망합니다.</>
+                : <>
+                    {viewMode === "constellation" && <>AI가 작동하는 구조를<br />관계로 탐색합니다.</>}
+                    {viewMode === "nebula" && <>지식의 밀도와 경계를<br />성운으로 조망합니다.</>}
+                    {viewMode === "orbit" && <>선택한 지식 주변의<br />1·2단계 관계를 추적합니다.</>}
+                  </>}
           </h2>
           <span>
-            {graphData.meta.source === "documents"
-              ? `${graphData.meta.documentCount ?? 0}개 Markdown 문서에서 추출한 관계 데이터`
-              : "개념과 시스템 사이를 연결한 선행 데모 데이터"}
+            {goldGraphActive
+              ? `${graphData.meta.documentCount ?? 0}개 대표 문서 기반 검토 표본 · ${knowledgeNodes.length}개 전문 노드 · ${knowledgeEdges.length}개 근거 관계 · 전체 코퍼스 아님`
+              : repositoryScopeContext
+              ? `${graphData.meta.documentCount ?? 0}개 Markdown · ${knowledgeNodes.length}개 노드 · ${knowledgeEdges.length}개 관계`
+              : corpusScopeActive
+                ? `D1 전체 ${(graphData.meta.corpusNodeCount ?? 0).toLocaleString()}노드 · ${(graphData.meta.corpusEdgeCount ?? 0).toLocaleString()}관계 중 화면 ${knowledgeNodes.length}노드 · ${knowledgeEdges.length}관계`
+              : overviewScopeActive
+                ? `${graphData.meta.repositoryCount ?? 0}개 저장소 · 공유 기술 중심 overview`
+                : graphData.meta.source === "documents"
+                  ? `${graphData.meta.documentCount ?? 0}개 Markdown 문서에서 추출한 관계 데이터`
+                  : "개념과 시스템 사이를 연결한 선행 데모 데이터"}
           </span>
-          {graphError && <span className="graph-sync-error">{graphError}</span>}
+          {graphError && (
+            <span className="graph-sync-error" role="alert">
+              <span>{graphError}</span>
+              <button type="button" onClick={() => void loadGraph()} disabled={graphLoading}>
+                다시 시도
+              </button>
+            </span>
+          )}
         </div>
 
         <div
@@ -2790,6 +3233,18 @@ export default function KnowledgeGraph() {
           <div className="control-cluster data-cluster" role="group" aria-label="데이터">
             <span className="control-cluster-label" aria-hidden="true">데이터</span>
             <div className="control-group data-switch">
+              {repositoryScopeContext && (
+                <button
+                  type="button"
+                  className="scope-back-control"
+                  disabled={graphLoading}
+                  onClick={() => void navigateGraphScope("overview")}
+                  title="전체 저장소 overview로 복귀"
+                >
+                  <span className="scope-back-icon" aria-hidden="true">←</span>
+                  <em>전체 저장소</em>
+                </button>
+              )}
               <Link className="dashboard-control" href="/dashboard" title="Markdown 문서 관리">
                 <span className="data-icon">＋</span>
                 <em>문서 관리</em>
@@ -2797,13 +3252,15 @@ export default function KnowledgeGraph() {
               <button
                 ref={dataMenuButtonRef}
                 type="button"
-                className={`data-source-control ${showcaseActive ? "is-active" : ""}`}
+                className={`data-source-control ${presentationFixtureActive ? "is-active" : ""}`}
                 aria-expanded={dataMenuOpen}
                 aria-controls="graph-data-source-panel"
                 aria-haspopup="dialog"
                 aria-label={
-                  showcaseActive
-                    ? "최대 밀도 데모 데이터 사용 중: 실제 지식 데이터가 아니며 읽기 전용입니다"
+                  goldGraphActive
+                    ? "온톨로지 v1 Gold Graph 대표 문서 검토 표본 사용 중: 전체 데이터가 아닙니다"
+                    : showcaseActive
+                      ? "최대 밀도 데모 데이터 사용 중: 실제 지식 데이터가 아니며 읽기 전용입니다"
                     : "그래프 데이터 선택"
                 }
                 onClick={toggleDataMenu}
@@ -2815,7 +3272,17 @@ export default function KnowledgeGraph() {
                   <i />
                   <i />
                 </span>
-                <em>{showcaseActive ? "최대 밀도" : "쇼케이스"}</em>
+                <em>{goldGraphActive
+                  ? "Gold Graph"
+                  : showcaseActive
+                    ? "최대 밀도"
+                    : corpusScopeActive
+                      ? "전체 D1"
+                      : overviewScopeActive
+                        ? "저장소 맵"
+                        : repositoryScopeActive
+                          ? "저장소 상세"
+                          : "데이터"}</em>
               </button>
             </div>
           </div>
@@ -2835,12 +3302,19 @@ export default function KnowledgeGraph() {
                 type="button"
                 className={autoRotate ? "is-active" : ""}
                 aria-pressed={autoRotate}
-                onClick={() => setAutoRotate((value) => !value)}
-                title="자동 회전"
+                aria-describedby={prefersReducedMotion ? "auto-rotate-motion-status" : undefined}
+                onClick={() => updateAutoRotateIntent(toggleAutoRotateIntent(autoRotateIntentRef.current))}
+                title={autoRotateStatus}
               >
                 <span className="orbit-icon" />
-                <em>오비트</em>
+                <em>자동 회전</em>
               </button>
+              {prefersReducedMotion && <span
+                id="auto-rotate-motion-status"
+                className="motion-preference-status"
+                role="status"
+                aria-live="polite"
+              >{autoRotateStatus}</span>}
               <button
                 type="button"
                 className={labelsVisible ? "is-active" : ""}
@@ -2901,29 +3375,84 @@ export default function KnowledgeGraph() {
             style={{ left: dataMenuPosition.left, bottom: dataMenuPosition.bottom }}
           >
             <header>
-              <span>{showcaseActive ? "DEMO · 500 NODES / 2,000 EDGES" : "DATA SOURCE"}</span>
-              <strong>{showcaseActive ? "MAX DENSITY" : "CURRENT GRAPH"}</strong>
+              <span>{goldGraphActive
+                ? "REVIEW SAMPLE · EVIDENCE BACKED"
+                : showcaseActive
+                  ? "DEMO · 500 NODES / 2,000 EDGES"
+                  : corpusScopeActive
+                    ? "LIVE D1 · RELATIONSHIP FIRST"
+                    : "DATA SOURCE"}</span>
+              <strong>{goldGraphActive
+                ? "GOLD GRAPH SAMPLE"
+                : showcaseActive
+                  ? "MAX DENSITY"
+                  : corpusScopeActive
+                    ? "FULL CORPUS MAP"
+                    : overviewScopeActive
+                      ? "REPOSITORY OVERVIEW"
+                      : repositoryScopeActive
+                        ? "REPOSITORY DETAIL"
+                        : "CURRENT GRAPH"}</strong>
             </header>
             <div className="data-source-options">
+              {presentationFixtureActive && (
+                <button
+                  type="button"
+                  aria-pressed={false}
+                  disabled={graphLoading}
+                  onClick={() => void selectDataSource("current")}
+                >
+                  <i className="data-option-current" aria-hidden="true" />
+                  <span>
+                    <strong>이전 실제 그래프로 복귀</strong>
+                    <small>쇼케이스 진입 전 범위와 화면 상태 복원</small>
+                  </span>
+                  <b>RETURN</b>
+                </button>
+              )}
               <button
                 type="button"
-                className={!showcaseActive ? "is-active" : ""}
-                aria-pressed={!showcaseActive}
+                className={corpusScopeActive ? "is-active" : ""}
+                aria-pressed={corpusScopeActive}
                 disabled={graphLoading}
-                onClick={() => void selectDataSource("current")}
+                onClick={() => void selectDataSource("corpus")}
               >
                 <i className="data-option-current" aria-hidden="true" />
                 <span>
-                  <strong>현재 지식 데이터</strong>
+                  <strong>전체 D1 지식 맵</strong>
                   <small>
-                    {graphData.meta.source === "documents"
-                      ? `Markdown 문서 ${graphData.meta.documentCount ?? 0}개`
-                      : showcaseActive
-                        ? "저장된 그래프로 복귀"
-                        : `${knowledgeNodes.length} 노드 · ${knowledgeEdges.length} 관계`}
+                    {(graphData.meta.corpusNodeCount ?? 0).toLocaleString()} 노드 · {(graphData.meta.corpusEdgeCount ?? 0).toLocaleString()} 관계 중 핵심 투영
                   </small>
                 </span>
-                <b>{!showcaseActive ? "ACTIVE" : "RETURN"}</b>
+                <b>{corpusScopeActive ? "ACTIVE" : "OPEN"}</b>
+              </button>
+              <button
+                type="button"
+                className={overviewScopeActive ? "is-active" : ""}
+                aria-pressed={overviewScopeActive}
+                disabled={graphLoading}
+                onClick={() => void selectDataSource("overview")}
+              >
+                <i className="data-option-overview" aria-hidden="true" />
+                <span>
+                  <strong>저장소 Overview</strong>
+                  <small>{graphData.meta.repositoryCount ?? 0}개 저장소와 공유 기술 중심 맵</small>
+                </span>
+                <b>{overviewScopeActive ? "ACTIVE" : "OPEN"}</b>
+              </button>
+              <button
+                type="button"
+                className={goldGraphActive ? "is-active is-gold" : "is-gold"}
+                aria-pressed={goldGraphActive}
+                disabled={graphLoading}
+                onClick={() => void selectDataSource("gold")}
+              >
+                <i className="data-option-gold" aria-hidden="true" />
+                <span>
+                  <strong>온톨로지 Gold Graph</strong>
+                  <small>대표 문서 3개 검토 표본 · 68노드 · 101관계 · 전체 아님</small>
+                </span>
+                <b>{goldGraphActive ? "ACTIVE" : "REVIEW"}</b>
               </button>
               <button
                 type="button"
@@ -2942,7 +3471,11 @@ export default function KnowledgeGraph() {
             </div>
             <footer role="status" aria-live="polite">
               <i aria-hidden="true" />
-              읽기 전용 · 저장되지 않음 · 실제 지식 데이터 아님
+              {goldGraphActive
+                ? "검토 표본 · 전체 코퍼스 아님 · D1과 분리 · 저장되지 않음"
+                : showcaseActive
+                  ? "읽기 전용 · 저장되지 않음 · 실제 지식 데이터 아님"
+                  : "실제 D1 읽기 전용 투영 · 화면 상한 500노드 / 2,000관계"}
             </footer>
           </section>
         )}
@@ -3055,7 +3588,11 @@ export default function KnowledgeGraph() {
         )}
 
         <div className="stage-footer">
-          <span>{graphData.meta.source === "documents" ? "MARKDOWN KNOWLEDGE" : "AI KNOWLEDGE PROTOTYPE"}</span>
+          <span>{goldGraphActive
+            ? "EVIDENCE GOLD SAMPLE"
+            : graphData.meta.source === "documents"
+              ? "MARKDOWN KNOWLEDGE"
+              : "AI KNOWLEDGE PROTOTYPE"}</span>
           <i />
           <span>THREE.JS · FORCE 3D · GPU BLOOM</span>
           <strong>01</strong>
@@ -3139,6 +3676,80 @@ export default function KnowledgeGraph() {
               <h2>{selectedNode.label}</h2>
               <p className="detail-summary">{selectedNode.summary}</p>
 
+              {selectedRepositoryId && !repositoryScopeActive && (
+                <button
+                  type="button"
+                  className="detail-scope-action"
+                  disabled={graphLoading}
+                  onClick={() => void navigateGraphScope("repository", selectedRepositoryId)}
+                >
+                  <span>
+                    <small>REPOSITORY SCOPE</small>
+                    <strong>저장소 상세 그래프 열기</strong>
+                  </span>
+                  <em aria-hidden="true">→</em>
+                </button>
+              )}
+
+              {(selectedNode.source || selectedTaskStatus || selectedNode.metrics) && (
+                <section className="detail-source-card" aria-label="노드 원본 근거와 상태">
+                  <div className="detail-source-card-heading">
+                    <span>SOURCE / STATUS</span>
+                    <i aria-hidden="true" />
+                  </div>
+                  <dl>
+                    {selectedNode.metrics && (
+                      <>
+                        <dt>Community</dt>
+                        <dd>{selectedNode.metrics.communityId}</dd>
+                        <dt>Centrality</dt>
+                        <dd>{Math.round(selectedNode.metrics.centrality * 100)}% · degree {selectedNode.metrics.degree}{selectedNode.metrics.bridge ? " · bridge" : ""}</dd>
+                      </>
+                    )}
+                    {selectedTaskStatus && (
+                      <>
+                        <dt>Task</dt>
+                        <dd>
+                          <span
+                            className="detail-task-status"
+                            data-status={selectedTaskStatus}
+                          >
+                            {selectedTaskStatus === "completed"
+                              ? "완료"
+                              : selectedTaskStatus === "pending"
+                                ? "미완료"
+                                : "상태 미정"}
+                          </span>
+                        </dd>
+                      </>
+                    )}
+                    {selectedNode.source && (
+                      <>
+                        <dt>Repository</dt>
+                        <dd>{selectedNode.source.repositoryOwner}/{selectedNode.source.repositoryName}</dd>
+                        <dt>Path</dt>
+                        <dd title={selectedNode.source.relativePath}>{selectedNode.source.relativePath}</dd>
+                        <dt>Commit</dt>
+                        <dd>
+                          <code title={selectedNode.source.commitSha}>
+                            {selectedNode.source.commitSha.slice(0, 12)}
+                          </code>
+                        </dd>
+                      </>
+                    )}
+                  </dl>
+                  {selectedNode.source && (
+                    <a
+                      href={selectedNode.source.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      GitHub 원문 근거 열기 <span aria-hidden="true">↗</span>
+                    </a>
+                  )}
+                </section>
+              )}
+
               <div className="detail-divider" />
               <section>
                 <h3>핵심 해석</h3>
@@ -3157,26 +3768,42 @@ export default function KnowledgeGraph() {
                   연결된 지식 <span>{connectedItems.length}</span>
                 </h3>
                 <div className="connection-list">
-                  {connectedItems.map((item) => (
-                    <button
-                      type="button"
-                      key={edgeId(item.edge)}
-                      onClick={() => item.node && selectNode(item.node.id)}
-                    >
-                      <i
-                        style={{
-                          borderColor: RELATION_STYLES[item.edge.type].color,
-                        }}
-                      />
-                      <span>
-                        <small>
-                          {relationLabels[item.edge.type]} · {Math.round(item.edge.confidence * 100)}%
-                        </small>
-                        <strong>{item.node?.shortLabel}</strong>
-                      </span>
-                      <em>{item.outgoing ? "→" : "←"}</em>
-                    </button>
-                  ))}
+                  {connectedItems.map((item) => {
+                    const layer = relationLayerForEdge(item.edge);
+                    const evidence = item.edge.evidence?.[0];
+                    return (
+                      <div className="connection-item" key={edgeId(item.edge)}>
+                        <button
+                          type="button"
+                          onClick={() => item.node && selectNode(item.node.id)}
+                        >
+                          <i
+                            style={{
+                              borderColor: RELATION_STYLES[item.edge.type].color,
+                              borderTopStyle: RELATION_LAYER_STYLES[layer].dash === "solid" ? "solid" : "dashed",
+                            }}
+                          />
+                          <span>
+                            <small>
+                              {RELATION_LAYER_LABELS[layer]} · {relationLabels[item.edge.type]} · {Math.round(item.edge.confidence * 100)}%
+                            </small>
+                            <strong>{item.node?.shortLabel}</strong>
+                          </span>
+                          <em>{item.outgoing ? "→" : "←"}</em>
+                        </button>
+                        {evidence && (
+                          <div className="connection-evidence">
+                            <span title={evidence.explanation}>{evidence.explanation}</span>
+                            {evidence.sourceUrl && (
+                              <a href={evidence.sourceUrl} target="_blank" rel="noreferrer">
+                                원문 근거 ↗
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             </div>

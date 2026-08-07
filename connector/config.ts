@@ -16,10 +16,12 @@ export const connectorConfig = Object.freeze({
   heartbeatIntervalMs: numberFrom("ATLAS_CONNECTOR_HEARTBEAT_MS", 15_000, 5_000, 30_000),
   leaseDurationMs: numberFrom("ATLAS_CONNECTOR_LEASE_MS", 90_000, 15_000, 300_000),
   codexTimeoutMs: numberFrom("ATLAS_CODEX_TIMEOUT_MS", 180_000, 15_000, 900_000),
+  githubTimeoutMs: numberFrom("ATLAS_GITHUB_TIMEOUT_MS", 120_000, 15_000, 300_000),
   maxInputBytes: numberFrom("ATLAS_CODEX_MAX_INPUT_BYTES", 256_000, 16_000, 512_000),
   maximumBackoffMs: numberFrom("ATLAS_CONNECTOR_MAX_BACKOFF_MS", 30_000, 1_000, 120_000),
   model: process.env.ATLAS_CODEX_MODEL?.trim() || undefined,
   codexPath: process.env.ATLAS_CODEX_PATH?.trim() || undefined,
+  ghPath: process.env.ATLAS_GH_PATH?.trim() || undefined,
   deleteSessionAfterRun: process.env.ATLAS_CODEX_KEEP_SESSIONS?.trim().toLowerCase() !== "true",
   version: "atlas-connector-1",
 });

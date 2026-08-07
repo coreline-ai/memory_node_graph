@@ -1,8 +1,7 @@
-import type { DocumentRecord, IngestionJob } from "../graph/model";
-import { buildEnrichmentJobInput } from "../llm/enrichment-contracts";
-import { extractGraph } from "../markdown/extract-graph";
-import { MARKDOWN_PARSER_VERSION, parseMarkdown } from "../markdown/parse-markdown";
-import { normalizeFileName, normalizeMarkdown, sha256, stableKey } from "../markdown/normalize";
+import type { DocumentRecord, DocumentSourceDescriptor, IngestionJob } from "../graph/model";
+import { extractGraphForSource, parserVersionForMarkdownSource } from "../markdown/parser-profiles";
+import { parseMarkdown } from "../markdown/parse-markdown";
+import { normalizeFileName, normalizeMarkdown, sha256 } from "../markdown/normalize";
 import {
   MAX_MARKDOWN_FILE_SIZE,
   MAX_MARKDOWN_FILES,
@@ -10,14 +9,17 @@ import {
 } from "../markdown/validate-markdown";
 import {
   findDocumentById,
-  findDocumentByName,
+  findDocumentBySourceKey,
   saveDocument,
   saveUnchangedJob,
+  toPublicDocumentRecord,
 } from "../storage/graph-repository";
+import { scheduleDocumentEnrichment } from "./enrichment-scheduler";
 import {
-  getEnrichmentJobRepository,
-  type EnqueueEnrichmentJobResult,
-} from "../storage/enrichment-job-repository";
+  createManualDocumentSourceDescriptor,
+  documentIdForSource,
+  documentSourceKey,
+} from "./document-source";
 
 export { MAX_MARKDOWN_FILE_SIZE, MAX_MARKDOWN_FILES };
 
@@ -40,11 +42,12 @@ const jobFor = (
   };
 };
 
-export async function ingestMarkdown(input: {
+export async function prepareMarkdownIngestion(input: {
   fileName: string;
   source: string;
   size?: number;
   forceReindex?: boolean;
+  sourceDescriptor?: DocumentSourceDescriptor;
 }) {
   validateMarkdownFileName(input.fileName);
   const normalizedSource = normalizeMarkdown(input.source);
@@ -55,18 +58,37 @@ export async function ingestMarkdown(input: {
   if (!normalizedSource.trim()) throw new Error(`${input.fileName}: 빈 문서는 처리할 수 없습니다.`);
 
   const normalizedName = normalizeFileName(input.fileName);
+  const sourceDescriptor = input.sourceDescriptor ?? createManualDocumentSourceDescriptor(input.fileName);
+  if (sourceDescriptor.type === "manual" && sourceDescriptor.normalizedName !== normalizedName) {
+    throw new Error("수동 문서 source descriptor와 파일명이 일치하지 않습니다.");
+  }
+  const sourceKey = documentSourceKey(sourceDescriptor);
   const hash = await sha256(normalizedSource);
-  const existing = await findDocumentByName(normalizedName);
-  const documentId = existing?.id ?? `document-${stableKey(normalizedName)}`;
+  const existing = await findDocumentBySourceKey(sourceKey);
+  const documentId = existing?.id ?? await documentIdForSource(sourceDescriptor);
+  const sameHash = existing?.hash === hash;
+  const parserVersion = parserVersionForMarkdownSource(sourceDescriptor);
 
-  if (existing?.hash === hash && !input.forceReindex) {
+  if (sameHash && existing?.parserVersion === parserVersion && !input.forceReindex) {
     const job = jobFor(documentId, input.fileName, "unchanged", "변경된 내용 없음");
-    await saveUnchangedJob(job);
-    return { document: existing as DocumentRecord, job, unchanged: true };
+    return {
+      document: toPublicDocumentRecord(existing),
+      job,
+      unchanged: true as const,
+      sameHash: true,
+      existed: true,
+      normalizedSource,
+      sourceDescriptor,
+      graph: undefined,
+    };
   }
 
   const root = parseMarkdown(normalizedSource);
-  const graph = extractGraph(root, documentId, input.fileName);
+  const graph = await extractGraphForSource(root, {
+    documentId,
+    fileName: input.fileName,
+    sourceDescriptor,
+  });
   const now = new Date().toISOString();
   const document: DocumentRecord = {
     id: documentId,
@@ -77,7 +99,11 @@ export async function ingestMarkdown(input: {
     status: "completed",
     nodeCount: graph.nodes.length,
     edgeCount: graph.edges.length,
-    parserVersion: MARKDOWN_PARSER_VERSION,
+    parserVersion,
+    sourceType: sourceDescriptor.type,
+    sourceLabel: sourceDescriptor.type === "github"
+      ? `${sourceDescriptor.repositoryName} · ${sourceDescriptor.relativePath}`
+      : "수동 업로드",
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -87,41 +113,63 @@ export async function ingestMarkdown(input: {
     "completed",
     `${graph.nodes.length}개 노드 · ${graph.edges.length}개 기본 관계 생성`,
   );
-  let enrichment: EnqueueEnrichmentJobResult | null = null;
-  let enrichmentWarning: string | undefined;
-  let enrichmentRepository: Awaited<ReturnType<typeof getEnrichmentJobRepository>> | undefined;
-  try {
-    enrichmentRepository = await getEnrichmentJobRepository();
-    await enrichmentRepository.markDocumentStale(
-      document.id,
-      document.hash,
-      undefined,
-      input.forceReindex === true,
-    );
-  } catch (error) {
-    enrichmentWarning = error instanceof Error ? error.message : "기존 보강 작업을 무효화하지 못했습니다.";
+  return {
+    document,
+    job,
+    unchanged: false as const,
+    sameHash,
+    existed: Boolean(existing),
+    normalizedSource,
+    sourceDescriptor,
+    graph,
+  };
+}
+
+export async function ingestMarkdown(input: {
+  fileName: string;
+  source: string;
+  size?: number;
+  forceReindex?: boolean;
+  sourceDescriptor?: DocumentSourceDescriptor;
+}) {
+  const prepared = await prepareMarkdownIngestion(input);
+  if (prepared.unchanged) {
+    await saveUnchangedJob(prepared.job);
+    return {
+      document: prepared.document,
+      job: prepared.job,
+      unchanged: true,
+    };
   }
-  await saveDocument({ document, source: normalizedSource, graph, job });
+  const {
+    document,
+    job,
+    graph,
+    normalizedSource,
+    sourceDescriptor,
+  } = prepared;
+  let enrichment: Awaited<ReturnType<typeof scheduleDocumentEnrichment>>["jobs"][number] | null = null;
+  let enrichmentSchedule: Awaited<ReturnType<typeof scheduleDocumentEnrichment>> | null = null;
+  let enrichmentWarning: string | undefined;
+  await saveDocument({ document, source: normalizedSource, sourceDescriptor, graph, job });
   try {
-    const repository = enrichmentRepository ?? await getEnrichmentJobRepository();
-    const enrichmentInput = await buildEnrichmentJobInput({
-      document: {
-        id: document.id,
-        name: document.fileName,
-        hash: document.hash,
-        parserVersion: document.parserVersion,
-      },
-      providerVersion: process.env.ATLAS_CODEX_PROVIDER_VERSION?.trim() || "codex-sdk-0.146.0",
-      nodes: graph.nodes,
-      existingRelations: graph.edges,
-      blocks: graph.blocks,
-      reprocessNonce: input.forceReindex ? crypto.randomUUID() : undefined,
+    enrichmentSchedule = await scheduleDocumentEnrichment({
+      document,
+      graph,
+      forceReprocess: input.forceReindex,
     });
-    enrichment = await repository.enqueue(enrichmentInput);
+    enrichment = enrichmentSchedule.jobs[0] ?? null;
   } catch (error) {
     enrichmentWarning = error instanceof Error ? error.message : "보강 작업을 등록하지 못했습니다.";
   }
-  return { document, job, enrichment, enrichmentWarning, unchanged: false };
+  return {
+    document,
+    job,
+    enrichment,
+    enrichmentSchedule,
+    enrichmentWarning,
+    unchanged: false,
+  };
 }
 
 export async function reindexDocument(id: string) {
@@ -132,5 +180,6 @@ export async function reindexDocument(id: string) {
     source: document.source,
     size: document.size,
     forceReindex: true,
+    sourceDescriptor: document.sourceDescriptor,
   });
 }

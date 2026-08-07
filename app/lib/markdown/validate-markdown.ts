@@ -78,7 +78,4 @@ export function validateDecodedMarkdown(
   if (knownBinaryText || (sample.length > 0 && controls / sample.length > 0.01)) {
     throw new Error(`${fileName}: Markdown으로 위장한 바이너리 파일은 처리할 수 없습니다.`);
   }
-  if (source.includes("\uFFFD")) {
-    throw new Error(`${fileName}: UTF-8로 인코딩된 문서만 지원합니다.`);
-  }
 }

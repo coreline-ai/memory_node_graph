@@ -32,7 +32,10 @@ export class OAuthProxyGraphEnrichment implements GraphEnrichmentProvider {
         ? payload.edges
         : [];
     const ids = new Set(input.nodes.map((node) => node.id));
-    const allowedTypes = new Set(["supports", "extends", "requires", "uses", "mitigates", "risks", "contradicts"]);
+    const allowedTypes = new Set([
+      "documents", "plans", "contains", "supports", "extends",
+      "requires", "uses", "mitigates", "risks", "contradicts",
+    ]);
     return candidates.flatMap((candidate) => {
       if (!candidate || typeof candidate !== "object") return [];
       const row = candidate as Record<string, unknown>;

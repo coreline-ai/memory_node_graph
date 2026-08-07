@@ -1,0 +1,3826 @@
+{
+  "version": "1.0.0",
+  "ontologyVersion": "knowledge-graph-ontology-v1",
+  "generatedAt": "2026-08-06T10:30:00.000Z",
+  "readOnly": true,
+  "repository": {
+    "repositoryId": "1322252398",
+    "owner": "coreline-ai",
+    "name": "memory_node_graph",
+    "commitSha": "1fd68ed2931a55f5b1f18dc302e83fc6e3e29597"
+  },
+  "selection": {
+    "rationale": "프로젝트 README와 Connector·GitHub 동기화 계획을 함께 사용해 UI, ingestion, storage, async enrichment, source sync, security와 QA 관계를 검토한다.",
+    "documentCount": 3,
+    "nodeTarget": "40-80"
+  },
+  "nodes": [
+    {
+      "id": "gold:project:memory-node-graph",
+      "label": "AI Systems Atlas",
+      "type": "project",
+      "status": "current",
+      "aliases": [],
+      "summary": "Markdown 근거를 발광형 Three.js 지식 그래프로 탐색하는 웹앱",
+      "display": {
+        "kind": "thesis",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:1",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L3",
+          "quote": "Markdown 문서를 규칙 기반으로 파싱해 노드·관계를 만들고, 발광형 Three.js 지식 그래프에서 세 가지 관점으로 탐색하는 웹앱입니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:document:readme",
+      "label": "README.md",
+      "type": "document",
+      "status": "current",
+      "aliases": [],
+      "summary": "프로젝트 사용법과 현재 아키텍처 정본",
+      "display": {
+        "kind": "concept",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:1",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L3",
+          "quote": "Markdown 문서를 규칙 기반으로 파싱해 노드·관계를 만들고, 발광형 Three.js 지식 그래프에서 세 가지 관점으로 탐색하는 웹앱입니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:document:connector-plan",
+      "label": "Codex Connector 개발 계획",
+      "type": "document",
+      "status": "current",
+      "aliases": [],
+      "summary": "로컬 Codex 로그인 기반 비동기 보강 계약",
+      "display": {
+        "kind": "concept",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:2",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L5",
+          "quote": "최근 업데이트: 2026-08-02 23:01:53 KST — Phase 3·4 Connector, 작업 API, 공식 Codex SDK 실제 호출과 원자적 결과 병합 구현 완료"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:document:github-sync-plan",
+      "label": "GitHub Markdown 동기화 계획",
+      "type": "document",
+      "status": "current",
+      "aliases": [],
+      "summary": "README와 dev-plan 수집·파싱·원자 적용 계약",
+      "display": {
+        "kind": "concept",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:2",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L5",
+          "quote": "이 문서는 Coreline GitHub 저장소의 README.md와 dev-plan/**/*.md를 수집·파싱해 AI Systems Atlas 지식 그래프에 적용하는 개발 범위를 고정하고, 구현이 목적 밖으로 확장되지 않도록 하기 위한 작업 문서다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:4",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L9",
+          "quote": "coreline-ai 공개 저장소의 기본 브랜치에서 루트 README.md와 dev-plan 디렉터리 아래 모든 .md 파일을 저장소 단위로 동기화한다. README에서는 프로젝트 목적·기능·기술을, 개발 계획에서는 Phase·작업·완료 상태·위험·의존성을 추출하고, 모든 관계가 GitHub 원문과 Markdown 블록 근거를 유지하도록 한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:component:web-app",
+      "label": "Atlas Web App",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "그래프와 대시보드 및 API를 제공하는 웹 애플리케이션",
+      "display": {
+        "kind": "system",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:1",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L3",
+          "quote": "Markdown 문서를 규칙 기반으로 파싱해 노드·관계를 만들고, 발광형 Three.js 지식 그래프에서 세 가지 관점으로 탐색하는 웹앱입니다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:12",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L19",
+          "quote": "/dashboard — Atlas Control Room"
+        }
+      ]
+    },
+    {
+      "id": "gold:component:renderer",
+      "label": "Three.js 3-View Renderer",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "별자리·성운·궤도 보기를 발광형 그래프로 렌더링",
+      "display": {
+        "kind": "system",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:47",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L116-L129",
+          "quote": "역할파일그래프 UI·Three.js 렌더러app/knowledge-graph.tsx그래프 레이아웃 전략app/graph/layouts.ts대시보드app/dashboard/Markdown AST 파서app/lib/markdown/parse-markdown.ts규칙 추출기app/lib/markdown/extract-graph.ts문서 처리 서비스app/lib/ingestion/ingestion-service.tsD1·메모리 저장소app/lib/storage/graph-repository.ts보강 작업 저장소app/lib/storage/enrichment-job-repository.ts결과 검증기app/lib/llm/enrichment-result-validator.ts로컬 Codex Connectorconnector/Drizzle 스키마db/schema.tsD1 SQLdrizzle/0001_atlas_documents.sql, drizzle/0002_codex_enrichment.sql, drizzle/0003_co…"
+        }
+      ]
+    },
+    {
+      "id": "gold:component:graph-projector",
+      "label": "GraphSnapshot Projector",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "저장 관계를 화면용 GraphSnapshot으로 투영",
+      "display": {
+        "kind": "system",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:component:dashboard",
+      "label": "Atlas Control Room",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "문서·동기화·보강 작업을 관리하고 상태를 표시",
+      "display": {
+        "kind": "system",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:12",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L19",
+          "quote": "/dashboard — Atlas Control Room"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L26",
+          "quote": "보강 대기·실행·완료·경고·실패 상태와 Connector 온라인 여부 확인"
+        }
+      ]
+    },
+    {
+      "id": "gold:workflow:ingestion",
+      "label": "Markdown Ingestion",
+      "type": "workflow",
+      "status": "current",
+      "aliases": [],
+      "summary": "검증→AST→규칙 추출→D1 저장으로 이어지는 기본 인덱싱 흐름",
+      "display": {
+        "kind": "system",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:workflow:validate",
+      "label": "Markdown Validation",
+      "type": "workflow",
+      "status": "current",
+      "aliases": [],
+      "summary": "형식·크기·해시를 검사하는 선행 단계",
+      "display": {
+        "kind": "practice",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:workflow:remark-ast",
+      "label": "Remark AST Parsing",
+      "type": "workflow",
+      "status": "current",
+      "aliases": [],
+      "summary": "Markdown을 구조화된 AST로 변환",
+      "display": {
+        "kind": "practice",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:workflow:rule-extraction",
+      "label": "Rule Graph Extraction",
+      "type": "workflow",
+      "status": "current",
+      "aliases": [],
+      "summary": "명시 패턴에서 결정적 노드와 관계를 생성",
+      "display": {
+        "kind": "practice",
+        "domain": "reasoning"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:26",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L50",
+          "quote": "기능:, 모듈:, 의존성:, 결정:, 위험:, 도구:, 개념: 패턴"
+        }
+      ]
+    },
+    {
+      "id": "gold:component:graph-repository",
+      "label": "Graph Repository",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "문서·블록·엔티티·관계를 D1에 저장하고 조회",
+      "display": {
+        "kind": "system",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:47",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L116-L129",
+          "quote": "역할파일그래프 UI·Three.js 렌더러app/knowledge-graph.tsx그래프 레이아웃 전략app/graph/layouts.ts대시보드app/dashboard/Markdown AST 파서app/lib/markdown/parse-markdown.ts규칙 추출기app/lib/markdown/extract-graph.ts문서 처리 서비스app/lib/ingestion/ingestion-service.tsD1·메모리 저장소app/lib/storage/graph-repository.ts보강 작업 저장소app/lib/storage/enrichment-job-repository.ts결과 검증기app/lib/llm/enrichment-result-validator.ts로컬 Codex Connectorconnector/Drizzle 스키마db/schema.tsD1 SQLdrizzle/0001_atlas_documents.sql, drizzle/0002_codex_enrichment.sql, drizzle/0003_co…"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:97",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L127",
+          "quote": "app/lib/storage/graph-repository.ts — source key 조회, 저장소 단위 staging·교체"
+        }
+      ]
+    },
+    {
+      "id": "gold:component:enrichment-queue",
+      "label": "Enrichment Job Queue",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "Codex 보강 작업의 등록·Claim·Lease·결과 상태를 관리",
+      "display": {
+        "kind": "system",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L39",
+          "quote": "웹앱과 Connector 사이에 D1 기반 비동기 작업 등록·Claim·Lease·결과 제출 흐름을 추가한다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:component:codex-connector",
+      "label": "Atlas Codex Connector",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "로컬 Codex 로그인으로 작업을 받아 의미 관계 후보를 생성",
+      "display": {
+        "kind": "system",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:13",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L37",
+          "quote": "공식 @openai/codex-sdk를 사용하는 독립 Node.js Connector를 추가한다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:33",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L65",
+          "quote": "다른 터미널에서 기존 ChatGPT/Codex 로그인을 사용하는 Connector를 실행합니다. OpenAI API 키는 사용하지 않습니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:component:result-validator",
+      "label": "Codex Result Validator",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "JSON Schema와 허용 ID·관계·근거를 서버에서 재검증",
+      "display": {
+        "kind": "system",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:17",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L41",
+          "quote": "Codex 출력은 JSON Schema로 제한하고 서버에서 다시 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:component:github-sync",
+      "label": "GitHub Markdown Synchronizer",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "공개 저장소 README와 dev-plan을 저장소 단위로 동기화",
+      "display": {
+        "kind": "system",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:4",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L9",
+          "quote": "coreline-ai 공개 저장소의 기본 브랜치에서 루트 README.md와 dev-plan 디렉터리 아래 모든 .md 파일을 저장소 단위로 동기화한다. README에서는 프로젝트 목적·기능·기술을, 개발 계획에서는 Phase·작업·완료 상태·위험·의존성을 추출하고, 모든 관계가 GitHub 원문과 Markdown 블록 근거를 유지하도록 한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L14",
+          "quote": "각 저장소 기본 브랜치의 루트 README.md와 dev-plan/**/*.md 일반 파일을 최소 수집 대상으로 삼는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:component:atomic-staging",
+      "label": "Repository Atomic Staging",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "저장소 문서 묶음을 검증 후 원자적으로 교체",
+      "display": {
+        "kind": "system",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:181",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L245",
+          "quote": "Phase 4. 저장소 단위 원자적 동기화"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:component:overview-projector",
+      "label": "Overview Projector",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "저장소와 공유 기술 중심의 overview를 예산 안에서 투영",
+      "display": {
+        "kind": "system",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:52",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L72",
+          "quote": "overview: 저장소 노드와 공유 기술·명시적 저장소 간 관계를 중심으로 500노드 예산을 지킨다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:212",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L291",
+          "quote": "/api/graph?scope=overview에서 저장소·공유 기술·명시적 저장소 관계만 투영한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:component:repository-projector",
+      "label": "Repository Detail Projector",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "선택 저장소의 README·계획·Phase·Task를 상세 투영",
+      "display": {
+        "kind": "system",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:53",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L73",
+          "quote": "repository: 선택한 저장소의 README 섹션, 계획 문서, Phase, Task와 근거 관계를 상세 투영한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:222",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L303",
+          "quote": "선택 저장소 상세에서 README와 모든 dev-plan 문서·Phase·Task가 조회된다."
+        }
+      ]
+    },
+    {
+      "id": "gold:component:write-boundary",
+      "label": "OAuth Write Boundary",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "공개 읽기와 인증된 문서 쓰기 동작을 분리",
+      "display": {
+        "kind": "system",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:38",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L78",
+          "quote": "그래프와 대시보드 읽기는 공개로 두고 문서 추가·삭제·재인덱싱만 OAuth 프록시 뒤에 둘 때 다음 값을 사용합니다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:40",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L84",
+          "quote": "이 모드는 신뢰 가능한 프록시가 클라이언트가 보낸 사용자 식별 헤더를 제거한 뒤 oai-authenticated-user-id, x-openai-user-id, cf-access-authenticated-user-email 중 하나를 주입하는 환경에서만 활성화해야 합니다. 로컬 데모 기본값은 public입니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:component:source-identity",
+      "label": "GitHub Source Identity",
+      "type": "component",
+      "status": "current",
+      "aliases": [],
+      "summary": "저장소·경로·commit을 이용해 문서와 노드의 source-local identity를 유지",
+      "display": {
+        "kind": "system",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:31",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L44",
+          "quote": "현재 documents.normalized_name은 전역 UNIQUE이므로 여러 저장소의 README.md가 충돌한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L67",
+          "quote": "저장소·문서·섹션·Phase·Task 노드는 source-local ID를 사용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:constellation",
+      "label": "별자리 보기",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "Force 3D 기반 기본 그래프 보기",
+      "display": {
+        "kind": "practice",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:5",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L11",
+          "quote": "별자리: 기존 Force 3D 그래프를 유지하는 기본 보기"
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:nebula",
+      "label": "성운 보기",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "분야별 클러스터와 브리지 관계 보기",
+      "display": {
+        "kind": "practice",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:6",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L12",
+          "quote": "성운: 지식 분야별 클러스터와 클러스터 사이 브리지 보기"
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:orbit",
+      "label": "궤도 보기",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "선택 노드 중심의 1-hop·2-hop 관계 보기",
+      "display": {
+        "kind": "practice",
+        "domain": "reasoning"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L13",
+          "quote": "궤도: 선택 노드를 중심으로 1-hop과 2-hop 관계 보기"
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:luminosity",
+      "label": "발광 프리셋",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "기본·브라이트·초신성 밝기 연출",
+      "display": {
+        "kind": "practice",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:8",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L14",
+          "quote": "기본, 브라이트, 초신성 발광 프리셋"
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:upload",
+      "label": "Markdown 추가",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "대시보드에서 .md와 .mdx 문서를 추가",
+      "display": {
+        "kind": "practice",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:13",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L21",
+          "quote": ".md, .mdx 파일 추가"
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:unchanged",
+      "label": "SHA-256 Unchanged Detection",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "동일 문서 해시의 불필요한 재처리를 생략",
+      "display": {
+        "kind": "practice",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L23",
+          "quote": "동일 파일 SHA-256 비교와 unchanged 처리"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:19",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L43",
+          "quote": "동일 문서 해시와 동일 보강 버전의 작업은 중복 실행하지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:reindex",
+      "label": "문서 재인덱싱",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "저장 원문을 현재 파서로 다시 인덱싱",
+      "display": {
+        "kind": "practice",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:16",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L24",
+          "quote": "재인덱싱과 삭제"
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:delete",
+      "label": "문서 삭제",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "문서와 자동 생성 그래프 데이터를 함께 제거",
+      "display": {
+        "kind": "practice",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:16",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L24",
+          "quote": "재인덱싱과 삭제"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:enrichment-status",
+      "label": "보강 상태 표시",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "작업 상태와 Connector 온라인 여부를 대시보드에 표시",
+      "display": {
+        "kind": "practice",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L26",
+          "quote": "보강 대기·실행·완료·경고·실패 상태와 Connector 온라인 여부 확인"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L45",
+          "quote": "대시보드에 보강 대기, 보강 중, 보강 완료, 보강 경고, Connector 오프라인 상태를 표시한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:retry-cancel",
+      "label": "보강 재시도·취소",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "실패·경고 작업 재시도와 대기·실행 작업 취소",
+      "display": {
+        "kind": "practice",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:19",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L27",
+          "quote": "실패·경고 작업은 최대 2회 수동 재시도, 대기·실행 작업은 취소"
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:provenance",
+      "label": "Block·GitHub Evidence",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "모든 의미 관계가 문서 블록과 commit 고정 원문으로 역추적",
+      "display": {
+        "kind": "practice",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L42",
+          "quote": "관계에 origin, Provider·Prompt 버전, 근거 블록, 생성 시각을 기록한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:4",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L9",
+          "quote": "coreline-ai 공개 저장소의 기본 브랜치에서 루트 README.md와 dev-plan 디렉터리 아래 모든 .md 파일을 저장소 단위로 동기화한다. README에서는 프로젝트 목적·기능·기술을, 개발 계획에서는 Phase·작업·완료 상태·위험·의존성을 추출하고, 모든 관계가 GitHub 원문과 Markdown 블록 근거를 유지하도록 한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:github-collection",
+      "label": "README·dev-plan 수집",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "루트 README와 dev-plan 아래 Markdown을 수집",
+      "display": {
+        "kind": "practice",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L14",
+          "quote": "각 저장소 기본 브랜치의 루트 README.md와 dev-plan/**/*.md 일반 파일을 최소 수집 대상으로 삼는다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:42",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L58",
+          "quote": "README가 없어도 dev-plan 문서가 있으면 해당 저장소는 동기화한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:scope-navigation",
+      "label": "Overview↔Repository 탐색",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "전체 저장소와 선택 저장소 상세 사이를 이동",
+      "display": {
+        "kind": "practice",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:215",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L294",
+          "quote": "그래프 UI에 overview→repository 진입과 전체 저장소 복귀 동작을 추가한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:223",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L304",
+          "quote": "다른 저장소로 전환하거나 overview로 복귀할 때 선택·필터 상태가 깨지지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:feature:performance-fixture",
+      "label": "500×2,000 성능 Fixture",
+      "type": "feature",
+      "status": "current",
+      "aliases": [],
+      "summary": "500노드·2,000관계 렌더링과 상호작용을 검증하는 읽기 전용 샘플",
+      "display": {
+        "kind": "practice",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:51",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L141",
+          "quote": "성능 HUD와 500 노드·2,000 관계 로컬 fixture는 개발 서버에서 다음 주소로 확인합니다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:52",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L143-L145",
+          "quote": "http://localhost:3000/?fixture=500x2000&perf=1"
+        }
+      ]
+    },
+    {
+      "id": "gold:api:graph",
+      "label": "GET /api/graph",
+      "type": "api",
+      "status": "current",
+      "aliases": [],
+      "summary": "현재 또는 scope별 GraphSnapshot 조회 API",
+      "display": {
+        "kind": "tool",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:100",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L130",
+          "quote": "app/api/graph/route.ts — overview·repository 투영 query"
+        }
+      ]
+    },
+    {
+      "id": "gold:api:documents",
+      "label": "POST /api/documents",
+      "type": "api",
+      "status": "current",
+      "aliases": [],
+      "summary": "Markdown 추가와 인덱싱 API",
+      "display": {
+        "kind": "tool",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        }
+      ]
+    },
+    {
+      "id": "gold:api:reindex",
+      "label": "POST /api/documents/:id/reindex",
+      "type": "api",
+      "status": "current",
+      "aliases": [],
+      "summary": "저장 원문 재인덱싱 API",
+      "display": {
+        "kind": "tool",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        }
+      ]
+    },
+    {
+      "id": "gold:api:claim",
+      "label": "POST /api/enrichment-jobs/claim",
+      "type": "api",
+      "status": "current",
+      "aliases": [],
+      "summary": "Connector가 작업을 Claim하는 API",
+      "display": {
+        "kind": "tool",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L39",
+          "quote": "웹앱과 Connector 사이에 D1 기반 비동기 작업 등록·Claim·Lease·결과 제출 흐름을 추가한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:api:result",
+      "label": "POST /api/enrichment-jobs/:id/result",
+      "type": "api",
+      "status": "current",
+      "aliases": [],
+      "summary": "검증된 Codex 결과를 제출하는 API",
+      "display": {
+        "kind": "tool",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L39",
+          "quote": "웹앱과 Connector 사이에 D1 기반 비동기 작업 등록·Claim·Lease·결과 제출 흐름을 추가한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L42",
+          "quote": "관계에 origin, Provider·Prompt 버전, 근거 블록, 생성 시각을 기록한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:data:markdown-block",
+      "label": "Markdown Evidence Block",
+      "type": "data",
+      "status": "current",
+      "aliases": [],
+      "summary": "문서 위치·텍스트·source URL을 가진 최소 근거 단위",
+      "display": {
+        "kind": "concept",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L42",
+          "quote": "관계에 origin, Provider·Prompt 버전, 근거 블록, 생성 시각을 기록한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:data:graph-snapshot",
+      "label": "GraphSnapshot",
+      "type": "data",
+      "status": "current",
+      "aliases": [],
+      "summary": "렌더러가 소비하는 노드·관계·메타데이터 묶음",
+      "display": {
+        "kind": "concept",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:35",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L48",
+          "quote": "현재 성능 기준은 500노드·2,000관계이므로 전체 문서를 단일 GraphSnapshot으로 투영하지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:data:relation-candidate",
+      "label": "Codex Relation Candidate",
+      "type": "data",
+      "status": "current",
+      "aliases": [],
+      "summary": "검증 전 후보로 취급되는 근거 기반 의미 관계",
+      "display": {
+        "kind": "concept",
+        "domain": "reasoning"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:58",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L88",
+          "quote": "Codex가 생성한 관계는 검증 전까지 후보 데이터로 취급한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:data:repository-manifest",
+      "label": "Repository Document Manifest",
+      "type": "data",
+      "status": "current",
+      "aliases": [],
+      "summary": "한 저장소에 적용할 README·dev-plan 문서 집합",
+      "display": {
+        "kind": "concept",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:4",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L9",
+          "quote": "coreline-ai 공개 저장소의 기본 브랜치에서 루트 README.md와 dev-plan 디렉터리 아래 모든 .md 파일을 저장소 단위로 동기화한다. README에서는 프로젝트 목적·기능·기술을, 개발 계획에서는 Phase·작업·완료 상태·위험·의존성을 추출하고, 모든 관계가 GitHub 원문과 Markdown 블록 근거를 유지하도록 한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:storage:d1",
+      "label": "Cloudflare D1",
+      "type": "storage",
+      "status": "current",
+      "aliases": [
+        "D1"
+      ],
+      "summary": "기본 그래프와 작업 상태의 영속 저장소",
+      "display": {
+        "kind": "system",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:32",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L63",
+          "quote": "D1 스키마는 첫 저장소 접근 시 자동 생성됩니다. 정식 마이그레이션 SQL은 drizzle/0001_atlas_documents.sql, drizzle/0002_codex_enrichment.sql, drizzle/0003_connector_dashboard.sql에 있습니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:storage:enrichment-jobs",
+      "label": "Enrichment Jobs",
+      "type": "storage",
+      "status": "current",
+      "aliases": [],
+      "summary": "비동기 보강 작업과 Lease·결과 상태 저장",
+      "display": {
+        "kind": "system",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L39",
+          "quote": "웹앱과 Connector 사이에 D1 기반 비동기 작업 등록·Claim·Lease·결과 제출 흐름을 추가한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:19",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L43",
+          "quote": "동일 문서 해시와 동일 보강 버전의 작업은 중복 실행하지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:storage:github-stage",
+      "label": "GitHub Apply Stage",
+      "type": "storage",
+      "status": "current",
+      "aliases": [],
+      "summary": "저장소 단위 원자 적용 전 문서·그래프 staging 저장",
+      "display": {
+        "kind": "system",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:97",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L127",
+          "quote": "app/lib/storage/graph-repository.ts — source key 조회, 저장소 단위 staging·교체"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:181",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L245",
+          "quote": "Phase 4. 저장소 단위 원자적 동기화"
+        }
+      ]
+    },
+    {
+      "id": "gold:technology:three-js",
+      "label": "Three.js",
+      "type": "technology",
+      "status": "current",
+      "aliases": [
+        "ThreeJS",
+        "Three JS"
+      ],
+      "summary": "발광형 3D 지식 그래프 렌더링 기술",
+      "display": {
+        "kind": "tool",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:1",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L3",
+          "quote": "Markdown 문서를 규칙 기반으로 파싱해 노드·관계를 만들고, 발광형 Three.js 지식 그래프에서 세 가지 관점으로 탐색하는 웹앱입니다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:technology:remark",
+      "label": "Remark",
+      "type": "technology",
+      "status": "current",
+      "aliases": [],
+      "summary": "Markdown AST 파싱 기술",
+      "display": {
+        "kind": "tool",
+        "domain": "memory"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:technology:codex-sdk",
+      "label": "OpenAI Codex SDK",
+      "type": "technology",
+      "status": "current",
+      "aliases": [
+        "Codex SDK",
+        "공식 Codex SDK",
+        "@openai/codex-sdk"
+      ],
+      "summary": "로컬 Codex CLI 로그인 상태를 사용하는 공식 TypeScript SDK",
+      "display": {
+        "kind": "tool",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:13",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L37",
+          "quote": "공식 @openai/codex-sdk를 사용하는 독립 Node.js Connector를 추가한다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:33",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L65",
+          "quote": "다른 터미널에서 기존 ChatGPT/Codex 로그인을 사용하는 Connector를 실행합니다. OpenAI API 키는 사용하지 않습니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:decision:rule-first",
+      "label": "규칙 기반 인덱싱 우선",
+      "type": "decision",
+      "status": "current",
+      "aliases": [],
+      "summary": "외부 LLM 없이 기본 그래프를 먼저 완성",
+      "display": {
+        "kind": "thesis",
+        "domain": "reasoning"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:27",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L51",
+          "quote": "모든 기본 인덱싱은 외부 LLM 없이 완료"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:57",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L87",
+          "quote": "규칙 기반 인덱싱 성공 여부와 Codex 보강 성공 여부를 분리한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:decision:optional-enrichment",
+      "label": "Codex 보강은 선택형",
+      "type": "decision",
+      "status": "current",
+      "aliases": [],
+      "summary": "보강 실패와 기본 그래프 성공을 분리",
+      "display": {
+        "kind": "thesis",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:2",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L5",
+          "quote": "외부 LightRAG 서버나 OpenAI API 키 없이 기본 인덱싱이 동작합니다. 선택형 Atlas Codex Connector는 로컬 codex login 상태를 사용해 문서 근거 기반 관계를 비동기로 보강합니다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:60",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L82",
+          "quote": "보강 실패는 규칙 기반 그래프와 GitHub 동기화 성공을 롤백하지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:decision:no-api-key",
+      "label": "OpenAI API 키 미사용",
+      "type": "decision",
+      "status": "current",
+      "aliases": [],
+      "summary": "Codex 인증은 로컬 CLI가 소유하고 API 키 경로를 제외",
+      "display": {
+        "kind": "thesis",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:33",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L65",
+          "quote": "다른 터미널에서 기존 ChatGPT/Codex 로그인을 사용하는 Connector를 실행합니다. OpenAI API 키는 사용하지 않습니다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:28",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L54",
+          "quote": "OpenAI API 키, LIGHTRAG_API_KEY, OAuth Client Secret 기반 LLM 호출"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:86",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L125",
+          "quote": "Codex 인증은 로컬 Codex CLI가 소유한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:decision:browser-isolation",
+      "label": "브라우저·Codex CLI 격리",
+      "type": "decision",
+      "status": "current",
+      "aliases": [],
+      "summary": "브라우저는 CLI와 직접 통신하지 않고 Connector만 아웃바운드 요청",
+      "display": {
+        "kind": "thesis",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:59",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L89",
+          "quote": "브라우저는 Codex CLI와 직접 통신하지 않는다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:60",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L90",
+          "quote": "Connector는 웹앱으로 아웃바운드 요청만 보내며 로컬 수신 포트를 공용으로 열지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:decision:atomic-sync",
+      "label": "저장소 단위 원자 Apply",
+      "type": "decision",
+      "status": "current",
+      "aliases": [],
+      "summary": "문서 묶음 검증 성공 후에만 저장소 그래프를 교체",
+      "display": {
+        "kind": "thesis",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:181",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L245",
+          "quote": "Phase 4. 저장소 단위 원자적 동기화"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:decision:source-local-id",
+      "label": "Source-local ID",
+      "type": "decision",
+      "status": "current",
+      "aliases": [],
+      "summary": "저장소·문서·Phase·Task ID를 출처 범위에 고정",
+      "display": {
+        "kind": "thesis",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L67",
+          "quote": "저장소·문서·섹션·Phase·Task 노드는 source-local ID를 사용한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:163",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L220",
+          "quote": "저장소·문서·섹션·Phase·Task의 source-local 안정 ID를 생성한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:decision:no-deploy",
+      "label": "승인 전 배포 금지",
+      "type": "decision",
+      "status": "current",
+      "aliases": [],
+      "summary": "로컬 구현·검증만 수행하고 별도 승인 전 배포하지 않음",
+      "display": {
+        "kind": "thesis",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:56",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L155",
+          "quote": "구현과 로컬 검증만 수행합니다. 별도 사용자 승인 전에는 배포하지 않습니다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:36",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L62",
+          "quote": "별도 승인 없는 운영 배포·D1 운영 마이그레이션 실행"
+        }
+      ]
+    },
+    {
+      "id": "gold:decision:graph-budget",
+      "label": "500노드·2,000관계 예산",
+      "type": "decision",
+      "status": "current",
+      "aliases": [],
+      "summary": "전체 문서를 하나의 무제한 snapshot으로 만들지 않는 성능 계약",
+      "display": {
+        "kind": "thesis",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:35",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L48",
+          "quote": "현재 성능 기준은 500노드·2,000관계이므로 전체 문서를 단일 GraphSnapshot으로 투영하지 않는다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:90",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L118",
+          "quote": "overview와 repository 상세가 각각 노드 예산과 500노드·2,000관계 성능 기준을 지키는지 확인한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:risk:connector-offline",
+      "label": "Connector Offline",
+      "type": "risk",
+      "status": "current",
+      "aliases": [],
+      "summary": "로그인·네트워크·Connector 중단으로 의미 보강이 실패할 수 있음",
+      "display": {
+        "kind": "risk",
+        "domain": "agents"
+      },
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L45",
+          "quote": "대시보드에 보강 대기, 보강 중, 보강 완료, 보강 경고, Connector 오프라인 상태를 표시한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:risk:credential-leak",
+      "label": "Codex Credential Leakage",
+      "type": "risk",
+      "status": "current",
+      "aliases": [],
+      "summary": "Codex 토큰이 브라우저·D1·로그로 유출될 위험",
+      "display": {
+        "kind": "risk",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:43",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L93",
+          "quote": "ATLAS_CONNECTOR_TOKEN은 OpenAI 키가 아니라 Atlas 작업 API만 보호하는 애플리케이션 자격증명입니다. Codex 로그인 토큰은 로컬 Connector 밖으로 전달되지 않고 브라우저·D1·웹앱 환경 변수에도 저장되지 않습니다. Connector는 OpenAI 키 환경 변수를 제거한 자식 환경에서 공식 SDK를 실행합니다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:29",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L55",
+          "quote": "ChatGPT/Codex 인증 토큰을 브라우저·D1·웹앱 환경 변수에 저장하는 기능"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:62",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L92",
+          "quote": "개발 중에도 ChatGPT/Codex 토큰 원문을 로그에 남기지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:risk:partial-sync",
+      "label": "Partial Repository Apply",
+      "type": "risk",
+      "status": "current",
+      "aliases": [],
+      "summary": "저장소 문서 일부만 반영되어 이전 정상 그래프를 훼손할 위험",
+      "display": {
+        "kind": "risk",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:88",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L116",
+          "quote": "동기화 실패가 이전 정상 그래프와 완료된 보강 관계를 훼손하지 않는지 확인한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:risk:identity-collision",
+      "label": "Cross-repository Identity Collision",
+      "type": "risk",
+      "status": "current",
+      "aliases": [],
+      "summary": "여러 저장소의 README와 동명 노드가 잘못 충돌하거나 병합될 위험",
+      "display": {
+        "kind": "risk",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:31",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L44",
+          "quote": "현재 documents.normalized_name은 전역 UNIQUE이므로 여러 저장소의 README.md가 충돌한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:81",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L109",
+          "quote": "서로 다른 저장소의 동일한 README.md 파일명이 충돌하지 않는지 확인한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:risk:graph-hairball",
+      "label": "Graph Hairball",
+      "type": "risk",
+      "status": "current",
+      "aliases": [],
+      "summary": "전체 구조 관계가 화면 예산을 소진해 탐색성이 사라질 위험",
+      "display": {
+        "kind": "risk",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:35",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L48",
+          "quote": "현재 성능 기준은 500노드·2,000관계이므로 전체 문서를 단일 GraphSnapshot으로 투영하지 않는다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:214",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L293",
+          "quote": "overview가 500노드 예산을 넘으면 결정적 우선순위로 공유 기술 노드를 제한하고 메타에 생략 수를 표시한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:test:verification-suite",
+      "label": "Type·Lint·Build·Test Suite",
+      "type": "test",
+      "status": "current",
+      "aliases": [],
+      "summary": "프로덕션·Connector 빌드와 API·Lease·결과 병합 회귀 검증",
+      "display": {
+        "kind": "practice",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L133-L137",
+          "quote": "npx tsc --noEmit npm run lint npm test"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:50",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L139",
+          "quote": "npm test는 프로덕션·Connector 빌드 후 그래프, 대시보드, Markdown API, 작업 API, Lease 상태 전이, 결과 병합과 Connector 순차 실행을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:test:performance",
+      "label": "500×2,000 Performance Test",
+      "type": "test",
+      "status": "current",
+      "aliases": [],
+      "summary": "대형 fixture의 렌더링·scope 성능 기준 검증",
+      "display": {
+        "kind": "practice",
+        "domain": "product"
+      },
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:51",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L141",
+          "quote": "성능 HUD와 500 노드·2,000 관계 로컬 fixture는 개발 서버에서 다음 주소로 확인합니다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:225",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L306",
+          "quote": "500노드·2,000관계 fixture와 실제 overview·대형 repository fixture 성능 기준을 통과한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:test:no-op-sync",
+      "label": "No-op Sync Test",
+      "type": "test",
+      "status": "current",
+      "aliases": [],
+      "summary": "동일 manifest 재실행에서 변경·삭제·보강 작업이 0인지 검증",
+      "display": {
+        "kind": "practice",
+        "domain": "infrastructure"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:89",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L117",
+          "quote": "두 번째 동일 동기화에서 변경 문서·보강 작업이 0개인지 확인한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:199",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L269",
+          "quote": "같은 manifest 재실행에서 변경·삭제·보강 작업이 0개다."
+        }
+      ]
+    },
+    {
+      "id": "gold:test:atomic-rollback",
+      "label": "Atomic Rollback Test",
+      "type": "test",
+      "status": "current",
+      "aliases": [],
+      "summary": "동기화 실패가 이전 정상 그래프와 보강 관계를 훼손하지 않는지 검증",
+      "display": {
+        "kind": "practice",
+        "domain": "safety"
+      },
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:88",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L116",
+          "quote": "동기화 실패가 이전 정상 그래프와 완료된 보강 관계를 훼손하지 않는지 확인한다."
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "gold:edge:001",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:document:readme",
+      "relation": "documents",
+      "displayType": "documents",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "프로젝트의 현재 사용·아키텍처 문서",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:1",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L3",
+          "quote": "Markdown 문서를 규칙 기반으로 파싱해 노드·관계를 만들고, 발광형 Three.js 지식 그래프에서 세 가지 관점으로 탐색하는 웹앱입니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:002",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:document:connector-plan",
+      "relation": "documents",
+      "displayType": "plans",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "Codex Connector 구현 계획",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:2",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L5",
+          "quote": "최근 업데이트: 2026-08-02 23:01:53 KST — Phase 3·4 Connector, 작업 API, 공식 Codex SDK 실제 호출과 원자적 결과 병합 구현 완료"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:003",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:document:github-sync-plan",
+      "relation": "documents",
+      "displayType": "plans",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "GitHub 문서 동기화 구현 계획",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:2",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L5",
+          "quote": "이 문서는 Coreline GitHub 저장소의 README.md와 dev-plan/**/*.md를 수집·파싱해 AI Systems Atlas 지식 그래프에 적용하는 개발 범위를 고정하고, 구현이 목적 밖으로 확장되지 않도록 하기 위한 작업 문서다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:004",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:component:web-app",
+      "relation": "contains",
+      "displayType": "contains",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "프로젝트 핵심 구성",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:005",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:component:renderer",
+      "relation": "contains",
+      "displayType": "contains",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "프로젝트 핵심 구성",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:006",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:component:graph-projector",
+      "relation": "contains",
+      "displayType": "contains",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "프로젝트 핵심 구성",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:007",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:component:dashboard",
+      "relation": "contains",
+      "displayType": "contains",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "프로젝트 핵심 구성",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:008",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:workflow:ingestion",
+      "relation": "contains",
+      "displayType": "contains",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "프로젝트 핵심 구성",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:009",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:component:graph-repository",
+      "relation": "contains",
+      "displayType": "contains",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "프로젝트 핵심 구성",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:010",
+      "source": "gold:document:connector-plan",
+      "target": "gold:component:codex-connector",
+      "relation": "plans",
+      "displayType": "plans",
+      "layer": "structural",
+      "confidence": 0.99,
+      "note": "Connector 책임을 정의",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:13",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L37",
+          "quote": "공식 @openai/codex-sdk를 사용하는 독립 Node.js Connector를 추가한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:011",
+      "source": "gold:document:connector-plan",
+      "target": "gold:component:enrichment-queue",
+      "relation": "plans",
+      "displayType": "plans",
+      "layer": "structural",
+      "confidence": 0.99,
+      "note": "비동기 작업 계약을 정의",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L39",
+          "quote": "웹앱과 Connector 사이에 D1 기반 비동기 작업 등록·Claim·Lease·결과 제출 흐름을 추가한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:012",
+      "source": "gold:document:connector-plan",
+      "target": "gold:component:result-validator",
+      "relation": "plans",
+      "displayType": "plans",
+      "layer": "structural",
+      "confidence": 0.99,
+      "note": "구조화 결과 검증을 정의",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:17",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L41",
+          "quote": "Codex 출력은 JSON Schema로 제한하고 서버에서 다시 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:013",
+      "source": "gold:document:github-sync-plan",
+      "target": "gold:component:github-sync",
+      "relation": "plans",
+      "displayType": "plans",
+      "layer": "structural",
+      "confidence": 0.99,
+      "note": "GitHub 수집·동기화를 정의",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:4",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L9",
+          "quote": "coreline-ai 공개 저장소의 기본 브랜치에서 루트 README.md와 dev-plan 디렉터리 아래 모든 .md 파일을 저장소 단위로 동기화한다. README에서는 프로젝트 목적·기능·기술을, 개발 계획에서는 Phase·작업·완료 상태·위험·의존성을 추출하고, 모든 관계가 GitHub 원문과 Markdown 블록 근거를 유지하도록 한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:014",
+      "source": "gold:document:github-sync-plan",
+      "target": "gold:component:atomic-staging",
+      "relation": "plans",
+      "displayType": "plans",
+      "layer": "structural",
+      "confidence": 0.99,
+      "note": "저장소 원자 적용을 정의",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:181",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L245",
+          "quote": "Phase 4. 저장소 단위 원자적 동기화"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:015",
+      "source": "gold:document:github-sync-plan",
+      "target": "gold:component:overview-projector",
+      "relation": "plans",
+      "displayType": "plans",
+      "layer": "structural",
+      "confidence": 0.98,
+      "note": "overview 투영을 정의",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:212",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L291",
+          "quote": "/api/graph?scope=overview에서 저장소·공유 기술·명시적 저장소 관계만 투영한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:016",
+      "source": "gold:document:github-sync-plan",
+      "target": "gold:component:repository-projector",
+      "relation": "plans",
+      "displayType": "plans",
+      "layer": "structural",
+      "confidence": 0.98,
+      "note": "repository 상세 투영을 정의",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:53",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L73",
+          "quote": "repository: 선택한 저장소의 README 섹션, 계획 문서, Phase, Task와 근거 관계를 상세 투영한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:017",
+      "source": "gold:component:renderer",
+      "target": "gold:feature:constellation",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "렌더러가 그래프 보기를 구현",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:5",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L11",
+          "quote": "별자리: 기존 Force 3D 그래프를 유지하는 기본 보기"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:018",
+      "source": "gold:component:renderer",
+      "target": "gold:feature:nebula",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "렌더러가 그래프 보기를 구현",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:6",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L12",
+          "quote": "성운: 지식 분야별 클러스터와 클러스터 사이 브리지 보기"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:019",
+      "source": "gold:component:renderer",
+      "target": "gold:feature:orbit",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "렌더러가 그래프 보기를 구현",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L13",
+          "quote": "궤도: 선택 노드를 중심으로 1-hop과 2-hop 관계 보기"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:020",
+      "source": "gold:component:renderer",
+      "target": "gold:feature:luminosity",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "렌더러가 그래프 보기를 구현",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:8",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L14",
+          "quote": "기본, 브라이트, 초신성 발광 프리셋"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:021",
+      "source": "gold:component:renderer",
+      "target": "gold:technology:three-js",
+      "relation": "uses",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "Three.js 기반 발광형 렌더링",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:1",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L3",
+          "quote": "Markdown 문서를 규칙 기반으로 파싱해 노드·관계를 만들고, 발광형 Three.js 지식 그래프에서 세 가지 관점으로 탐색하는 웹앱입니다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:022",
+      "source": "gold:component:renderer",
+      "target": "gold:data:graph-snapshot",
+      "relation": "reads_from",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "GraphSnapshot을 화면에 렌더링",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:023",
+      "source": "gold:component:graph-projector",
+      "target": "gold:storage:d1",
+      "relation": "reads_from",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.97,
+      "note": "D1 그래프를 읽어 투영",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:024",
+      "source": "gold:component:graph-projector",
+      "target": "gold:data:graph-snapshot",
+      "relation": "produces",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "렌더러 입력 snapshot 생성",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:025",
+      "source": "gold:component:overview-projector",
+      "target": "gold:data:graph-snapshot",
+      "relation": "produces",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "overview snapshot 생성",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:212",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L291",
+          "quote": "/api/graph?scope=overview에서 저장소·공유 기술·명시적 저장소 관계만 투영한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:214",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L293",
+          "quote": "overview가 500노드 예산을 넘으면 결정적 우선순위로 공유 기술 노드를 제한하고 메타에 생략 수를 표시한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:026",
+      "source": "gold:component:repository-projector",
+      "target": "gold:data:graph-snapshot",
+      "relation": "produces",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "repository 상세 snapshot 생성",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:53",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L73",
+          "quote": "repository: 선택한 저장소의 README 섹션, 계획 문서, Phase, Task와 근거 관계를 상세 투영한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:027",
+      "source": "gold:component:overview-projector",
+      "target": "gold:feature:scope-navigation",
+      "relation": "supports",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.93,
+      "note": "overview 진입·복귀 지원",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:215",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L294",
+          "quote": "그래프 UI에 overview→repository 진입과 전체 저장소 복귀 동작을 추가한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:028",
+      "source": "gold:component:repository-projector",
+      "target": "gold:feature:scope-navigation",
+      "relation": "supports",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.93,
+      "note": "repository 상세 진입 지원",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:215",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L294",
+          "quote": "그래프 UI에 overview→repository 진입과 전체 저장소 복귀 동작을 추가한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:223",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L304",
+          "quote": "다른 저장소로 전환하거나 overview로 복귀할 때 선택·필터 상태가 깨지지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:029",
+      "source": "gold:api:graph",
+      "target": "gold:component:graph-projector",
+      "relation": "calls",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "그래프 조회가 projector를 호출",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:100",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L130",
+          "quote": "app/api/graph/route.ts — overview·repository 투영 query"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:030",
+      "source": "gold:api:graph",
+      "target": "gold:data:graph-snapshot",
+      "relation": "produces",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "GraphSnapshot 응답",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:031",
+      "source": "gold:component:dashboard",
+      "target": "gold:feature:upload",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "Control Room 사용자 기능",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:13",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L21",
+          "quote": ".md, .mdx 파일 추가"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:032",
+      "source": "gold:component:dashboard",
+      "target": "gold:feature:unchanged",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "Control Room 사용자 기능",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L23",
+          "quote": "동일 파일 SHA-256 비교와 unchanged 처리"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:033",
+      "source": "gold:component:dashboard",
+      "target": "gold:feature:reindex",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "Control Room 사용자 기능",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:16",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L24",
+          "quote": "재인덱싱과 삭제"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:034",
+      "source": "gold:component:dashboard",
+      "target": "gold:feature:delete",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "Control Room 사용자 기능",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:16",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L24",
+          "quote": "재인덱싱과 삭제"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:035",
+      "source": "gold:component:dashboard",
+      "target": "gold:feature:enrichment-status",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "Control Room 사용자 기능",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L26",
+          "quote": "보강 대기·실행·완료·경고·실패 상태와 Connector 온라인 여부 확인"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:036",
+      "source": "gold:component:dashboard",
+      "target": "gold:feature:retry-cancel",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "Control Room 사용자 기능",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:19",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L27",
+          "quote": "실패·경고 작업은 최대 2회 수동 재시도, 대기·실행 작업은 취소"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:037",
+      "source": "gold:component:web-app",
+      "target": "gold:api:documents",
+      "relation": "contains",
+      "displayType": "contains",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "웹앱 문서 API",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:038",
+      "source": "gold:component:web-app",
+      "target": "gold:api:graph",
+      "relation": "contains",
+      "displayType": "contains",
+      "layer": "structural",
+      "confidence": 1,
+      "note": "웹앱 그래프 API",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:039",
+      "source": "gold:api:documents",
+      "target": "gold:workflow:ingestion",
+      "relation": "calls",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "업로드 후 기본 인덱싱 시작",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:040",
+      "source": "gold:api:reindex",
+      "target": "gold:workflow:ingestion",
+      "relation": "calls",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "저장 원문 재인덱싱",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:041",
+      "source": "gold:feature:upload",
+      "target": "gold:workflow:validate",
+      "relation": "requires",
+      "displayType": "requires",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "업로드 문서는 검증을 통과해야 함",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:042",
+      "source": "gold:workflow:validate",
+      "target": "gold:workflow:remark-ast",
+      "relation": "precedes",
+      "displayType": "extends",
+      "layer": "explicit",
+      "confidence": 1,
+      "note": "검증 후 AST 파싱",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:043",
+      "source": "gold:workflow:remark-ast",
+      "target": "gold:workflow:rule-extraction",
+      "relation": "precedes",
+      "displayType": "extends",
+      "layer": "explicit",
+      "confidence": 1,
+      "note": "AST 파싱 후 규칙 추출",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:044",
+      "source": "gold:workflow:remark-ast",
+      "target": "gold:technology:remark",
+      "relation": "uses",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "Remark Markdown AST 사용",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:045",
+      "source": "gold:workflow:rule-extraction",
+      "target": "gold:data:markdown-block",
+      "relation": "reads_from",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.91,
+      "note": "블록 문맥을 근거로 규칙 추출",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:23",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L47",
+          "quote": "문서 루트와 제목 계층"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:26",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L50",
+          "quote": "기능:, 모듈:, 의존성:, 결정:, 위험:, 도구:, 개념: 패턴"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:046",
+      "source": "gold:workflow:rule-extraction",
+      "target": "gold:storage:d1",
+      "relation": "writes_to",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "기본 노드·관계를 D1에 저장",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:047",
+      "source": "gold:workflow:ingestion",
+      "target": "gold:feature:unchanged",
+      "relation": "supports",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.95,
+      "note": "동일 hash 재처리 방지",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L23",
+          "quote": "동일 파일 SHA-256 비교와 unchanged 처리"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:19",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L43",
+          "quote": "동일 문서 해시와 동일 보강 버전의 작업은 중복 실행하지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:048",
+      "source": "gold:workflow:ingestion",
+      "target": "gold:decision:rule-first",
+      "relation": "requires",
+      "displayType": "requires",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "기본 인덱싱은 규칙 경로로 완료",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:27",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L51",
+          "quote": "모든 기본 인덱싱은 외부 LLM 없이 완료"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:57",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L87",
+          "quote": "규칙 기반 인덱싱 성공 여부와 Codex 보강 성공 여부를 분리한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:049",
+      "source": "gold:component:enrichment-queue",
+      "target": "gold:storage:d1",
+      "relation": "depends_on",
+      "displayType": "requires",
+      "layer": "explicit",
+      "confidence": 0.92,
+      "note": "기본 그래프 저장 후 D1 작업 계약을 사용",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:050",
+      "source": "gold:component:enrichment-queue",
+      "target": "gold:storage:enrichment-jobs",
+      "relation": "writes_to",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "작업 상태와 Lease 저장",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L39",
+          "quote": "웹앱과 Connector 사이에 D1 기반 비동기 작업 등록·Claim·Lease·결과 제출 흐름을 추가한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:051",
+      "source": "gold:component:codex-connector",
+      "target": "gold:api:claim",
+      "relation": "calls",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "작업 Claim·Lease",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L31-L43",
+          "quote": "flowchart LR U[\"Markdown 추가\"] --> V[\"형식·크기·해시 검증\"] V --> P[\"Remark Markdown AST\"] P --> E[\"규칙 기반 노드·관계 추출\"] E --> D[\"Cloudflare D1 저장\"] D --> G[\"GraphSnapshot 투영\"] G --> R[\"Three.js 3-View Renderer\"] D --> Q[\"Enrichment Job\"] C[\"로컬 Atlas Codex Connector\"] -->|\"Claim·Lease\"| Q C --> S[\"공식 Codex SDK·기존 로그인\"] C -->|\"검증된 관계 결과\"| D"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:45",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L97-L112",
+          "quote": "Method경로역할GET/api/graph현재 그래프 snapshotGET/api/documents문서·작업·통계 목록POST/api/documentsMarkdown 추가·인덱싱DELETE/api/documents/:id문서와 자동 그래프 데이터 삭제POST/api/documents/:id/reindex저장 원문 재인덱싱GET/api/ingestion-jobs/:id작업 상태 조회POST/api/enrichment-jobs/claimConnector가 작업 한 개 ClaimPOST/api/enrichment-jobs/:id/start작업 실행 시작POST/api/enrichment-jobs/:id/leaseLease 갱신POST/api/enrichment-jobs/:id/result검증할 구조화 결과 제출POST/api/enrichment-jobs/:id/fail제한된 실패·재시도 보고POST/api/enrichment-jobs/:id/cancel사용자 작업 취소POST/api/enrichment-jobs/:id…"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:052",
+      "source": "gold:api:claim",
+      "target": "gold:storage:enrichment-jobs",
+      "relation": "reads_from",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "대기 작업 Claim",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L39",
+          "quote": "웹앱과 Connector 사이에 D1 기반 비동기 작업 등록·Claim·Lease·결과 제출 흐름을 추가한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:053",
+      "source": "gold:api:claim",
+      "target": "gold:storage:enrichment-jobs",
+      "relation": "writes_to",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "Lease 상태 갱신",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L39",
+          "quote": "웹앱과 Connector 사이에 D1 기반 비동기 작업 등록·Claim·Lease·결과 제출 흐름을 추가한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:054",
+      "source": "gold:component:codex-connector",
+      "target": "gold:technology:codex-sdk",
+      "relation": "uses",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 1,
+      "note": "공식 SDK로 로컬 Codex 실행",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:13",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L37",
+          "quote": "공식 @openai/codex-sdk를 사용하는 독립 Node.js Connector를 추가한다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:33",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L65",
+          "quote": "다른 터미널에서 기존 ChatGPT/Codex 로그인을 사용하는 Connector를 실행합니다. OpenAI API 키는 사용하지 않습니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:055",
+      "source": "gold:component:codex-connector",
+      "target": "gold:data:relation-candidate",
+      "relation": "produces",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.91,
+      "note": "근거 기반 의미 관계 후보 생성",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:58",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L88",
+          "quote": "Codex가 생성한 관계는 검증 전까지 후보 데이터로 취급한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:056",
+      "source": "gold:component:codex-connector",
+      "target": "gold:api:result",
+      "relation": "calls",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "구조화 결과 제출",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:15",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L39",
+          "quote": "웹앱과 Connector 사이에 D1 기반 비동기 작업 등록·Claim·Lease·결과 제출 흐름을 추가한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L42",
+          "quote": "관계에 origin, Provider·Prompt 버전, 근거 블록, 생성 시각을 기록한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:057",
+      "source": "gold:api:result",
+      "target": "gold:component:result-validator",
+      "relation": "calls",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "서버 재검증 후 저장",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:17",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L41",
+          "quote": "Codex 출력은 JSON Schema로 제한하고 서버에서 다시 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:058",
+      "source": "gold:component:result-validator",
+      "target": "gold:data:markdown-block",
+      "relation": "reads_from",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "반환된 evidence block 검증",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:17",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L41",
+          "quote": "Codex 출력은 JSON Schema로 제한하고 서버에서 다시 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:059",
+      "source": "gold:component:result-validator",
+      "target": "gold:data:relation-candidate",
+      "relation": "reads_from",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "허용 ID·관계 schema 검증",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:17",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L41",
+          "quote": "Codex 출력은 JSON Schema로 제한하고 서버에서 다시 검증한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:060",
+      "source": "gold:api:result",
+      "target": "gold:storage:d1",
+      "relation": "writes_to",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "검증된 관계 원자 저장",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L42",
+          "quote": "관계에 origin, Provider·Prompt 버전, 근거 블록, 생성 시각을 기록한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:061",
+      "source": "gold:feature:enrichment-status",
+      "target": "gold:storage:enrichment-jobs",
+      "relation": "reads_from",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.95,
+      "note": "작업 상태 표시",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L45",
+          "quote": "대시보드에 보강 대기, 보강 중, 보강 완료, 보강 경고, Connector 오프라인 상태를 표시한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:062",
+      "source": "gold:feature:retry-cancel",
+      "target": "gold:component:enrichment-queue",
+      "relation": "calls",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.94,
+      "note": "재시도·취소 상태 전이",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:19",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L27",
+          "quote": "실패·경고 작업은 최대 2회 수동 재시도, 대기·실행 작업은 취소"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:063",
+      "source": "gold:decision:optional-enrichment",
+      "target": "gold:decision:rule-first",
+      "relation": "supports",
+      "displayType": "supports",
+      "layer": "inferred",
+      "confidence": 0.9,
+      "note": "보강과 기본 그래프 성공 경계를 분리",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:57",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L87",
+          "quote": "규칙 기반 인덱싱 성공 여부와 Codex 보강 성공 여부를 분리한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:60",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L82",
+          "quote": "보강 실패는 규칙 기반 그래프와 GitHub 동기화 성공을 롤백하지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:064",
+      "source": "gold:decision:rule-first",
+      "target": "gold:risk:connector-offline",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "inferred",
+      "confidence": 0.88,
+      "note": "Connector 실패에도 기본 그래프 유지",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:60",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L82",
+          "quote": "보강 실패는 규칙 기반 그래프와 GitHub 동기화 성공을 롤백하지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:065",
+      "source": "gold:component:codex-connector",
+      "target": "gold:risk:connector-offline",
+      "relation": "risks",
+      "displayType": "risks",
+      "layer": "explicit",
+      "confidence": 0.92,
+      "note": "로그인·네트워크 실패 가능",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:21",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L45",
+          "quote": "대시보드에 보강 대기, 보강 중, 보강 완료, 보강 경고, Connector 오프라인 상태를 표시한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:066",
+      "source": "gold:component:github-sync",
+      "target": "gold:feature:github-collection",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "README·dev-plan 수집 구현",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:4",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L9",
+          "quote": "coreline-ai 공개 저장소의 기본 브랜치에서 루트 README.md와 dev-plan 디렉터리 아래 모든 .md 파일을 저장소 단위로 동기화한다. README에서는 프로젝트 목적·기능·기술을, 개발 계획에서는 Phase·작업·완료 상태·위험·의존성을 추출하고, 모든 관계가 GitHub 원문과 Markdown 블록 근거를 유지하도록 한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L14",
+          "quote": "각 저장소 기본 브랜치의 루트 README.md와 dev-plan/**/*.md 일반 파일을 최소 수집 대상으로 삼는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:067",
+      "source": "gold:component:github-sync",
+      "target": "gold:component:source-identity",
+      "relation": "depends_on",
+      "displayType": "requires",
+      "layer": "explicit",
+      "confidence": 0.95,
+      "note": "저장소·경로 identity 필요",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:31",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L44",
+          "quote": "현재 documents.normalized_name은 전역 UNIQUE이므로 여러 저장소의 README.md가 충돌한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L67",
+          "quote": "저장소·문서·섹션·Phase·Task 노드는 source-local ID를 사용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:068",
+      "source": "gold:component:github-sync",
+      "target": "gold:data:repository-manifest",
+      "relation": "produces",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.97,
+      "note": "저장소 문서 manifest 생성",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:4",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L9",
+          "quote": "coreline-ai 공개 저장소의 기본 브랜치에서 루트 README.md와 dev-plan 디렉터리 아래 모든 .md 파일을 저장소 단위로 동기화한다. README에서는 프로젝트 목적·기능·기술을, 개발 계획에서는 Phase·작업·완료 상태·위험·의존성을 추출하고, 모든 관계가 GitHub 원문과 Markdown 블록 근거를 유지하도록 한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:069",
+      "source": "gold:component:github-sync",
+      "target": "gold:component:atomic-staging",
+      "relation": "calls",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "수집 문서를 원자 적용 경로로 전달",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:181",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L245",
+          "quote": "Phase 4. 저장소 단위 원자적 동기화"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:070",
+      "source": "gold:component:atomic-staging",
+      "target": "gold:storage:github-stage",
+      "relation": "writes_to",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "적용 전 staging 저장",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:97",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L127",
+          "quote": "app/lib/storage/graph-repository.ts — source key 조회, 저장소 단위 staging·교체"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:181",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L245",
+          "quote": "Phase 4. 저장소 단위 원자적 동기화"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:071",
+      "source": "gold:component:atomic-staging",
+      "target": "gold:storage:d1",
+      "relation": "writes_to",
+      "displayType": "uses",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "검증된 저장소 그래프 교체",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:181",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L245",
+          "quote": "Phase 4. 저장소 단위 원자적 동기화"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:072",
+      "source": "gold:component:github-sync",
+      "target": "gold:feature:unchanged",
+      "relation": "supports",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "동일 Blob SHA 처리 생략",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:190",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L258",
+          "quote": "동일 Blob SHA는 파싱·보강 enqueue를 생략한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:073",
+      "source": "gold:decision:atomic-sync",
+      "target": "gold:component:atomic-staging",
+      "relation": "requires",
+      "displayType": "requires",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "원자 적용 경계 구현",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:181",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L245",
+          "quote": "Phase 4. 저장소 단위 원자적 동기화"
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:074",
+      "source": "gold:decision:atomic-sync",
+      "target": "gold:risk:partial-sync",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "explicit",
+      "confidence": 0.97,
+      "note": "실패 시 이전 정상 그래프 보존",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:88",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L116",
+          "quote": "동기화 실패가 이전 정상 그래프와 완료된 보강 관계를 훼손하지 않는지 확인한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:075",
+      "source": "gold:component:github-sync",
+      "target": "gold:risk:partial-sync",
+      "relation": "risks",
+      "displayType": "risks",
+      "layer": "explicit",
+      "confidence": 0.88,
+      "note": "다중 문서 적용 중 부분 실패 위험",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:88",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L116",
+          "quote": "동기화 실패가 이전 정상 그래프와 완료된 보강 관계를 훼손하지 않는지 확인한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:196",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L266",
+          "quote": "여러 README와 dev-plan 문서를 한 저장소 단위로 성공 적용한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:076",
+      "source": "gold:decision:source-local-id",
+      "target": "gold:component:source-identity",
+      "relation": "supports",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "source-local 안정 ID 계약",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L67",
+          "quote": "저장소·문서·섹션·Phase·Task 노드는 source-local ID를 사용한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:163",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L220",
+          "quote": "저장소·문서·섹션·Phase·Task의 source-local 안정 ID를 생성한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:077",
+      "source": "gold:decision:source-local-id",
+      "target": "gold:risk:identity-collision",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "동명 README와 노드의 저장소 간 충돌 방지",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:31",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L44",
+          "quote": "현재 documents.normalized_name은 전역 UNIQUE이므로 여러 저장소의 README.md가 충돌한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:81",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L109",
+          "quote": "서로 다른 저장소의 동일한 README.md 파일명이 충돌하지 않는지 확인한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:078",
+      "source": "gold:component:source-identity",
+      "target": "gold:risk:identity-collision",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "inferred",
+      "confidence": 0.9,
+      "note": "repository ID와 path로 범위 분리",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L67",
+          "quote": "저장소·문서·섹션·Phase·Task 노드는 source-local ID를 사용한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:81",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L109",
+          "quote": "서로 다른 저장소의 동일한 README.md 파일명이 충돌하지 않는지 확인한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:079",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:feature:provenance",
+      "relation": "implements",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.94,
+      "note": "문서 근거 기반 관계 추적",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:4",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L9",
+          "quote": "coreline-ai 공개 저장소의 기본 브랜치에서 루트 README.md와 dev-plan 디렉터리 아래 모든 .md 파일을 저장소 단위로 동기화한다. README에서는 프로젝트 목적·기능·기술을, 개발 계획에서는 Phase·작업·완료 상태·위험·의존성을 추출하고, 모든 관계가 GitHub 원문과 Markdown 블록 근거를 유지하도록 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L42",
+          "quote": "관계에 origin, Provider·Prompt 버전, 근거 블록, 생성 시각을 기록한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:080",
+      "source": "gold:feature:provenance",
+      "target": "gold:data:markdown-block",
+      "relation": "depends_on",
+      "displayType": "requires",
+      "layer": "explicit",
+      "confidence": 0.99,
+      "note": "관계가 block evidence를 요구",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:7",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L15",
+          "quote": "Codex 결과는 문서 블록 근거와 함께 구조화된 JSON으로 반환하고, 웹앱이 허용된 노드·관계·근거만 검증하여 저장한다. Codex가 꺼져 있거나 로그인·추론·네트워크가 실패해도 규칙 기반 그래프와 현재 발광형 GUI는 정상 동작해야 한다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:18",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L42",
+          "quote": "관계에 origin, Provider·Prompt 버전, 근거 블록, 생성 시각을 기록한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:081",
+      "source": "gold:decision:no-api-key",
+      "target": "gold:technology:codex-sdk",
+      "relation": "requires",
+      "displayType": "requires",
+      "layer": "explicit",
+      "confidence": 0.94,
+      "note": "로컬 Codex 로그인 경로 사용",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:33",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L65",
+          "quote": "다른 터미널에서 기존 ChatGPT/Codex 로그인을 사용하는 Connector를 실행합니다. OpenAI API 키는 사용하지 않습니다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:86",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L125",
+          "quote": "Codex 인증은 로컬 Codex CLI가 소유한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:082",
+      "source": "gold:decision:no-api-key",
+      "target": "gold:risk:credential-leak",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "explicit",
+      "confidence": 0.92,
+      "note": "API 키·토큰 저장 경로 제외",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:28",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L54",
+          "quote": "OpenAI API 키, LIGHTRAG_API_KEY, OAuth Client Secret 기반 LLM 호출"
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:29",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L55",
+          "quote": "ChatGPT/Codex 인증 토큰을 브라우저·D1·웹앱 환경 변수에 저장하는 기능"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:083",
+      "source": "gold:decision:browser-isolation",
+      "target": "gold:component:codex-connector",
+      "relation": "requires",
+      "displayType": "requires",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "CLI 접근을 Connector로 제한",
+      "evidence": [
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:59",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L89",
+          "quote": "브라우저는 Codex CLI와 직접 통신하지 않는다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:60",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L90",
+          "quote": "Connector는 웹앱으로 아웃바운드 요청만 보내며 로컬 수신 포트를 공용으로 열지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:084",
+      "source": "gold:decision:browser-isolation",
+      "target": "gold:risk:credential-leak",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "토큰을 브라우저·웹앱 밖에 유지",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:43",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L93",
+          "quote": "ATLAS_CONNECTOR_TOKEN은 OpenAI 키가 아니라 Atlas 작업 API만 보호하는 애플리케이션 자격증명입니다. Codex 로그인 토큰은 로컬 Connector 밖으로 전달되지 않고 브라우저·D1·웹앱 환경 변수에도 저장되지 않습니다. Connector는 OpenAI 키 환경 변수를 제거한 자식 환경에서 공식 SDK를 실행합니다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:59",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L89",
+          "quote": "브라우저는 Codex CLI와 직접 통신하지 않는다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:62",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L92",
+          "quote": "개발 중에도 ChatGPT/Codex 토큰 원문을 로그에 남기지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:085",
+      "source": "gold:component:write-boundary",
+      "target": "gold:risk:credential-leak",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "explicit",
+      "confidence": 0.9,
+      "note": "쓰기 요청의 신뢰 프록시 경계",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:38",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L78",
+          "quote": "그래프와 대시보드 읽기는 공개로 두고 문서 추가·삭제·재인덱싱만 OAuth 프록시 뒤에 둘 때 다음 값을 사용합니다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:40",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L84",
+          "quote": "이 모드는 신뢰 가능한 프록시가 클라이언트가 보낸 사용자 식별 헤더를 제거한 뒤 oai-authenticated-user-id, x-openai-user-id, cf-access-authenticated-user-email 중 하나를 주입하는 환경에서만 활성화해야 합니다. 로컬 데모 기본값은 public입니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:086",
+      "source": "gold:project:memory-node-graph",
+      "target": "gold:risk:credential-leak",
+      "relation": "risks",
+      "displayType": "risks",
+      "layer": "explicit",
+      "confidence": 0.82,
+      "note": "웹·Connector 인증 경계의 보안 위험",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:43",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L93",
+          "quote": "ATLAS_CONNECTOR_TOKEN은 OpenAI 키가 아니라 Atlas 작업 API만 보호하는 애플리케이션 자격증명입니다. Codex 로그인 토큰은 로컬 Connector 밖으로 전달되지 않고 브라우저·D1·웹앱 환경 변수에도 저장되지 않습니다. Connector는 OpenAI 키 환경 변수를 제거한 자식 환경에서 공식 SDK를 실행합니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:087",
+      "source": "gold:decision:graph-budget",
+      "target": "gold:component:overview-projector",
+      "relation": "requires",
+      "displayType": "requires",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "overview 노드 예산 적용",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:52",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L72",
+          "quote": "overview: 저장소 노드와 공유 기술·명시적 저장소 간 관계를 중심으로 500노드 예산을 지킨다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:214",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L293",
+          "quote": "overview가 500노드 예산을 넘으면 결정적 우선순위로 공유 기술 노드를 제한하고 메타에 생략 수를 표시한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:088",
+      "source": "gold:decision:graph-budget",
+      "target": "gold:risk:graph-hairball",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "inferred",
+      "confidence": 0.9,
+      "note": "무제한 단일 snapshot을 방지",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:35",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L48",
+          "quote": "현재 성능 기준은 500노드·2,000관계이므로 전체 문서를 단일 GraphSnapshot으로 투영하지 않는다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:214",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L293",
+          "quote": "overview가 500노드 예산을 넘으면 결정적 우선순위로 공유 기술 노드를 제한하고 메타에 생략 수를 표시한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:089",
+      "source": "gold:component:overview-projector",
+      "target": "gold:risk:graph-hairball",
+      "relation": "risks",
+      "displayType": "risks",
+      "layer": "explicit",
+      "confidence": 0.82,
+      "note": "구조 관계가 화면 예산을 소진할 수 있음",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:35",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L48",
+          "quote": "현재 성능 기준은 500노드·2,000관계이므로 전체 문서를 단일 GraphSnapshot으로 투영하지 않는다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:214",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L293",
+          "quote": "overview가 500노드 예산을 넘으면 결정적 우선순위로 공유 기술 노드를 제한하고 메타에 생략 수를 표시한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:090",
+      "source": "gold:feature:performance-fixture",
+      "target": "gold:decision:graph-budget",
+      "relation": "supports",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.95,
+      "note": "500×2,000 계약을 시각 검증",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:51",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L141",
+          "quote": "성능 HUD와 500 노드·2,000 관계 로컬 fixture는 개발 서버에서 다음 주소로 확인합니다."
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:52",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L143-L145",
+          "quote": "http://localhost:3000/?fixture=500x2000&perf=1"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:091",
+      "source": "gold:decision:no-deploy",
+      "target": "gold:project:memory-node-graph",
+      "relation": "supports",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.95,
+      "note": "승인 전 로컬 검증 경계",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:56",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L155",
+          "quote": "구현과 로컬 검증만 수행합니다. 별도 사용자 승인 전에는 배포하지 않습니다."
+        },
+        {
+          "documentId": "document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7",
+          "blockId": "block:document-bd4c02be0f4314254057293fc9c43dc94002984d0dfa19ad763d6e99a7faffb7:36",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260802_221947.md#L62",
+          "quote": "별도 승인 없는 운영 배포·D1 운영 마이그레이션 실행"
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:092",
+      "source": "gold:test:verification-suite",
+      "target": "gold:project:memory-node-graph",
+      "relation": "tests",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "타입·린트·빌드·통합 회귀 검증",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L133-L137",
+          "quote": "npx tsc --noEmit npm run lint npm test"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:50",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L139",
+          "quote": "npm test는 프로덕션·Connector 빌드 후 그래프, 대시보드, Markdown API, 작업 API, Lease 상태 전이, 결과 병합과 Connector 순차 실행을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:093",
+      "source": "gold:test:verification-suite",
+      "target": "gold:component:renderer",
+      "relation": "tests",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "타입·린트·빌드·통합 회귀 검증",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L133-L137",
+          "quote": "npx tsc --noEmit npm run lint npm test"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:50",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L139",
+          "quote": "npm test는 프로덕션·Connector 빌드 후 그래프, 대시보드, Markdown API, 작업 API, Lease 상태 전이, 결과 병합과 Connector 순차 실행을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:094",
+      "source": "gold:test:verification-suite",
+      "target": "gold:component:dashboard",
+      "relation": "tests",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "타입·린트·빌드·통합 회귀 검증",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L133-L137",
+          "quote": "npx tsc --noEmit npm run lint npm test"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:50",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L139",
+          "quote": "npm test는 프로덕션·Connector 빌드 후 그래프, 대시보드, Markdown API, 작업 API, Lease 상태 전이, 결과 병합과 Connector 순차 실행을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:095",
+      "source": "gold:test:verification-suite",
+      "target": "gold:component:enrichment-queue",
+      "relation": "tests",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.96,
+      "note": "타입·린트·빌드·통합 회귀 검증",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:49",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L133-L137",
+          "quote": "npx tsc --noEmit npm run lint npm test"
+        },
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:50",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L139",
+          "quote": "npm test는 프로덕션·Connector 빌드 후 그래프, 대시보드, Markdown API, 작업 API, Lease 상태 전이, 결과 병합과 Connector 순차 실행을 확인합니다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:096",
+      "source": "gold:test:performance",
+      "target": "gold:component:renderer",
+      "relation": "tests",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "500노드·2,000관계 렌더링 검증",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:51",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L141",
+          "quote": "성능 HUD와 500 노드·2,000 관계 로컬 fixture는 개발 서버에서 다음 주소로 확인합니다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:225",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L306",
+          "quote": "500노드·2,000관계 fixture와 실제 overview·대형 repository fixture 성능 기준을 통과한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:097",
+      "source": "gold:test:performance",
+      "target": "gold:risk:graph-hairball",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "inferred",
+      "confidence": 0.85,
+      "note": "성능 예산 회귀 탐지",
+      "evidence": [
+        {
+          "documentId": "document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb",
+          "blockId": "block:document-ef37aecd67828e1f94c85f54b62a575748b6e9b40da3107187a33a8cade303bb:51",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/README.md#L141",
+          "quote": "성능 HUD와 500 노드·2,000 관계 로컬 fixture는 개발 서버에서 다음 주소로 확인합니다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:225",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L306",
+          "quote": "500노드·2,000관계 fixture와 실제 overview·대형 repository fixture 성능 기준을 통과한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:098",
+      "source": "gold:test:no-op-sync",
+      "target": "gold:component:github-sync",
+      "relation": "tests",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "두 번째 동일 동기화가 no-op인지 검증",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:89",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L117",
+          "quote": "두 번째 동일 동기화에서 변경 문서·보강 작업이 0개인지 확인한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:199",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L269",
+          "quote": "같은 manifest 재실행에서 변경·삭제·보강 작업이 0개다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:099",
+      "source": "gold:test:no-op-sync",
+      "target": "gold:feature:unchanged",
+      "relation": "tests",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "unchanged 결정성 검증",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:89",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L117",
+          "quote": "두 번째 동일 동기화에서 변경 문서·보강 작업이 0개인지 확인한다."
+        },
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:199",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L269",
+          "quote": "같은 manifest 재실행에서 변경·삭제·보강 작업이 0개다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:100",
+      "source": "gold:test:atomic-rollback",
+      "target": "gold:component:atomic-staging",
+      "relation": "tests",
+      "displayType": "supports",
+      "layer": "explicit",
+      "confidence": 0.98,
+      "note": "원자 롤백 검증",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:88",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L116",
+          "quote": "동기화 실패가 이전 정상 그래프와 완료된 보강 관계를 훼손하지 않는지 확인한다."
+        }
+      ]
+    },
+    {
+      "id": "gold:edge:101",
+      "source": "gold:test:atomic-rollback",
+      "target": "gold:risk:partial-sync",
+      "relation": "mitigates",
+      "displayType": "mitigates",
+      "layer": "explicit",
+      "confidence": 0.93,
+      "note": "이전 정상 그래프 보존을 검증",
+      "evidence": [
+        {
+          "documentId": "document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d",
+          "blockId": "block:document-d9b76262f64332b5893374ddd002571615af3f494833e43faa05b7c2d530008d:88",
+          "sourceUrl": "https://github.com/coreline-ai/memory_node_graph/blob/1fd68ed2931a55f5b1f18dc302e83fc6e3e29597/dev-plan/implement_20260804_160905.md#L116",
+          "quote": "동기화 실패가 이전 정상 그래프와 완료된 보강 관계를 훼손하지 않는지 확인한다."
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,9 @@
 import { connectorConfig } from "./config.js";
 import { ConnectorRunner } from "./runner.js";
+import { parseConnectorRunOptions } from "./run-policy.js";
 
 const runner = new ConnectorRunner(connectorConfig);
+const runOptions = parseConnectorRunOptions(process.argv.slice(2));
 let signalCount = 0;
 const shutdown = (signal: string) => {
   signalCount += 1;
@@ -13,7 +15,11 @@ const shutdown = (signal: string) => {
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 
-runner.run({ once: process.argv.includes("--once") }).catch((error) => {
-  console.error(`[atlas-connector] fatal message=${error instanceof Error ? error.message : "unknown"}`);
-  process.exitCode = 1;
-});
+runner.run(runOptions)
+  .then((receipt) => {
+    console.info(`[atlas-connector] receipt ${JSON.stringify(receipt)}`);
+  })
+  .catch((error) => {
+    console.error(`[atlas-connector] fatal message=${error instanceof Error ? error.message : "unknown"}`);
+    process.exitCode = 1;
+  });
