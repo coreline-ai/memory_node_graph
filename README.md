@@ -24,8 +24,6 @@
 
 </div>
 
-![전체 D1 관계 중심 지식 그래프](./docs/screenshots/02-corpus-constellation-min.png)
-
 > [!IMPORTANT]
 > **OpenAI API와 API Key를 사용하지 않습니다.** 기본 그래프는 Markdown AST와 규칙 추출만으로 완성됩니다. 현재 릴리스의 선택형 Codex 보강은 공식 `@openai/codex-sdk`와 기존 `codex login` OAuth 세션을 사용하는 로컬 Connector 방식입니다.
 
