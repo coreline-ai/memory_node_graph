@@ -92,6 +92,7 @@ test("server-renders the graph with grouped controls and the three graph views",
   assert.match(html, /graph-controls-scroll-hint/);
   assert.match(html, /작은 화면에서는 가로로 스크롤/);
   assert.match(html, /그래프 데이터 선택/);
+  assert.match(html, />커스텀</);
   assert.match(html, /관계 계층/);
   assert.match(html, /구조/);
   assert.match(html, /명시/);

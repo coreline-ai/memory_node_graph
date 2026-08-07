@@ -21,6 +21,8 @@ export type GraphSnapshot = {
     omittedNodeCount?: number;
     totalEdgeCount?: number;
     omittedEdgeCount?: number;
+    projectedFactualEdgeCount?: number;
+    displayEdgeCount?: number;
     corpusNodeCount?: number;
     corpusEdgeCount?: number;
     projectionMode?: "full-corpus-knowledge-map" | "single-repository-knowledge-map" | "multi-repository-shared-knowledge" | "repository-evidence-graph";

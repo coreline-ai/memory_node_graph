@@ -1147,10 +1147,15 @@ textarea:focus-visible {
   right: 24px;
   bottom: 39px;
   z-index: 16;
-  display: flex;
-  gap: 0;
+  display: grid;
+  grid-template-areas:
+    "status view data"
+    "status stage stage";
+  grid-template-columns: 108px auto auto;
+  gap: 1px 0;
   align-items: center;
-  padding: 3px;
+  max-width: calc(100% - 48px);
+  padding: 4px;
   background: rgba(11, 14, 17, 0.8);
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -1171,12 +1176,14 @@ textarea:focus-visible {
 }
 
 .control-status {
+  grid-area: status;
   display: flex;
   flex: 0 0 auto;
   gap: 8px;
   align-items: center;
   min-width: 108px;
-  height: 31px;
+  height: 100%;
+  min-height: 63px;
   padding: 0 10px 0 9px;
   color: #7d858c;
   border-right: 1px solid rgba(255, 255, 255, 0.075);
@@ -1230,8 +1237,27 @@ textarea:focus-visible {
   padding: 0 2px 0 3px;
 }
 
+.view-cluster {
+  grid-area: view;
+}
+
+.data-cluster {
+  grid-area: data;
+}
+
+.stage-cluster {
+  grid-area: stage;
+  justify-content: flex-end;
+  padding-top: 1px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+}
+
 .control-cluster + .control-cluster {
   border-left: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.stage-cluster.control-cluster {
+  border-left: 0;
 }
 
 .control-cluster-label {
@@ -1665,10 +1691,63 @@ textarea:focus-visible {
   box-shadow: 0 0 7px rgba(121, 213, 192, 0.64);
 }
 
+.gold-corpus-cta {
+  display: inline-grid;
+  grid-template-columns: auto auto 18px;
+  gap: 8px;
+  align-items: center;
+  width: fit-content;
+  min-height: 34px;
+  margin-top: 14px;
+  padding: 0 10px 0 12px;
+  color: #8d949a;
+  background: rgba(101, 181, 255, 0.055);
+  border: 1px solid rgba(101, 181, 255, 0.2);
+  border-radius: 3px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.gold-corpus-cta:hover,
+.gold-corpus-cta:focus-visible {
+  color: #d9eaf6;
+  background: rgba(101, 181, 255, 0.1);
+  border-color: rgba(101, 181, 255, 0.42);
+  outline: none;
+  box-shadow: 0 0 22px rgba(101, 181, 255, 0.08);
+}
+
+.gold-corpus-cta:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.gold-corpus-cta span,
+.gold-corpus-cta strong {
+  font-size: 8px;
+  letter-spacing: 0.04em;
+}
+
+.gold-corpus-cta span {
+  color: #697078;
+  font-family: var(--font-mono);
+}
+
+.gold-corpus-cta strong {
+  color: #b9d8ec;
+  font-weight: 620;
+}
+
+.gold-corpus-cta i {
+  color: #86c9f6;
+  font-style: normal;
+  text-shadow: 0 0 8px rgba(101, 181, 255, 0.65);
+}
+
 .luminosity-panel {
   position: absolute;
   right: 24px;
-  bottom: 82px;
+  bottom: 122px;
   z-index: 28;
   width: min(310px, calc(100% - 48px));
   padding: 0 16px 14px;
@@ -2771,6 +2850,17 @@ textarea:focus-visible {
 }
 
 @media (max-width: 640px) {
+  .graph-controls {
+    grid-template-areas:
+      "view data"
+      "stage stage";
+    grid-template-columns: auto auto;
+  }
+
+  .control-status {
+    display: none;
+  }
+
   .top-command {
     right: 14px;
     left: 64px;
@@ -2811,7 +2901,7 @@ textarea:focus-visible {
 
   .luminosity-panel {
     right: 12px;
-    bottom: 78px;
+    bottom: 116px;
     width: min(310px, calc(100% - 24px));
     max-height: calc(100svh - 112px);
     overflow-y: auto;

@@ -129,6 +129,174 @@ const corpusNodePriority = (node: KnowledgeNode, degree: number) => {
   return degree * 1_000 + semanticBonus;
 };
 
+const displayPairKey = (source: string, target: string) =>
+  source < target ? `${source}|${target}` : `${target}|${source}`;
+
+const CORPUS_WEAVE_IGNORED_TAGS = new Set([
+  "canonical",
+  "component",
+  "completed",
+  "concept",
+  "document",
+  "github",
+  "pending",
+  "plan",
+  "repository",
+  "section",
+  "shared",
+  "system",
+  "task",
+  "technology",
+]);
+
+const corpusWeaveTags = (node: KnowledgeNode) => new Set(node.tags.filter((tag) =>
+  !CORPUS_WEAVE_IGNORED_TAGS.has(tag)
+  && !tag.startsWith("alias:")
+  && !tag.startsWith("source:")
+  && !tag.startsWith("status:")
+  && tag.length > 2));
+
+/**
+ * Adds a bounded, explicitly non-factual display weave to large corpus views.
+ * The underlying D1 relations stay untouched; these edges only make the
+ * selected factual clusters legible as one visual atlas and can be audited via
+ * the `display` relation layer.
+ */
+const createCorpusDisplayWeave = (
+  nodes: readonly KnowledgeNode[],
+  factualEdges: readonly KnowledgeEdge[],
+  edgeBudget: number,
+) => {
+  if (nodes.length < 250 || factualEdges.length >= edgeBudget) return [] as KnowledgeEdge[];
+  const displayBudget = Math.min(edgeBudget - factualEdges.length, nodes.length * 2);
+  if (displayBudget <= 0) return [] as KnowledgeEdge[];
+
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const degree = new Map(nodes.map((node) => [node.id, 0]));
+  const adjacency = new Map(nodes.map((node) => [node.id, new Set<string>()]));
+  const occupiedPairs = new Set<string>();
+  for (const edge of factualEdges) {
+    if (!nodeById.has(edge.source) || !nodeById.has(edge.target)) continue;
+    occupiedPairs.add(displayPairKey(edge.source, edge.target));
+    degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
+    degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
+    adjacency.get(edge.source)?.add(edge.target);
+    adjacency.get(edge.target)?.add(edge.source);
+  }
+
+  const components: KnowledgeNode[][] = [];
+  const visited = new Set<string>();
+  for (const node of [...nodes].sort(byNodeIdentity)) {
+    if (visited.has(node.id)) continue;
+    const component: KnowledgeNode[] = [];
+    const queue = [node.id];
+    visited.add(node.id);
+    for (let index = 0; index < queue.length; index += 1) {
+      const current = nodeById.get(queue[index]);
+      if (current) component.push(current);
+      for (const neighbor of adjacency.get(queue[index]) ?? []) {
+        if (visited.has(neighbor)) continue;
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+    component.sort((left, right) =>
+      (degree.get(right.id) ?? 0) - (degree.get(left.id) ?? 0)
+      || corpusNodePriority(right, degree.get(right.id) ?? 0)
+        - corpusNodePriority(left, degree.get(left.id) ?? 0)
+      || byNodeIdentity(left, right));
+    components.push(component);
+  }
+  components.sort((left, right) =>
+    right.length - left.length || byNodeIdentity(left[0], right[0]));
+
+  const displayEdges: KnowledgeEdge[] = [];
+  const displayDegree = new Map(nodes.map((node) => [node.id, 0]));
+  const addDisplayEdge = (source: KnowledgeNode, target: KnowledgeNode, note: string) => {
+    if (displayEdges.length >= displayBudget || source.id === target.id) return false;
+    const key = displayPairKey(source.id, target.id);
+    if (occupiedPairs.has(key)) return false;
+    occupiedPairs.add(key);
+    displayDegree.set(source.id, (displayDegree.get(source.id) ?? 0) + 1);
+    displayDegree.set(target.id, (displayDegree.get(target.id) ?? 0) + 1);
+    displayEdges.push({
+      source: source.id,
+      target: target.id,
+      type: "related_to",
+      confidence: 0.38,
+      note,
+      layer: "display",
+      origin: "display",
+      provider: "corpus-visual-weave-v1",
+    });
+    return true;
+  };
+
+  // First make every selected factual component part of one visible atlas.
+  for (let index = 1; index < components.length && displayEdges.length < displayBudget; index += 1) {
+    addDisplayEdge(
+      components[index - 1][0],
+      components[index][0],
+      "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
+    );
+  }
+
+  const tagsById = new Map(nodes.map((node) => [node.id, corpusWeaveTags(node)]));
+  const candidates: Array<{ source: KnowledgeNode; target: KnowledgeNode; score: number }> = [];
+  for (let leftIndex = 0; leftIndex < nodes.length; leftIndex += 1) {
+    const source = nodes[leftIndex];
+    const sourceTags = tagsById.get(source.id)!;
+    for (let rightIndex = leftIndex + 1; rightIndex < nodes.length; rightIndex += 1) {
+      const target = nodes[rightIndex];
+      if (occupiedPairs.has(displayPairKey(source.id, target.id))) continue;
+      const targetTags = tagsById.get(target.id)!;
+      let sharedTags = 0;
+      for (const tag of sourceTags) if (targetTags.has(tag)) sharedTags += 1;
+      const score = sharedTags * 12
+        + (source.domain === target.domain ? 4 : 0)
+        + (source.kind === target.kind ? 2 : 0)
+        + (isRepositoryNode(source) || isRepositoryNode(target) ? -3 : 0);
+      if (score > 0) candidates.push({ source, target, score });
+    }
+  }
+  candidates.sort((left, right) =>
+    right.score - left.score
+    || displayPairKey(left.source.id, left.target.id)
+      .localeCompare(displayPairKey(right.source.id, right.target.id)));
+  const displayDegreeCap = Math.max(4, Math.ceil(displayBudget * 2 / nodes.length) + 3);
+  for (const candidate of candidates) {
+    if (displayEdges.length >= displayBudget) break;
+    if ((displayDegree.get(candidate.source.id) ?? 0) >= displayDegreeCap
+      || (displayDegree.get(candidate.target.id) ?? 0) >= displayDegreeCap) continue;
+    addDisplayEdge(
+      candidate.source,
+      candidate.target,
+      "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
+    );
+  }
+
+  // Sparse or weakly tagged corpora still receive a deterministic low-degree
+  // ring so the force layout does not split into isolated islands.
+  const ring = [...nodes].sort((left, right) =>
+    left.domain.localeCompare(right.domain)
+    || left.kind.localeCompare(right.kind)
+    || byNodeIdentity(left, right));
+  for (const stride of [1, 7, 19, 37]) {
+    for (let index = 0; index < ring.length && displayEdges.length < displayBudget; index += 1) {
+      const source = ring[index];
+      const target = ring[(index + stride) % ring.length];
+      if ((displayDegree.get(source.id) ?? 0) >= displayDegreeCap + 1
+        || (displayDegree.get(target.id) ?? 0) >= displayDegreeCap + 1) continue;
+      addDisplayEdge(
+        source,
+        target,
+        "전체 코퍼스 배치를 위한 화면용 연결선이며 사실 관계로 저장되지 않습니다.",
+      );
+    }
+  }
+  return displayEdges;
+};
+
 /**
  * Builds a deterministic, relationship-first view of the whole corpus. It
  * never invents factual edges: seeds are high-degree/repository nodes, then
@@ -238,7 +406,9 @@ export function projectGraphCorpus(
     layerPriority[relationLayerFor(left)] - layerPriority[relationLayerFor(right)]
     || right.confidence - left.confidence
     || edgeKey(left).localeCompare(edgeKey(right)));
-  const selectedEdges = connectedEdges.slice(0, edgeBudget);
+  const factualEdges = connectedEdges.slice(0, edgeBudget);
+  const displayEdges = createCorpusDisplayWeave(nodes, factualEdges, edgeBudget);
+  const selectedEdges = [...factualEdges, ...displayEdges];
   const corpusNodeCount = snapshot.meta.corpusNodeCount ?? snapshot.meta.totalNodeCount ?? snapshot.nodes.length;
   const corpusEdgeCount = snapshot.meta.corpusEdgeCount ?? snapshot.meta.totalEdgeCount ?? snapshot.edges.length;
 
@@ -256,8 +426,10 @@ export function projectGraphCorpus(
       totalNodeCount: corpusNodeCount,
       omittedNodeCount: Math.max(0, corpusNodeCount - nodes.length),
       totalEdgeCount: corpusEdgeCount,
-      omittedEdgeCount: Math.max(0, corpusEdgeCount - selectedEdges.length),
-      message: `전체 D1에서 관계 중심 핵심 노드 ${nodes.length}개와 실제 관계 ${selectedEdges.length}개를 투영했습니다.`,
+      omittedEdgeCount: Math.max(0, corpusEdgeCount - factualEdges.length),
+      projectedFactualEdgeCount: factualEdges.length,
+      displayEdgeCount: displayEdges.length,
+      message: `전체 D1에서 관계 중심 핵심 노드 ${nodes.length}개와 실제 관계 ${factualEdges.length}개를 투영하고 화면용 연결선 ${displayEdges.length}개를 더했습니다.`,
     },
   };
 }

@@ -11,18 +11,19 @@ Markdown 문서를 규칙 기반으로 파싱해 노드·관계를 만들고, �
 - `별자리`: 기존 Force 3D 그래프를 유지하는 기본 보기
 - `성운`: 지식 분야별 클러스터와 클러스터 사이 브리지 보기
 - `궤도`: 선택 노드를 중심으로 1-hop과 2-hop 관계 보기
-- `기본`, `브라이트`, `초신성` 발광 프리셋
+- `기본`, `브라이트`, `초신성` 발광 프리셋과 항상 노출되는 `커스텀` 밝기·관계선·후광·입자 조절
+- 하단 제어판은 보기·데이터와 연출·발광을 2단 관측 덱으로 배치해 화면 폭 안에서 잘리지 않도록 표시
 - 필터, 검색, 상세 패널, 자동 회전, 라벨, 카메라 조작
 - 구조·명시·추론·화면 관계 계층 필터와 계층별 실선·점선·흐름·밝기 표현
 - 노드 상세에서 community·centrality·degree, 연결 관계 confidence·evidence·GitHub 원문 line 링크 확인
 - `prefers-reduced-motion`에서는 자동 회전을 처음부터 켜지 않으며, 사용자가 직접 선택하면 저속으로 동작하고 현재 상태를 표시
 - `V` 키로 보기 순환
 - 공유 가능한 URL: `/?scope=corpus`, `/?scope=overview`, `/?scope=repository&repositoryId=...`, `/?view=orbit&node=...`
-- 기본 화면은 전체 D1의 관계 차수·저장소 다양성·의미 유형을 기준으로 선택한 최대 500노드·2,000관계 `corpus` 투영이며, D1 전체 수량과 현재 화면 수량을 분리해 표시
+- 기본 화면은 전체 D1의 관계 차수·저장소 다양성·의미 유형을 기준으로 선택한 최대 500노드·2,000선 `corpus` 투영이며, D1 전체 수량·화면의 실제 관계·비저장 시각 연결 수를 분리해 표시
 - 저장소·공유 기술 `overview`에서 저장소 노드 상세 패널을 열면 README·개발 계획·Phase·Task `repository` 그래프로 진입
 - 상단 경로와 하단 `전체 저장소` 버튼으로 overview에 복귀하며 브라우저 앞·뒤 이동에도 scope·선택 노드·활성 필터를 복원
 - GitHub 노드 상세 패널에서 저장소, 원문 경로, commit SHA, line 고정 원본 링크를 확인하고 Task는 완료·미완료 상태를 별도 배지로 표시
-- 세 scope 모두 결정적 500노드·2,000관계 상한과 생략 수 메타를 제공하며, `corpus`는 저장된 endpoint 사이의 실제 관계만 표시하고 부족한 관계를 임의 생성하지 않음
+- 세 scope 모두 결정적 500노드·2,000선 상한과 생략 수 메타를 제공하며, `corpus`는 저장된 endpoint 사이의 실제 관계를 우선한 뒤 대형 화면에만 `display` 계층의 비저장 시각 연결을 추가함. 이 연결은 사실 관계·분석 지표·RAG·D1에 포함되지 않음
 - 관계선 Shader는 geometry의 vertex color를 명시적으로 활성화하며, 초기 데이터 요청은 React Strict Mode 재실행에서도 취소된 첫 프레임 때문에 누락되지 않음
 - 하단 데이터 메뉴의 `온톨로지 Gold Graph`에서 README와 대표 개발 계획 3개를 근거로 만든 68개 전문 노드·101개 관계 표본을 현재 별자리·성운·궤도 GUI로 검토
 - Gold Graph는 공개 GitHub block·line evidence를 가진 읽기 전용 fixture이며 현재 D1·파서·영속 관계를 변경하지 않음
@@ -228,11 +229,11 @@ Phase 3 온톨로지 계약은 `docs/knowledge-graph-ontology-v1.md`, 검증된 
 
 2026-08-06에 수집된 **853개 문서·148,655개 근거 블록**을 parser v4로 전부 재처리했습니다. 실패 문서는 0개이며 D1은 **89,669개 엔티티·94,488개 관계**(규칙 94,487개·Codex 근거 관계 1개)로 갱신됐습니다. 구조 관계 외에 `references` 21,265개, `same_as` 3,707개, `tests` 968개, `calls` 693개, `precedes` 261개, `depends_on` 136개 등이 source block과 GitHub line 근거로 저장됐습니다.
 
-2026-08-07 최종 로컬 감사에서도 문서 853개·고유 엔티티 89,669개·관계 94,488개·대기 보강 10,903개가 유지됐습니다. 대시보드의 **99,393 노드**는 문서별 node count 합계이고, corpus 메타의 **89,669 노드**는 같은 의미 mention을 canonical entity로 통합한 고유 엔티티 수이므로 서로 다른 집계입니다. 실제 corpus 화면은 500노드·1,539관계, overview는 130노드·176관계, Gold 표본은 68노드·101관계, 최대 밀도 fixture는 500노드·2,000관계로 확인했습니다.
+2026-08-07 최종 로컬 감사에서도 문서 853개·고유 엔티티 89,669개·관계 94,488개·대기 보강 10,903개가 유지됐습니다. 대시보드의 **99,393 노드**는 문서별 node count 합계이고, corpus 메타의 **89,669 노드**는 같은 의미 mention을 canonical entity로 통합한 고유 엔티티 수이므로 서로 다른 집계입니다. 실제 corpus 화면은 500노드·1,539개 실제 관계에 461개 비저장 시각 연결을 더한 2,000선, overview는 130노드·176관계, Gold 표본은 68노드·101관계, 최대 밀도 fixture는 500노드·2,000관계로 확인했습니다.
 
 전체 문서는 16블록·2블록 overlap 기준 **10,904개 Codex 청크 작업**으로 등록했습니다. 로컬 OAuth Connector smoke 1개를 실제 실행해 `atlas-relations-v2-chunked` 결과 관계 1개와 원본 line evidence를 D1에 병합했으며, 나머지 10,903개는 외부 API 키 없이 로컬 Connector가 순차 처리할 대기 상태입니다. 실행 보고서는 `.wrangler/reports/full-reprocess-2026-08-06T17-46-32-545Z.json`에 있습니다.
 
-실데이터 scope 감사에서 전체 `corpus`는 **500노드·1,539개 실제 관계**, 111개 저장소 overview는 130노드·176관계, `memory_node_graph` repository는 471노드·598관계로 투영됐습니다. 전체 `corpus`는 24개 대표 저장소와 고차수 의미 anchor 40개의 1-hop 후보에서 선택 집합의 실제 관계를 가장 많이 늘리는 노드를 반복 선택합니다. 임의 display 관계 없이 D1에 저장된 관계만 반환하며, 브라우저 성능 HUD에서 75 FPS·P95 14.1ms·HIGH를 확인했습니다. D1 관계 source/target index와 scope 전용 제한 조회를 적용했고 500노드·2,000관계 표시 상한을 유지합니다.
+실데이터 scope 감사에서 전체 `corpus`는 **500노드·1,539개 실제 관계**, 111개 저장소 overview는 130노드·176관계, `memory_node_graph` repository는 471노드·598관계로 투영됐습니다. 전체 `corpus`는 24개 대표 저장소와 고차수 의미 anchor 40개의 1-hop 후보에서 선택 집합의 실제 관계를 가장 많이 늘리는 노드를 반복 선택합니다. 화면에서는 분리된 실제 클러스터를 한 지식 우주로 읽을 수 있도록 공유 태그·분야 기반 `display` 연결 461개를 별도 계층으로 더합니다. `display` 연결은 `origin=display`, `provider=corpus-visual-weave-v1`로 식별되며 D1 저장, 근거 관계 수, 커뮤니티·중심성 분석, RAG 검색에 사용되지 않습니다. D1 관계 source/target index와 scope 전용 제한 조회를 적용했고 500노드·2,000선 표시 상한을 유지합니다.
 
 반복 `corpus` 요청은 문서 최신 갱신 시각과 문서·엔티티·관계 수·row version으로 만든 fingerprint가 같을 때 제한 조회 후보 snapshot을 메모리에서 재사용합니다. 각 요청에는 복제본을 반환하므로 consolidation·analytics가 cache 원본을 오염시키지 않으며, 문서 재처리나 관계 보강으로 fingerprint가 바뀌면 다음 요청에서 D1을 다시 읽습니다.
 
@@ -261,7 +262,7 @@ ATLAS_BASE_URL=http://localhost:3000
 
 | Method | 경로 | 역할 |
 |---|---|---|
-| `GET` | `/api/graph`, `/api/graph?scope=corpus` | 전체 D1 관계 중심 500노드·최대 2,000관계 snapshot; 전체/표시 수량 메타 포함 |
+| `GET` | `/api/graph`, `/api/graph?scope=corpus` | 전체 D1 관계 중심 500노드·최대 2,000선 snapshot; `projectedFactualEdgeCount`와 비저장 `displayEdgeCount`를 분리한 전체/표시 수량 메타 포함 |
 | `GET` | `/api/graph?showcase=gold` | 온톨로지 v1 Gold Graph 읽기 전용 fixture; 현재 D1과 분리 |
 | `GET` | `/api/graph?scope=overview` | 저장소·공유 기술 overview snapshot; 결정적 500노드·2,000관계 예산과 생략 수 메타 포함 |
 | `GET` | `/api/graph?scope=repository&repositoryId=...` | 선택 GitHub 저장소의 README·개발 계획·Phase·Task 상세 snapshot |

@@ -299,7 +299,7 @@ export default function KnowledgeGraph() {
   const shouldFitShowcaseRef = useRef(false);
   const viewModeRef = useRef<GraphViewMode>("constellation");
   const luminosityRef = useRef<LuminosityPreset>("bright");
-  const luminosityPreviewRef = useRef(false);
+  const luminosityPreviewRef = useRef(true);
   const luminosityControlsRef = useRef<LuminosityControls>({
     ...luminosityPresetControls.bright,
   });
@@ -330,7 +330,7 @@ export default function KnowledgeGraph() {
   const [luminosityPanelOpen, setLuminosityPanelOpen] = useState(false);
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
   const [dataMenuPosition, setDataMenuPosition] = useState({ left: 12, bottom: 82 });
-  const [luminosityPreviewEnabled, setLuminosityPreviewEnabled] = useState(false);
+  const luminosityPreviewEnabled = true;
   const [graphLoading, setGraphLoading] = useState(true);
   const [graphError, setGraphError] = useState("");
   const [graphRequestedScope, setGraphRequestedScope] =
@@ -635,14 +635,11 @@ export default function KnowledgeGraph() {
   );
 
   useEffect(() => {
-    const previewEnabled =
-      new URL(window.location.href).searchParams.get("preview") === "luminosity-v2";
     const initialShowcase = new URL(window.location.href).searchParams.get("showcase");
-    luminosityPreviewRef.current = previewEnabled;
+    luminosityPreviewRef.current = true;
     const frame = window.requestAnimationFrame(() => {
       if (initialShowcase === "max") applyShowcasePresentation();
       if (initialShowcase === "gold") applyGoldPresentation();
-      setLuminosityPreviewEnabled(previewEnabled);
       setPerformanceEnabled(new URL(window.location.href).searchParams.get("perf") === "1");
       void loadGraph();
     });
@@ -3174,13 +3171,25 @@ export default function KnowledgeGraph() {
               : repositoryScopeContext
               ? `${graphData.meta.documentCount ?? 0}개 Markdown · ${knowledgeNodes.length}개 노드 · ${knowledgeEdges.length}개 관계`
               : corpusScopeActive
-                ? `D1 전체 ${(graphData.meta.corpusNodeCount ?? 0).toLocaleString()}노드 · ${(graphData.meta.corpusEdgeCount ?? 0).toLocaleString()}관계 중 화면 ${knowledgeNodes.length}노드 · ${knowledgeEdges.length}관계`
+                ? `D1 전체 ${(graphData.meta.corpusNodeCount ?? 0).toLocaleString()}노드 · ${(graphData.meta.corpusEdgeCount ?? 0).toLocaleString()}관계 중 화면 ${knowledgeNodes.length}노드 · 실제 ${(graphData.meta.projectedFactualEdgeCount ?? knowledgeEdges.length).toLocaleString()}관계${(graphData.meta.displayEdgeCount ?? 0) > 0 ? ` + 시각 연결 ${graphData.meta.displayEdgeCount?.toLocaleString()}` : ""}`
               : overviewScopeActive
                 ? `${graphData.meta.repositoryCount ?? 0}개 저장소 · 공유 기술 중심 overview`
                 : graphData.meta.source === "documents"
                   ? `${graphData.meta.documentCount ?? 0}개 Markdown 문서에서 추출한 관계 데이터`
                   : "개념과 시스템 사이를 연결한 선행 데모 데이터"}
           </span>
+          {goldGraphActive && (
+            <button
+              type="button"
+              className="gold-corpus-cta"
+              disabled={graphLoading}
+              onClick={() => void selectDataSource("corpus")}
+            >
+              <span>Gold 표본 닫기</span>
+              <strong>실제 D1 연결망 보기</strong>
+              <i aria-hidden="true">→</i>
+            </button>
+          )}
           {graphError && (
             <span className="graph-sync-error" role="alert">
               <span>{graphError}</span>
@@ -3342,25 +3351,23 @@ export default function KnowledgeGraph() {
                   <em>{LUMINOSITY_LABELS[preset]}</em>
                 </button>
               ))}
-              {luminosityPreviewEnabled && (
-                <button
-                  ref={luminosityButtonRef}
-                  type="button"
-                  className={`luminosity-adjust-button ${savedCustomControls ? "has-custom" : ""} ${luminosityCustom ? "is-custom" : ""}`}
-                  aria-pressed={luminosityCustom}
-                  aria-expanded={luminosityPanelOpen}
-                  aria-controls="luminosity-control-panel"
-                  onClick={openOrRestoreCustomLuminosity}
-                  title={
-                    savedCustomControls && !luminosityCustom
-                      ? "마지막 커스텀 설정 복원"
-                      : "발광 세부 조절"
-                  }
-                >
-                  <span className="adjust-icon" aria-hidden="true">✦</span>
-                  <em>{savedCustomControls ? "커스텀" : "조절"}</em>
-                </button>
-              )}
+              <button
+                ref={luminosityButtonRef}
+                type="button"
+                className={`luminosity-adjust-button ${savedCustomControls ? "has-custom" : ""} ${luminosityCustom ? "is-custom" : ""}`}
+                aria-pressed={luminosityCustom}
+                aria-expanded={luminosityPanelOpen}
+                aria-controls="luminosity-control-panel"
+                onClick={openOrRestoreCustomLuminosity}
+                title={
+                  savedCustomControls && !luminosityCustom
+                    ? "마지막 커스텀 설정 복원"
+                    : "발광 세부 조절"
+                }
+              >
+                <span className="adjust-icon" aria-hidden="true">✦</span>
+                <em>커스텀</em>
+              </button>
             </div>
           </div>
         </div>
@@ -3421,7 +3428,9 @@ export default function KnowledgeGraph() {
                 <span>
                   <strong>전체 D1 지식 맵</strong>
                   <small>
-                    {(graphData.meta.corpusNodeCount ?? 0).toLocaleString()} 노드 · {(graphData.meta.corpusEdgeCount ?? 0).toLocaleString()} 관계 중 핵심 투영
+                    {corpusScopeActive
+                      ? `${(graphData.meta.projectedFactualEdgeCount ?? knowledgeEdges.length).toLocaleString()}개 실제 관계 + ${(graphData.meta.displayEdgeCount ?? 0).toLocaleString()}개 시각 연결`
+                      : "실제 문서 코퍼스 · 500노드 관계 확장 투영"}
                   </small>
                 </span>
                 <b>{corpusScopeActive ? "ACTIVE" : "OPEN"}</b>
@@ -3473,14 +3482,14 @@ export default function KnowledgeGraph() {
               <i aria-hidden="true" />
               {goldGraphActive
                 ? "검토 표본 · 전체 코퍼스 아님 · D1과 분리 · 저장되지 않음"
-                : showcaseActive
+                  : showcaseActive
                   ? "읽기 전용 · 저장되지 않음 · 실제 지식 데이터 아님"
-                  : "실제 D1 읽기 전용 투영 · 화면 상한 500노드 / 2,000관계"}
+                  : `실제 D1 읽기 전용 투영 · 화면 상한 500노드 / 2,000선${(graphData.meta.displayEdgeCount ?? 0) > 0 ? ` · 화면용 ${graphData.meta.displayEdgeCount?.toLocaleString()}선은 비저장` : ""}`}
             </footer>
           </section>
         )}
 
-        {luminosityPreviewEnabled && luminosityPanelOpen && (
+        {luminosityPanelOpen && (
           <section
             ref={luminosityPanelRef}
             id="luminosity-control-panel"

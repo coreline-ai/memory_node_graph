@@ -109,6 +109,56 @@ test("corpus 소형 그래프는 임의 관계를 만들지 않는다", () => {
   assert.deepEqual(projected.edges, edges);
 });
 
+test("corpus 대형 희소 그래프는 사실 관계를 보존하고 비저장 display weave로 화면 연결을 확장한다", () => {
+  const nodes = Array.from({ length: 300 }, (_, index) => ({
+    ...technology(index),
+    id: `concept:weave:${String(index).padStart(3, "0")}`,
+    domain: index % 2 ? "agents" : "memory",
+    tags: [index % 3 ? "retrieval" : "orchestration", `cluster-${Math.floor(index / 20)}`],
+  }));
+  const factualEdges = nodes.flatMap((node, index) => {
+    if (index % 20 === 19) return [];
+    return [{
+      source: node.id,
+      target: nodes[index + 1].id,
+      type: "supports",
+      confidence: 0.9,
+      note: "stored relationship",
+      layer: "explicit",
+    }];
+  });
+  const snapshot = {
+    nodes,
+    edges: factualEdges,
+    meta: {
+      source: "documents",
+      provider: "markdown-ast",
+      generatedAt: "2026-08-07T00:00:00Z",
+      corpusNodeCount: 89_669,
+      corpusEdgeCount: 94_488,
+    },
+  };
+  const projected = projectGraphCorpus(snapshot);
+  const repeated = projectGraphCorpus({
+    ...snapshot,
+    nodes: [...nodes].reverse(),
+    edges: [...factualEdges].reverse(),
+  });
+  const projectedFacts = projected.edges.filter((edge) => edge.layer !== "display");
+  const displayEdges = projected.edges.filter((edge) => edge.layer === "display");
+
+  assert.deepEqual(projectedFacts, factualEdges);
+  assert.ok(displayEdges.length > 0);
+  assert.ok(displayEdges.every((edge) =>
+    edge.origin === "display"
+    && edge.provider === "corpus-visual-weave-v1"
+    && /사실 관계로 저장되지 않습니다/.test(edge.note)));
+  assert.equal(projected.meta.projectedFactualEdgeCount, factualEdges.length);
+  assert.equal(projected.meta.displayEdgeCount, displayEdges.length);
+  assert.equal(projected.meta.omittedEdgeCount, 94_488 - factualEdges.length);
+  assert.deepEqual(repeated.edges, projected.edges);
+});
+
 test("overview는 모든 저장소를 우선하고 공유 기술을 결정적으로 500노드 예산에 맞춘다", () => {
   const repositories = Array.from({ length: 3 }, (_, index) => repository(index));
   const technologies = Array.from({ length: 510 }, (_, index) => technology(index));

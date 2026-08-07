@@ -335,6 +335,10 @@ test("compact graph controls keep grouped horizontal access without dropping con
   assert.ok(compactStart > responsiveStart);
   assert.ok(phoneStart > compactStart);
 
+  const baseRules = css.slice(0, responsiveStart);
+  assert.match(baseRules, /grid-template-areas:\s*"status view data"\s*"status stage stage"/);
+  assert.match(baseRules, /\.stage-cluster\s*\{[\s\S]*?grid-area:\s*stage/);
+
   const responsiveRules = css.slice(responsiveStart, compactStart);
   const compactRules = css.slice(compactStart, phoneStart);
   assert.match(responsiveRules, /overflow-x:\s*auto/);
