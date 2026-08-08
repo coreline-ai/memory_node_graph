@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { GitHubSourceEngine } from "../.connector-dist/connector/github-source-engine.js";
+import {
+  cleanGitHubEnvironment,
+  GitHubSourceEngine,
+} from "../.runtime-dist/server/github/github-source-engine.js";
 
 const config = {
   baseUrl: "http://localhost:3000",
-  token: "",
-  connectorId: "github-engine-test",
+  runtimeId: "github-engine-test",
   pollIntervalMs: 1,
-  heartbeatIntervalMs: 10_000,
+  statusIntervalMs: 10_000,
   leaseDurationMs: 90_000,
   codexTimeoutMs: 180_000,
   githubTimeoutMs: 120_000,
@@ -18,7 +20,7 @@ const config = {
   codexPath: undefined,
   ghPath: "gh-test",
   deleteSessionAfterRun: true,
-  version: "atlas-connector-test",
+  version: "atlas-runtime-test",
 };
 
 const repository = (overrides) => ({
@@ -74,6 +76,31 @@ const gitBlobSha = (content) => {
   const bytes = Buffer.from(content, "utf8");
   return createHash("sha1").update(`blob ${bytes.byteLength}\0`).update(bytes).digest("hex");
 };
+
+test("GitHub 서버 실행 환경은 키링 OAuth만 남기고 API·IPC 비밀을 제거한다", () => {
+  const previous = Object.fromEntries([
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "ATLAS_RUNTIME_ORIGIN",
+    "ATLAS_INTERNAL_RUNTIME_SECRET",
+    "OPENAI_API_KEY",
+    "LIGHTRAG_API_KEY",
+    "CODEX_API_KEY",
+  ].map((key) => [key, process.env[key]]));
+  try {
+    for (const key of Object.keys(previous)) process.env[key] = `should-not-reach-gh-${key}`;
+    process.env.ATLAS_SAFE_FIXTURE = "preserved";
+    const env = cleanGitHubEnvironment();
+    for (const key of Object.keys(previous)) assert.equal(env[key], undefined);
+    assert.equal(env.ATLAS_SAFE_FIXTURE, "preserved");
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    delete process.env.ATLAS_SAFE_FIXTURE;
+  }
+});
 
 test("GitHub source engine은 keyring gh 인증으로 숫자 repository ID 목록만 정제한다", async () => {
   const calls = [];
@@ -138,6 +165,8 @@ test("GitHub source engine은 keyring gh 인증으로 숫자 repository ID 목�
     assert.equal(result.summary.discoveredCount, 4);
     assert.equal(result.summary.selectedCount, 2);
     assert.ok(calls.some((call) => call.args.includes("user/repos?per_page=100&affiliation=owner&visibility=all")));
+    assert.ok(calls.filter((call) => call.args[0] === "api")
+      .every((call) => call.args.includes("--method") && call.args.includes("GET")));
     assert.ok(calls.every((call) => !("GH_TOKEN" in call.env) && !("GITHUB_TOKEN" in call.env)));
     assert.ok(calls.every((call) => !call.args.some((arg) => arg.includes("token"))));
   } finally {

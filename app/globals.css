@@ -1014,7 +1014,8 @@ textarea:focus-visible {
   top: calc(100% + 7px);
   right: 0;
   left: 0;
-  overflow: hidden;
+  max-height: min(520px, calc(100vh - 88px));
+  overflow-y: auto;
   background: rgba(14, 17, 21, 0.97);
   border: 1px solid var(--border-strong);
   border-radius: 5px;
@@ -1055,6 +1056,31 @@ textarea:focus-visible {
 .search-results button strong,
 .search-results button small {
   display: block;
+}
+
+.search-results button em {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 5px;
+  padding: 2px 5px;
+  overflow: hidden;
+  color: #70808b;
+  font-family: var(--font-mono);
+  font-size: 6.5px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(101, 181, 255, 0.045);
+  border: 1px solid rgba(101, 181, 255, 0.1);
+  border-radius: 2px;
+}
+
+.search-results button em.is-outside {
+  color: #9a8bb7;
+  background: rgba(159, 122, 234, 0.055);
+  border-color: rgba(159, 122, 234, 0.15);
 }
 
 .search-results button > span {
@@ -1116,6 +1142,15 @@ textarea:focus-visible {
   margin-top: 11px;
   color: #555b61;
   font-size: 9.5px;
+}
+
+.graph-title-block > .projection-guide {
+  display: block;
+  max-width: 320px;
+  margin-top: 9px;
+  color: #596b76;
+  font-size: 8px;
+  line-height: 1.5;
 }
 
 .graph-title-block > .graph-sync-error {
@@ -1458,6 +1493,8 @@ textarea:focus-visible {
     0 0 34px rgba(121, 213, 192, 0.035);
   backdrop-filter: blur(22px);
   animation: data-source-panel-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes data-source-panel-in {
@@ -1499,6 +1536,7 @@ textarea:focus-visible {
   display: grid;
   gap: 5px;
   padding: 11px 0;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1573,6 +1611,85 @@ textarea:focus-visible {
 
 .data-source-options .is-active b {
   color: #80ac9f;
+}
+
+.recent-document-options {
+  display: grid;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+}
+
+.recent-document-options > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 4px;
+  color: #626c73;
+  font-family: var(--font-mono);
+  font-size: 6.5px;
+  letter-spacing: 0.08em;
+}
+
+.recent-document-options > div small {
+  color: #444c52;
+  font-size: 6px;
+  letter-spacing: 0;
+}
+
+.recent-document-options > button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 45px;
+  padding: 7px 9px;
+  color: #737b81;
+  text-align: left;
+  background: rgba(101, 181, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.recent-document-options > button:hover,
+.recent-document-options > button:focus-visible,
+.recent-document-options > button.is-active {
+  color: #bccbd5;
+  background: rgba(101, 181, 255, 0.055);
+  border-color: rgba(101, 181, 255, 0.16);
+  outline: none;
+}
+
+.recent-document-options > button span,
+.recent-document-options > button strong,
+.recent-document-options > button small {
+  display: block;
+  min-width: 0;
+}
+
+.recent-document-options > button strong {
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-document-options > button small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: #4f5960;
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-document-options > button b {
+  color: #596b78;
+  font-family: var(--font-mono);
+  font-size: 6px;
 }
 
 .data-option-current,

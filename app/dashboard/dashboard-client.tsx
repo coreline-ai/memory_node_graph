@@ -7,28 +7,43 @@ import type {
   DashboardSnapshot,
   DocumentRecord,
 } from "../lib/graph/model";
+import { GRAPH_REVISION_STORAGE_KEY } from "../lib/graph/graph-revision";
+import type {
+  DocumentMutationOperation,
+  DocumentMutationResponse,
+} from "../lib/ingestion/document-mutation-receipt";
 import type { GitHubRepositoryDescriptor } from "../lib/github/discovery-contracts";
 import type {
-  GitHubConnectorCapabilityRecord,
+  GitHubRuntimeCapabilityRecord,
   GitHubSourceJobRecord,
 } from "../lib/github/source-job-contracts";
+import type { GitHubRuntimeStatus } from "../lib/github/github-runtime-status";
+import type { CodexRuntimeStatus } from "../lib/llm/codex-runtime-status";
 import type {
   GitHubRepositorySyncStatus,
   GitHubRepositorySyncSummary,
 } from "../lib/github/dashboard-projection";
 import type { GitHubDashboardDryRun } from "../lib/github/dashboard-dry-run";
-import { resolveGitHubCapabilityGuidance } from "../lib/github/capability-guidance";
 import {
   countDashboardDocumentsBySource,
   filterDashboardDocumentsBySource,
   type DashboardDocumentSourceFilter,
 } from "../lib/dashboard/document-source-filter";
+import {
+  presentCodexRuntime,
+  presentGitHubRuntime,
+} from "../lib/dashboard/runtime-presentation";
 
 type GitHubDashboardState = {
   jobs: GitHubSourceJobRecord[];
-  capabilities: GitHubConnectorCapabilityRecord[];
+  capabilities: GitHubRuntimeCapabilityRecord[];
   repositorySync: GitHubRepositorySyncSummary[];
   repositoryDryRun: GitHubDashboardDryRun | null;
+};
+
+type RuntimeDashboardState = {
+  codex: CodexRuntimeStatus;
+  github: GitHubRuntimeStatus;
 };
 
 type RepositoryFilter = "all" | "recommended" | "selected" | "public" | "private" | "warning";
@@ -68,7 +83,7 @@ const emptySnapshot: DashboardSnapshot = {
   documents: [],
   jobs: [],
   enrichmentJobs: [],
-  connector: { status: "offline", onlineCount: 0, queuedJobs: 0, activeJobs: 0 },
+  runtime: { status: "offline", onlineCount: 0, queuedJobs: 0, activeJobs: 0 },
   totals: {
     documents: 0,
     nodes: 0,
@@ -78,8 +93,40 @@ const emptySnapshot: DashboardSnapshot = {
     enrichmentQueued: 0,
     enrichmentActive: 0,
     enrichmentWarnings: 0,
+    legacyEnrichmentQueued: 0,
+    storedNodes: 0,
+    storedEdges: 0,
+    projectionNodeLimit: 500,
+    projectionEdgeLimit: 2_000,
   },
   storage: "memory",
+  graphRevision: "atlas-graph-v1:0:none:0:0:0:0:none",
+};
+
+const emptyRuntimeState: RuntimeDashboardState = {
+  codex: {
+    state: "failed",
+    available: false,
+    authenticated: false,
+    message: "Codex OAuth 상태를 확인하고 있습니다.",
+  },
+  github: {
+    version: "atlas-integrated-github-runtime-1",
+    state: "unavailable",
+    available: false,
+    authenticated: false,
+    authorized: false,
+    message: "GitHub OAuth 상태를 확인하고 있습니다.",
+  },
+};
+
+const mutationOperationLabels: Record<DocumentMutationOperation, string> = {
+  created: "신규 반영",
+  updated: "내용 갱신",
+  unchanged: "변경 없음",
+  reindexed: "재인덱싱",
+  deleted: "삭제 완료",
+  failed: "처리 실패",
 };
 
 const enrichmentLabels: Record<DashboardEnrichmentJob["status"], string> = {
@@ -116,30 +163,6 @@ const date = new Intl.DateTimeFormat("ko-KR", {
   minute: "2-digit",
 });
 
-const connectorStopReasonLabels: Record<NonNullable<DashboardSnapshot["connector"]["stopReason"]>, string> = {
-  dry_run: "DRY RUN",
-  job_limit: "JOB LIMIT",
-  runtime_limit: "TIME LIMIT",
-  idle: "QUEUE EMPTY",
-  once: "ONE JOB",
-  signal: "STOPPED",
-  fatal: "ERROR",
-};
-
-const runtimeLabel = (milliseconds?: number) => {
-  if (!milliseconds) return "시간 제한 없음";
-  if (milliseconds < 60_000) return `${Math.ceil(milliseconds / 1_000)}초`;
-  return `${Math.ceil(milliseconds / 60_000)}분`;
-};
-
-const githubCapabilityLabels: Record<GitHubConnectorCapabilityRecord["status"], string> = {
-  online: "GH ONLINE",
-  login_required: "LOGIN REQUIRED",
-  forbidden: "ACCESS DENIED",
-  rate_limited: "RATE LIMITED",
-  offline: "OFFLINE",
-};
-
 const activeGitHubStatuses = new Set<GitHubSourceJobRecord["status"]>(["queued", "leased", "running"]);
 const githubPreviewMaxRepositories = 10;
 const repositorySyncLabels: Record<GitHubRepositorySyncStatus, string> = {
@@ -166,11 +189,13 @@ async function jsonRequest<T>(input: RequestInfo | URL, init?: RequestInit) {
 export default function DashboardClient() {
   const [snapshot, setSnapshot] = useState(emptySnapshot);
   const [githubState, setGitHubState] = useState(emptyGitHubState);
+  const [runtimeState, setRuntimeState] = useState(emptyRuntimeState);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [mutationReport, setMutationReport] = useState<DocumentMutationResponse | null>(null);
   const [pendingDelete, setPendingDelete] = useState<DocumentRecord | null>(null);
   const [pendingJobAction, setPendingJobAction] = useState<string>("");
   const [documentSourceFilter, setDocumentSourceFilter] = useState<DashboardDocumentSourceFilter>("all");
@@ -186,15 +211,26 @@ export default function DashboardClient() {
   const [reprocessProgress, setReprocessProgress] = useState({ completed: 0, failed: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const selectionHydrationRef = useRef("");
+  const announcedGraphRevisionRef = useRef("");
 
   const load = useCallback(async () => {
     try {
-      const [nextSnapshot, nextGitHubState] = await Promise.all([
+      const [nextSnapshot, nextGitHubState, nextCodexStatus, nextGitHubStatus] = await Promise.all([
         jsonRequest<DashboardSnapshot>("/api/documents", { cache: "no-store" }),
         jsonRequest<GitHubDashboardState>("/api/github/source-jobs", { cache: "no-store" }),
+        jsonRequest<{ runtime: CodexRuntimeStatus }>("/api/runtime/codex/status", { cache: "no-store" })
+          .then((payload) => payload.runtime)
+          .catch(() => null),
+        jsonRequest<{ runtime: GitHubRuntimeStatus }>("/api/runtime/github/status", { cache: "no-store" })
+          .then((payload) => payload.runtime)
+          .catch(() => null),
       ]);
       setSnapshot(nextSnapshot);
       setGitHubState(nextGitHubState);
+      setRuntimeState((current) => ({
+        codex: nextCodexStatus ?? current.codex,
+        github: nextGitHubStatus ?? current.github,
+      }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "문서 상태를 불러오지 못했습니다.");
     } finally {
@@ -210,6 +246,19 @@ export default function DashboardClient() {
       window.clearInterval(interval);
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!snapshot.graphRevision || announcedGraphRevisionRef.current === snapshot.graphRevision) return;
+    announcedGraphRevisionRef.current = snapshot.graphRevision;
+    try {
+      window.localStorage.setItem(GRAPH_REVISION_STORAGE_KEY, JSON.stringify({
+        graphRevision: snapshot.graphRevision,
+        announcedAt: new Date().toISOString(),
+      }));
+    } catch {
+      // Cross-tab acceleration is optional; the graph also polls the revision endpoint.
+    }
+  }, [snapshot.graphRevision]);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -242,17 +291,11 @@ export default function DashboardClient() {
     [documentSourceFilter, snapshot.documents],
   );
 
-  const latestGitHubCapability = useMemo(() => [...githubState.capabilities]
+  const latestGitHubCapability = useMemo(() => githubState.capabilities
+    .filter((capability) => capability.runtimeId.startsWith("atlas-runtime-"))
     .sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt))[0], [githubState.capabilities]);
-  const githubCapabilityGuidance = useMemo(
-    () => resolveGitHubCapabilityGuidance(latestGitHubCapability),
-    [latestGitHubCapability],
-  );
-  const displayedGitHubCapabilityLabel = githubCapabilityGuidance.status === "no_signal"
-    ? "NO SIGNAL"
-    : latestGitHubCapability
-      ? githubCapabilityLabels[latestGitHubCapability.status]
-      : "NO SIGNAL";
+  const codexRuntime = useMemo(() => presentCodexRuntime(runtimeState.codex), [runtimeState.codex]);
+  const githubRuntime = useMemo(() => presentGitHubRuntime(runtimeState.github), [runtimeState.github]);
 
   const latestDiscoveryJob = useMemo(() => [...githubState.jobs]
     .filter((job) => job.kind === "discovery")
@@ -318,7 +361,7 @@ export default function DashboardClient() {
   const activeGitHubJob = githubState.jobs.find((job) => activeGitHubStatuses.has(job.status));
   const canStartGitHubDiscovery = !startingDiscovery
     && !activeGitHubJob
-    && githubCapabilityGuidance.canRequestDiscovery;
+    && runtimeState.github.available;
 
   const startGitHubDiscovery = async () => {
     if (startingDiscovery || activeGitHubJob) return;
@@ -432,11 +475,12 @@ export default function DashboardClient() {
     try {
       const form = new FormData();
       files.forEach((file) => form.append("files", file, file.name));
-      const payload = await jsonRequest<{ snapshot: DashboardSnapshot }>("/api/documents", {
+      const payload = await jsonRequest<DocumentMutationResponse>("/api/documents", {
         method: "POST",
         body: form,
       });
       setSnapshot(payload.snapshot);
+      setMutationReport(payload);
       setFiles([]);
       if (inputRef.current) inputRef.current.value = "";
       setDrawerOpen(false);
@@ -450,11 +494,12 @@ export default function DashboardClient() {
   const reindex = async (documentId: string) => {
     setError("");
     try {
-      const payload = await jsonRequest<{ snapshot: DashboardSnapshot }>(
+      const payload = await jsonRequest<DocumentMutationResponse>(
         `/api/documents/${encodeURIComponent(documentId)}/reindex`,
         { method: "POST" },
       );
       setSnapshot(payload.snapshot);
+      setMutationReport(payload);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "재인덱싱하지 못했습니다.");
     }
@@ -464,11 +509,12 @@ export default function DashboardClient() {
     if (!pendingDelete) return;
     setError("");
     try {
-      const payload = await jsonRequest<{ snapshot: DashboardSnapshot }>(
+      const payload = await jsonRequest<DocumentMutationResponse>(
         `/api/documents/${encodeURIComponent(pendingDelete.id)}`,
         { method: "DELETE" },
       );
       setSnapshot(payload.snapshot);
+      setMutationReport(payload);
       setPendingDelete(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "문서를 삭제하지 못했습니다.");
@@ -573,8 +619,8 @@ export default function DashboardClient() {
       <section className="status-strip" aria-label="지식 저장소 현황">
         {[
           ["문서", snapshot.totals.documents],
-          ["노드", snapshot.totals.nodes],
-          ["관계", snapshot.totals.edges],
+          ["고유 노드", snapshot.totals.storedNodes],
+          ["저장 관계", snapshot.totals.storedEdges],
           ["보강 대기", snapshot.totals.enrichmentQueued],
           ["보강 중", snapshot.totals.enrichmentActive],
           ["주의", snapshot.totals.failed + snapshot.totals.enrichmentWarnings],
@@ -586,7 +632,38 @@ export default function DashboardClient() {
         <em>{snapshot.storage === "d1" ? "D1 PERSISTENT" : "LOCAL MEMORY"}</em>
       </section>
 
+      <section className="graph-inventory-orbit" aria-label="저장 그래프와 화면 투영 범위">
+        <div><i /><span><small>STORED KNOWLEDGE</small><strong>{number.format(snapshot.totals.storedNodes)} 노드 · {number.format(snapshot.totals.storedEdges)} 관계</strong></span></div>
+        <span className="inventory-path" aria-hidden="true"><i /><i /><i /></span>
+        <div><i /><span><small>CURRENT VIEW PROJECTION</small><strong>보기별 최대 {number.format(snapshot.totals.projectionNodeLimit)} 노드 · {number.format(snapshot.totals.projectionEdgeLimit)} 선</strong></span></div>
+        <p>전체 지식은 저장소에 유지하고, 그래프 화면은 관계가 중요한 일부를 선택해 그립니다. 문서별 발생 노드 합계는 {number.format(snapshot.totals.nodes)}개이며 같은 개념은 고유 노드로 합쳐집니다.</p>
+      </section>
+
       {error && <div className="dashboard-error" role="alert"><span>!</span>{error}<button type="button" onClick={() => setError("")}>닫기</button></div>}
+      {mutationReport && <section className={`document-mutation-report${mutationReport.summary.failed ? " has-failures" : ""}`} aria-live="polite">
+        <header>
+          <div><p>GRAPH UPDATE RECEIPT</p><strong>{mutationReport.summary.failed
+            ? "일부 문서를 확인해야 합니다."
+            : mutationReport.summary.unchanged && !mutationReport.summary.completed
+              ? "저장된 그래프와 동일합니다."
+              : "문서 그래프 반영이 완료되었습니다."}</strong></div>
+          <dl>
+            <div><dt>완료</dt><dd>{mutationReport.summary.completed}</dd></div>
+            <div><dt>동일</dt><dd>{mutationReport.summary.unchanged}</dd></div>
+            <div><dt>실패</dt><dd>{mutationReport.summary.failed}</dd></div>
+            <div><dt>변화</dt><dd>{mutationReport.summary.nodeDelta >= 0 ? "+" : ""}{mutationReport.summary.nodeDelta}N · {mutationReport.summary.edgeDelta >= 0 ? "+" : ""}{mutationReport.summary.edgeDelta}E</dd></div>
+          </dl>
+          <button type="button" onClick={() => setMutationReport(null)} aria-label="그래프 반영 결과 닫기">닫기</button>
+        </header>
+        <div>
+          {mutationReport.receipts.map((receipt, index) => <article className={`mutation-${receipt.status}`} key={`${receipt.fileName}-${receipt.operation}-${index}`}>
+            <i />
+            <span><strong>{receipt.fileName}</strong><small>{receipt.message}{receipt.warning ? ` · ${receipt.warning}` : ""}</small></span>
+            <em>{mutationOperationLabels[receipt.operation]}</em>
+            <code>{receipt.nodes.delta >= 0 ? "+" : ""}{receipt.nodes.delta}N · {receipt.edges.delta >= 0 ? "+" : ""}{receipt.edges.delta}E</code>
+          </article>)}
+        </div>
+      </section>}
 
       {reprocessPreview && <section className="reprocess-preview" aria-live="polite">
         <div>
@@ -595,7 +672,7 @@ export default function DashboardClient() {
           <span>
             {number.format(reprocessPreview.totals.documents)}개 문서 · {number.format(reprocessPreview.totals.repositories)}개 저장소 · {number.format(reprocessPreview.totals.blocks)}개 근거 블록 · 예상 {number.format(reprocessPreview.totals.chunks)}개 Codex 청크
           </span>
-          <small>구조·명시 관계는 즉시 교체되고, 추론 관계는 로컬 Connector가 대기열을 순차 처리합니다.</small>
+          <small>구조·명시 관계는 즉시 교체되고, 추론 관계는 통합 Codex OAuth 런타임이 대기열을 순차 처리합니다.</small>
         </div>
         <div className="reprocess-preview-actions">
           {reprocessing && <strong>{number.format(reprocessProgress.completed + reprocessProgress.failed)} / {number.format(reprocessPreview.totals.documents)}</strong>}
@@ -609,12 +686,12 @@ export default function DashboardClient() {
       <section className="github-discovery" aria-labelledby="github-discovery-title">
         <header className="github-discovery-heading">
           <div>
-            <p>GITHUB SOURCE DISCOVERY · LOCAL GH</p>
+            <p>GITHUB SOURCE DISCOVERY · INTEGRATED OAUTH</p>
             <h2 id="github-discovery-title">Coreline 저장소 선택</h2>
           </div>
           <div className="github-discovery-actions">
-            <span className={`github-capability github-${githubCapabilityGuidance.status}`}>
-              <i />{displayedGitHubCapabilityLabel}
+            <span className={`github-capability runtime-${githubRuntime.tone}`}>
+              <i />{githubRuntime.label}
             </span>
             <button
               type="button"
@@ -626,47 +703,44 @@ export default function DashboardClient() {
                 ? "요청 중…"
                 : activeGitHubJob
                   ? "Discovery 진행 중"
-                  : !githubCapabilityGuidance.canRequestDiscovery
-                    ? githubCapabilityGuidance.actionLabel
-                    : latestGitHubCapability?.status === "online"
-                      ? discovery ? "저장소 다시 찾기" : "저장소 찾기"
-                      : githubCapabilityGuidance.actionLabel}
+                  : runtimeState.github.available
+                    ? discovery ? "저장소 다시 찾기" : "저장소 찾기"
+                    : githubRuntime.label}
               <span>↻</span>
             </button>
           </div>
         </header>
 
-        {githubCapabilityGuidance.status !== "online" && <section
-          className={`github-capability-guide tone-${githubCapabilityGuidance.tone}`}
-          aria-label="GitHub Connector 복구 안내"
+        {runtimeState.github.state !== "connected" && <section
+          className={`github-capability-guide tone-${githubRuntime.tone}`}
+          aria-label="GitHub OAuth 상태 안내"
           aria-live="polite"
         >
           <span className="github-capability-guide-mark" aria-hidden="true"><i /><i /></span>
           <div className="github-capability-guide-copy">
-            <p>CONNECTOR RECOVERY GUIDE</p>
-            <strong>{githubCapabilityGuidance.title}</strong>
-            <span>{githubCapabilityGuidance.description}</span>
+            <p>GITHUB AUTH STATUS</p>
+            <strong>{githubRuntime.title}</strong>
+            <span>{githubRuntime.description}</span>
           </div>
           <div className="github-capability-guide-step">
             <small>NEXT STEP</small>
-            <span>{githubCapabilityGuidance.nextStep}</span>
-            {githubCapabilityGuidance.retryAt && <time>
-              제한 해제 예상 {date.format(new Date(githubCapabilityGuidance.retryAt))}
+            <span>{githubRuntime.nextStep}</span>
+            {runtimeState.github.rateLimitResetAt && <time>
+              제한 해제 예상 {date.format(new Date(runtimeState.github.rateLimitResetAt))}
             </time>}
-            {githubCapabilityGuidance.command && <code>{githubCapabilityGuidance.command}</code>}
+            {githubRuntime.command && <code>{githubRuntime.command}</code>}
           </div>
           <button
             type="button"
-            disabled={!canStartGitHubDiscovery}
-            onClick={() => void startGitHubDiscovery()}
-          >{githubCapabilityGuidance.actionLabel}</button>
+            onClick={() => void load()}
+          >상태 다시 확인</button>
         </section>}
 
         <div className="github-discovery-body">
           <aside className="github-discovery-summary">
             <div className="github-account">
               <span className="github-account-mark" aria-hidden="true">GH</span>
-              <p><strong>{latestGitHubCapability?.accountLogin ?? "coreline-ai"}</strong><small>{latestGitHubCapability?.message ?? "Connector를 실행하면 로컬 gh 로그인 상태를 확인합니다."}</small></p>
+              <p><strong>{latestGitHubCapability?.accountLogin ?? "GitHub OAuth"}</strong><small>{runtimeState.github.message}</small></p>
             </div>
             <div className="github-total"><span>접근 가능</span><strong>{number.format(discovery?.totals.total ?? 0)}</strong><small>REPOSITORIES</small></div>
             <dl className="github-metrics">
@@ -734,8 +808,8 @@ export default function DashboardClient() {
             </div>
             <div className="github-repository-list" role="list" aria-label="발견된 GitHub 저장소">
               {!discovery ? <div className="github-repository-empty">
-                <strong>{activeGitHubJob ? "Connector가 저장소 목록을 확인하고 있습니다." : "아직 발견된 저장소가 없습니다."}</strong>
-                <p>{activeGitHubJob ? "작업이 완료되면 수량·필터·선택 목록이 자동으로 갱신됩니다." : "로컬 Connector 연결 후 저장소 찾기를 실행하세요."}</p>
+                <strong>{activeGitHubJob ? "통합 런타임이 저장소 목록을 확인하고 있습니다." : "아직 발견된 저장소가 없습니다."}</strong>
+                <p>{activeGitHubJob ? "작업이 완료되면 수량·필터·선택 목록이 자동으로 갱신됩니다." : "GitHub OAuth 연결 후 저장소 찾기를 실행하세요."}</p>
               </div> : visibleRepositories.length === 0 ? <div className="github-repository-empty"><strong>필터와 일치하는 저장소가 없습니다.</strong><p>검색어 또는 필터를 변경하세요.</p></div> : visibleRepositories.map((repository) => {
                 const selection = discoverySelectionById.get(repository.repositoryId);
                 const selected = selectedRepositorySet.has(repository.repositoryId);
@@ -852,7 +926,7 @@ export default function DashboardClient() {
             <strong>저장소를 최대 {githubPreviewMaxRepositories}개 선택하고 파일 미리보기를 실행하세요.</strong>
             <p>기본 브랜치의 루트 README.md와 dev-plan/**/*.md 경로·크기·Blob SHA만 확인합니다.</p>
           </div> : !preview ? <div className="github-preview-empty">
-            <strong>{latestPreviewJob.status === "failed" ? "파일 미리보기를 완료하지 못했습니다." : "Connector가 선택 저장소의 Git Tree를 확인하고 있습니다."}</strong>
+            <strong>{latestPreviewJob.status === "failed" ? "파일 미리보기를 완료하지 못했습니다." : "통합 런타임이 선택 저장소의 Git Tree를 확인하고 있습니다."}</strong>
             <p>{latestPreviewJob.errorMessage ?? "완료되면 저장소별 대상 파일과 manifest digest가 표시됩니다."}</p>
           </div> : <>
             <dl className="github-preview-metrics">
@@ -1046,49 +1120,44 @@ export default function DashboardClient() {
         <aside className="ingestion-activity" aria-labelledby="ingestion-title">
           <header className="panel-heading">
             <div><p>PIPELINE ACTIVITY</p><h2 id="ingestion-title">인덱싱 · 보강 상태</h2></div>
-            <span className={`activity-live connector-${snapshot.connector.status}`}><i /> {snapshot.connector.status === "online" ? "CONNECTED" : "OFFLINE"}</span>
+            <span className={`activity-live runtime-${snapshot.totals.failed || snapshot.totals.enrichmentWarnings ? "blocked" : snapshot.totals.processing || snapshot.totals.enrichmentActive ? "working" : "ready"}`}>
+              <i /> {snapshot.totals.failed || snapshot.totals.enrichmentWarnings ? "CHECK" : snapshot.totals.processing || snapshot.totals.enrichmentActive ? "WORKING" : "READY"}
+            </span>
           </header>
-          <section className={`connector-beacon connector-${snapshot.connector.status}`} aria-live="polite">
-            <div className="connector-signal" aria-hidden="true"><i /><i /><span /></div>
-            <div className="connector-copy">
-              <p>CODEX CONNECTOR</p>
-              <strong>{snapshot.connector.status === "online" ? "로컬 Connector 연결됨" : "Connector 오프라인"}</strong>
-              <small>{snapshot.connector.status === "online"
-                ? `${snapshot.connector.onlineCount}개 연결 · ${snapshot.connector.activeJobs ? `${snapshot.connector.activeJobs}개 분석 중` : "작업 대기 중"}`
-                : snapshot.connector.queuedJobs
-                  ? `${snapshot.connector.queuedJobs}개 보강 작업이 연결을 기다립니다.`
-                  : "기본 그래프는 계속 사용할 수 있습니다."}</small>
-            </div>
-            <time>{snapshot.connector.lastSeenAt ? `마지막 신호 ${date.format(new Date(snapshot.connector.lastSeenAt))}` : "연결 기록 없음"}</time>
+          <section className="runtime-auth-grid" aria-label="OAuth 연결 상태" aria-live="polite">
+            <article className={`runtime-auth-card tone-${codexRuntime.tone}`}>
+              <span className="runtime-orbit" aria-hidden="true"><i /><i /></span>
+              <div><p>CODEX OAUTH</p><strong>{codexRuntime.title}</strong><small>{codexRuntime.description}</small></div>
+              <em>{codexRuntime.label}</em>
+              <footer><span>{codexRuntime.nextStep}</span>{codexRuntime.command && <code>{codexRuntime.command}</code>}</footer>
+            </article>
+            <article className={`runtime-auth-card tone-${githubRuntime.tone}`}>
+              <span className="runtime-orbit" aria-hidden="true"><i /><i /></span>
+              <div><p>GITHUB OAUTH</p><strong>{githubRuntime.title}</strong><small>{githubRuntime.description}</small></div>
+              <em>{githubRuntime.label}</em>
+              <footer><span>{githubRuntime.nextStep}</span>{githubRuntime.command && <code>{githubRuntime.command}</code>}</footer>
+            </article>
+            <button type="button" className="runtime-refresh" onClick={() => void load()}>상태 다시 확인 <span>↻</span></button>
           </section>
-          <section className="connector-run-policy" aria-label="Connector 제한 실행 상태">
-            <header>
-              <p>SAFE RUN POLICY</p>
-              <strong>{snapshot.connector.runMode === "bounded" ? "제한 실행" : "연속 실행"}</strong>
-              <em>{snapshot.connector.status === "online"
-                ? "RUNNING"
-                : snapshot.connector.stopReason
-                  ? connectorStopReasonLabels[snapshot.connector.stopReason]
-                  : "READY"}</em>
-            </header>
+          <section className="pipeline-summary" aria-label="현재 작업 상태">
+            <header><p>KNOWLEDGE PIPELINE</p><strong>현재 실행 가능한 작업</strong><em>{snapshot.totals.enrichmentActive ? "ANALYZING" : snapshot.totals.processing ? "PARSING" : "STABLE"}</em></header>
             <dl>
-              <div><dt>처리</dt><dd>{number.format(snapshot.connector.processedJobs ?? 0)}{snapshot.connector.maxJobs !== undefined ? ` / ${number.format(snapshot.connector.maxJobs)}` : ""}</dd></div>
-              <div><dt>성공</dt><dd>{number.format(snapshot.connector.succeededJobs ?? 0)}</dd></div>
-              <div><dt>주의</dt><dd>{number.format(snapshot.connector.warningJobs ?? 0)}</dd></div>
-              <div><dt>실패</dt><dd>{number.format(snapshot.connector.failedJobs ?? 0)}</dd></div>
+              <div><dt>기본 그래프</dt><dd>{number.format(snapshot.documents.filter((document) => document.status === "completed" || document.status === "unchanged").length)}</dd></div>
+              <div><dt>보강 대기</dt><dd>{number.format(snapshot.totals.enrichmentQueued)}</dd></div>
+              <div><dt>보강 중</dt><dd>{number.format(snapshot.totals.enrichmentActive)}</dd></div>
+              <div><dt>확인 필요</dt><dd>{number.format(snapshot.totals.failed + snapshot.totals.enrichmentWarnings)}</dd></div>
             </dl>
-            <p>{snapshot.connector.runMode === "bounded"
-              ? `최대 ${snapshot.connector.maxJobs ?? "–"}개 · ${runtimeLabel(snapshot.connector.maxRuntimeMs)} · 대기열 ${number.format(snapshot.connector.queuedJobs)}개`
-              : `대기열 ${number.format(snapshot.connector.queuedJobs)}개 · 제한 실행은 npm run connector:batch`}</p>
-            <small>{snapshot.connector.status === "online"
-              ? "안전 중지: Connector 터미널에서 Ctrl+C"
-              : snapshot.connector.queuedJobs
-                ? "안전 재개: npm run connector:batch (기본 1개·최대 5분)"
-                : "처리할 Codex 보강 작업이 없습니다."}</small>
+            <p>Markdown 분석과 기본 노드·관계 생성은 OAuth 없이 즉시 실행됩니다.</p>
+            {snapshot.totals.legacyEnrichmentQueued > 0 && <small>이전 방식 대기열 {number.format(snapshot.totals.legacyEnrichmentQueued)}개는 현재 통합 런타임 작업 수에서 제외했습니다.</small>}
           </section>
           <div className="pipeline-map" aria-label="문서 처리 단계">
-            {[["01", "VALIDATE", "형식·크기·중복"], ["02", "PARSE", "Markdown AST"], ["03", "PROJECT", "기본 그래프 반영"], ["04", "ENRICH", "Codex 관계 보강"]].map(([step, title, description]) => (
-              <div key={step}><span>{step}</span><i /><p><strong>{title}</strong><small>{description}</small></p></div>
+            {[
+              ["01", "VALIDATE", "형식·크기·중복", snapshot.totals.processing ? "working" : "ready"],
+              ["02", "PARSE", "Markdown AST", snapshot.totals.processing ? "working" : "ready"],
+              ["03", "PROJECT", "기본 그래프 반영", snapshot.totals.failed ? "blocked" : "ready"],
+              ["04", "ENRICH", "Codex 관계 보강", snapshot.totals.enrichmentActive ? "working" : runtimeState.codex.available ? "ready" : "optional"],
+            ].map(([step, title, description, state]) => (
+              <div className={`pipeline-${state}`} key={step}><span>{step}</span><i /><p><strong>{title}</strong><small>{description}</small></p></div>
             ))}
           </div>
           <div className="activity-list enrichment-activity-list">
@@ -1112,7 +1181,7 @@ export default function DashboardClient() {
               </div>
             ))}
           </div>
-          <footer>기본 그래프는 Connector와 무관하게 즉시 동작합니다. Codex 보강은 로컬 로그인 상태를 쓰는 별도 선택 단계입니다.</footer>
+          <footer>기본 그래프는 OAuth 없이 즉시 동작합니다. Codex와 GitHub는 서로 독립된 로그인 상태를 사용하는 선택 기능입니다.</footer>
         </aside>
       </div>
 

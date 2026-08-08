@@ -25,7 +25,15 @@ import {
   type RelationLayer,
   type RelationKind,
 } from "./graph-data";
-import type { GraphSnapshot } from "./lib/graph/model";
+import type {
+  GraphDocumentSummary,
+  GraphNodeSearchResult,
+  GraphSnapshot,
+} from "./lib/graph/model";
+import {
+  GRAPH_REVISION_STORAGE_KEY,
+  shouldRefreshGraphRevision,
+} from "./lib/graph/graph-revision";
 import {
   graphApiRequestFromPageUrl,
   graphScopeHistoryStateFromHistoryState,
@@ -305,6 +313,8 @@ export default function KnowledgeGraph() {
   });
   const selectedIdRef = useRef<string | null>(null);
   const autoRotateIntentRef = useRef<AutoRotateIntent>(initialAutoRotateIntent(false));
+  const graphRevisionRef = useRef("");
+  const graphLoadingRef = useRef(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hovered, setHovered] = useState<{
     id: string;
@@ -313,6 +323,9 @@ export default function KnowledgeGraph() {
   } | null>(null);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [indexedSearchResults, setIndexedSearchResults] = useState<GraphNodeSearchResult[]>([]);
+  const [indexedSearchLoading, setIndexedSearchLoading] = useState(false);
+  const [recentDocuments, setRecentDocuments] = useState<GraphDocumentSummary[]>([]);
   const [autoRotateIntent, setAutoRotateIntent] = useState<AutoRotateIntent>(() =>
     initialAutoRotateIntent(false),
   );
@@ -411,6 +424,7 @@ export default function KnowledgeGraph() {
   }, [replaceDomains, replaceKinds, replaceRelations]);
 
   const loadGraph = useCallback(async () => {
+    graphLoadingRef.current = true;
     setGraphLoading(true);
     setGraphError("");
     try {
@@ -426,6 +440,8 @@ export default function KnowledgeGraph() {
           ? null
           : pageUrl.searchParams.get("scope") === "repository"
             ? "repository"
+            : pageUrl.searchParams.get("scope") === "document"
+              ? "document"
             : pageUrl.searchParams.get("scope") === "overview"
               ? "overview"
               : "corpus",
@@ -448,21 +464,27 @@ export default function KnowledgeGraph() {
           : null,
       );
       setGraphRequestedScope(payload.meta.scope ?? null);
+      graphRevisionRef.current = payload.meta.graphRevision ?? "";
       setGraphData(payload);
     } catch (error) {
       setGraphError(error instanceof Error ? error.message : "그래프를 불러오지 못했습니다.");
     } finally {
+      graphLoadingRef.current = false;
       setGraphLoading(false);
     }
   }, [restoreGraphScopeState]);
 
   const navigateGraphScope = useCallback(
-    async (scope: GraphNavigationScope, repositoryId?: string) => {
+    async (scope: GraphNavigationScope, resourceId?: string, focusNodeId?: string) => {
       const nextUrl = pageUrlForGraphScope(
         new URL(window.location.href),
         scope,
-        repositoryId,
+        resourceId,
       );
+      if (focusNodeId) {
+        nextUrl.searchParams.set("view", "orbit");
+        nextUrl.searchParams.set("node", focusNodeId);
+      }
       window.history.replaceState(
         historyStateWithGraphScopeState(window.history.state, graphScopeState()),
         "",
@@ -473,12 +495,17 @@ export default function KnowledgeGraph() {
         "",
         nextUrl,
       );
-      setSelectedId(null);
+      setSelectedId(focusNodeId ?? null);
+      if (focusNodeId) {
+        setViewMode("orbit");
+        viewModeRef.current = "orbit";
+      }
       setHovered(null);
       setQuery("");
       setSearchOpen(false);
       setDataMenuOpen(false);
       await loadGraph();
+      if (focusNodeId) graphApiRef.current?.setViewMode("orbit", focusNodeId);
     },
     [graphScopeState, loadGraph],
   );
@@ -653,6 +680,52 @@ export default function KnowledgeGraph() {
   }, [loadGraph]);
 
   useEffect(() => {
+    let disposed = false;
+    const presentationActive = () => {
+      const url = new URL(window.location.href);
+      return url.searchParams.has("showcase") || url.searchParams.has("fixture");
+    };
+    const refreshIfChanged = async (announcedRevision?: string) => {
+      if (disposed || presentationActive() || graphLoadingRef.current) return;
+      try {
+        const nextRevision = announcedRevision || (await (async () => {
+          const response = await fetch("/api/graph/revision", { cache: "no-store" });
+          if (!response.ok) return "";
+          const payload = await response.json() as { graphRevision?: string };
+          return payload.graphRevision ?? "";
+        })());
+        if (shouldRefreshGraphRevision(graphRevisionRef.current, nextRevision)) {
+          await loadGraph();
+        }
+      } catch {
+        // The full graph loader owns user-visible errors. A lightweight
+        // revision probe may fail transiently without replacing the graph.
+      }
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== GRAPH_REVISION_STORAGE_KEY || !event.newValue) return;
+      try {
+        const payload = JSON.parse(event.newValue) as { graphRevision?: string };
+        void refreshIfChanged(payload.graphRevision);
+      } catch {
+        // Ignore malformed cross-tab notifications and keep polling.
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refreshIfChanged();
+    };
+    const interval = window.setInterval(() => void refreshIfChanged(), 5_000);
+    window.addEventListener("storage", onStorage);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      window.removeEventListener("storage", onStorage);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [loadGraph]);
+
+  useEffect(() => {
     if (!graphData.meta.generatedAt) return;
     window.history.replaceState(
       historyStateWithGraphScopeState(window.history.state, graphScopeState()),
@@ -660,6 +733,50 @@ export default function KnowledgeGraph() {
       window.location.href,
     );
   }, [graphData.meta.generatedAt, graphScopeState]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/graph/documents?limit=6", {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const payload = await response.json() as { documents?: GraphDocumentSummary[] };
+        if (Array.isArray(payload.documents)) setRecentDocuments(payload.documents);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [graphData.meta.graphRevision]);
+
+  useEffect(() => {
+    const normalized = query.trim();
+    if (normalized.length < 2) {
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setIndexedSearchLoading(true);
+      void fetch(`/api/graph/search?q=${encodeURIComponent(normalized)}&limit=8`, {
+        cache: "no-store",
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          const payload = await response.json() as { results?: GraphNodeSearchResult[] };
+          setIndexedSearchResults(response.ok && Array.isArray(payload.results) ? payload.results : []);
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setIndexedSearchResults([]);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setIndexedSearchLoading(false);
+        });
+    }, 180);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
 
   const nodeMap = useMemo(
     () => new Map(knowledgeNodes.map((nodeItem) => [nodeItem.id, nodeItem])),
@@ -716,8 +833,11 @@ export default function KnowledgeGraph() {
   const corpusScopeActive = !presentationFixtureActive && graphData.meta.scope === "corpus";
   const overviewScopeActive = !presentationFixtureActive && graphData.meta.scope === "overview";
   const repositoryScopeActive = !presentationFixtureActive && graphData.meta.scope === "repository";
+  const documentScopeActive = !presentationFixtureActive && graphData.meta.scope === "document";
   const repositoryScopeContext = repositoryScopeActive
     || (Boolean(graphError) && graphRequestedScope === "repository");
+  const documentScopeContext = documentScopeActive
+    || (Boolean(graphError) && graphRequestedScope === "document");
   const currentRepositoryNode = graphData.meta.repositoryId
     ? nodeMap.get(`repository:github:${graphData.meta.repositoryId}`) ?? null
     : null;
@@ -757,6 +877,8 @@ export default function KnowledgeGraph() {
       ? `MAX ${knowledgeNodes.length}N`
       : repositoryScopeActive
         ? `REPO ${knowledgeNodes.length}N`
+        : documentScopeActive
+          ? `DOC ${knowledgeNodes.length}N/${knowledgeEdges.length}E`
         : corpusScopeActive
           ? `D1 ${knowledgeNodes.length}N/${knowledgeEdges.length}E`
         : overviewScopeActive
@@ -789,7 +911,7 @@ export default function KnowledgeGraph() {
   const searchResults = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return [];
-    return knowledgeNodes
+    const localResults = knowledgeNodes
       .filter((item) =>
         [item.label, item.summary, item.tags.join(" ")]
           .join(" ")
@@ -799,8 +921,21 @@ export default function KnowledgeGraph() {
       .sort(
         (a, b) => (degreeMap.get(b.id) ?? 0) - (degreeMap.get(a.id) ?? 0),
       )
-      .slice(0, 6);
-  }, [degreeMap, knowledgeNodes, query]);
+      .slice(0, 8)
+      .map((node) => ({
+        node,
+        score: 1,
+        document: undefined,
+        inCurrentProjection: true,
+      }));
+    if (indexedSearchResults.length > 0) {
+      return indexedSearchResults.map((result) => ({
+        ...result,
+        inCurrentProjection: nodeMap.has(result.node.id),
+      })).slice(0, 8);
+    }
+    return localResults.slice(0, 8);
+  }, [degreeMap, indexedSearchResults, knowledgeNodes, nodeMap, query]);
 
   const applyLens = useCallback(
     (lens: string) => {
@@ -837,6 +972,26 @@ export default function KnowledgeGraph() {
       graphApiRef.current?.flyTo(id);
     }
   }, []);
+
+  const openSearchResult = useCallback(async (
+    result: GraphNodeSearchResult & { inCurrentProjection: boolean },
+  ) => {
+    if (!result.inCurrentProjection && result.document) {
+      await navigateGraphScope("document", result.document.id, result.node.id);
+      return;
+    }
+    setSelectedId(result.node.id);
+    setQuery("");
+    setSearchOpen(false);
+    setSidebarOpen(false);
+    setViewMode("orbit");
+    viewModeRef.current = "orbit";
+    graphApiRef.current?.setViewMode("orbit", result.node.id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", "orbit");
+    url.searchParams.set("node", result.node.id);
+    window.history.replaceState({}, "", url);
+  }, [navigateGraphScope]);
 
   useEffect(() => {
     const nodeIds = new Set<string>();
@@ -2855,7 +3010,9 @@ export default function KnowledgeGraph() {
             </div>
             <div>
               <p className="eyebrow">
-                KNOWLEDGE GRAPH · {repositoryScopeContext
+                KNOWLEDGE GRAPH · {documentScopeContext
+                  ? "DOCUMENT EVIDENCE"
+                  : repositoryScopeContext
                   ? "REPOSITORY DETAIL"
                   : corpusScopeActive
                     ? "FULL D1 CORPUS"
@@ -2892,6 +3049,8 @@ export default function KnowledgeGraph() {
                   ? "ERROR"
                   : repositoryScopeActive
                   ? "REPO"
+                  : documentScopeActive
+                    ? "DOC"
                   : corpusScopeActive
                     ? "D1 MAP"
                   : overviewScopeActive
@@ -3074,7 +3233,19 @@ export default function KnowledgeGraph() {
             <span className="context-dot" />
             <span>AI SYSTEMS</span>
             <i>/</i>
-            {repositoryScopeContext ? (
+            {documentScopeContext ? (
+              <>
+                <button
+                  type="button"
+                  disabled={graphLoading}
+                  onClick={() => void navigateGraphScope("corpus")}
+                >
+                  전체 D1
+                </button>
+                <i>/</i>
+                <span>{graphData.meta.documentName ?? "문서 중심 그래프"}</span>
+              </>
+            ) : repositoryScopeContext ? (
               <>
                 <button
                   type="button"
@@ -3099,11 +3270,16 @@ export default function KnowledgeGraph() {
             <input
               type="search"
               value={query}
-              placeholder="개념, 시스템, 위험 검색"
-              aria-label="지식 노드 검색"
+              placeholder="전체 코퍼스 노드 검색"
+              aria-label="전체 지식 코퍼스 노드 검색"
               onFocus={() => setSearchOpen(true)}
               onChange={(event) => {
-                setQuery(event.target.value);
+                const nextQuery = event.target.value;
+                setQuery(nextQuery);
+                setIndexedSearchResults([]);
+                if (nextQuery.trim().length < 2) {
+                  setIndexedSearchLoading(false);
+                }
                 setSearchOpen(true);
               }}
             />
@@ -3113,23 +3289,30 @@ export default function KnowledgeGraph() {
                 {searchResults.length > 0 ? (
                   searchResults.map((item) => (
                     <button
-                      key={item.id}
+                      key={item.node.id}
                       type="button"
                       role="option"
                       aria-selected={false}
-                      onClick={() => selectNode(item.id)}
+                      onClick={() => void openSearchResult(item)}
                     >
                       <i
-                        style={{ background: `#${NODE_COLORS[item.kind].toString(16).padStart(6, "0")}` }}
+                        style={{ background: `#${NODE_COLORS[item.node.kind].toString(16).padStart(6, "0")}` }}
                       />
                       <span>
-                        <strong>{item.shortLabel}</strong>
+                        <strong>{item.node.shortLabel}</strong>
                         <small>
-                          {nodeKindLabels[item.kind]} · {domainLabels[item.domain]}
+                          {nodeKindLabels[item.node.kind]} · {domainLabels[item.node.domain]}
                         </small>
+                        <em className={item.inCurrentProjection ? "is-current" : "is-outside"}>
+                          {item.inCurrentProjection
+                            ? "현재 화면 · 궤도로 열기"
+                            : `${item.document?.fileName ?? "연결 문서"} · 문서 중심 1·2단계`}
+                        </em>
                       </span>
                     </button>
                   ))
+                ) : indexedSearchLoading ? (
+                  <p>전체 코퍼스에서 검색 중…</p>
                 ) : (
                   <p>일치하는 지식 노드가 없습니다.</p>
                 )}
@@ -3142,6 +3325,8 @@ export default function KnowledgeGraph() {
           <p>
             INTERACTIVE KNOWLEDGE · {goldGraphActive
               ? "ONTOLOGY V1 · REVIEW SAMPLE"
+              : documentScopeContext
+              ? "DOCUMENT · 1–2 HOP EVIDENCE"
               : repositoryScopeContext
               ? "REPOSITORY DETAIL"
               : corpusScopeActive
@@ -3153,6 +3338,8 @@ export default function KnowledgeGraph() {
           <h2>
             {goldGraphActive
               ? <>검증된 프로젝트 구조 표본을<br />근거 관계로 탐색합니다.</>
+              : documentScopeContext
+              ? <>{graphData.meta.documentName ?? "선택 문서"}에서 시작해<br />1·2단계 근거 관계를 추적합니다.</>
               : repositoryScopeContext
               ? <>{currentRepositoryNode?.shortLabel ?? "선택 저장소"}의 문서와 계획을<br />관계로 추적합니다.</>
               : corpusScopeActive
@@ -3168,6 +3355,8 @@ export default function KnowledgeGraph() {
           <span>
             {goldGraphActive
               ? `${graphData.meta.documentCount ?? 0}개 대표 문서 기반 검토 표본 · ${knowledgeNodes.length}개 전문 노드 · ${knowledgeEdges.length}개 근거 관계 · 전체 코퍼스 아님`
+              : documentScopeContext
+              ? `${graphData.meta.documentSourceLabel ?? "Markdown"} · 문서 직접 노드 ${(graphData.meta.documentSeedNodeIds?.length ?? 0).toLocaleString()}개 · 화면 ${knowledgeNodes.length.toLocaleString()}노드 · 저장 관계 ${knowledgeEdges.length.toLocaleString()}개 · 화면용 비저장선 0개`
               : repositoryScopeContext
               ? `${graphData.meta.documentCount ?? 0}개 Markdown · ${knowledgeNodes.length}개 노드 · ${knowledgeEdges.length}개 관계`
               : corpusScopeActive
@@ -3178,6 +3367,11 @@ export default function KnowledgeGraph() {
                   ? `${graphData.meta.documentCount ?? 0}개 Markdown 문서에서 추출한 관계 데이터`
                   : "개념과 시스템 사이를 연결한 선행 데모 데이터"}
           </span>
+          {corpusScopeActive && (
+            <small className="projection-guide">
+              화면은 전체 {(graphData.meta.corpusNodeCount ?? 0).toLocaleString()}개 노드 중 핵심 500개 투영입니다. 상단 검색으로 화면 밖 노드를 찾으면 해당 Markdown 중심의 1·2단계 관계를 궤도로 엽니다.
+            </small>
+          )}
           {goldGraphActive && (
             <button
               type="button"
@@ -3242,16 +3436,16 @@ export default function KnowledgeGraph() {
           <div className="control-cluster data-cluster" role="group" aria-label="데이터">
             <span className="control-cluster-label" aria-hidden="true">데이터</span>
             <div className="control-group data-switch">
-              {repositoryScopeContext && (
+              {(repositoryScopeContext || documentScopeContext) && (
                 <button
                   type="button"
                   className="scope-back-control"
                   disabled={graphLoading}
-                  onClick={() => void navigateGraphScope("overview")}
-                  title="전체 저장소 overview로 복귀"
+                  onClick={() => void navigateGraphScope(documentScopeContext ? "corpus" : "overview")}
+                  title={documentScopeContext ? "전체 D1 코퍼스로 복귀" : "전체 저장소 overview로 복귀"}
                 >
                   <span className="scope-back-icon" aria-hidden="true">←</span>
-                  <em>전체 저장소</em>
+                  <em>{documentScopeContext ? "전체 D1" : "전체 저장소"}</em>
                 </button>
               )}
               <Link className="dashboard-control" href="/dashboard" title="Markdown 문서 관리">
@@ -3291,6 +3485,8 @@ export default function KnowledgeGraph() {
                         ? "저장소 맵"
                         : repositoryScopeActive
                           ? "저장소 상세"
+                          : documentScopeActive
+                            ? "문서 중심"
                           : "데이터"}</em>
               </button>
             </div>
@@ -3388,6 +3584,8 @@ export default function KnowledgeGraph() {
                   ? "DEMO · 500 NODES / 2,000 EDGES"
                   : corpusScopeActive
                     ? "LIVE D1 · RELATIONSHIP FIRST"
+                    : documentScopeActive
+                      ? "DOCUMENT · STORED EVIDENCE"
                     : "DATA SOURCE"}</span>
               <strong>{goldGraphActive
                 ? "GOLD GRAPH SAMPLE"
@@ -3399,6 +3597,8 @@ export default function KnowledgeGraph() {
                       ? "REPOSITORY OVERVIEW"
                       : repositoryScopeActive
                         ? "REPOSITORY DETAIL"
+                        : documentScopeActive
+                          ? "DOCUMENT EVIDENCE MAP"
                         : "CURRENT GRAPH"}</strong>
             </header>
             <div className="data-source-options">
@@ -3477,6 +3677,30 @@ export default function KnowledgeGraph() {
                 </span>
                 <b>{showcaseActive ? "ACTIVE" : "VIEW"}</b>
               </button>
+              {recentDocuments.length > 0 && (
+                <div className="recent-document-options" aria-label="최근 Markdown 문서">
+                  <div>
+                    <span>RECENT DOCUMENTS</span>
+                    <small>문서 직접 노드 + 1·2단계 저장 관계</small>
+                  </div>
+                  {recentDocuments.map((document) => (
+                    <button
+                      key={document.id}
+                      type="button"
+                      className={documentScopeActive && graphData.meta.documentId === document.id ? "is-active" : ""}
+                      aria-pressed={documentScopeActive && graphData.meta.documentId === document.id}
+                      disabled={graphLoading}
+                      onClick={() => void navigateGraphScope("document", document.id)}
+                    >
+                      <span>
+                        <strong>{document.fileName}</strong>
+                        <small>{document.sourceLabel} · {document.nodeCount.toLocaleString()}N / {document.edgeCount.toLocaleString()}E</small>
+                      </span>
+                      <b>{documentScopeActive && graphData.meta.documentId === document.id ? "ACTIVE" : "OPEN"}</b>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <footer role="status" aria-live="polite">
               <i aria-hidden="true" />
@@ -3484,6 +3708,8 @@ export default function KnowledgeGraph() {
                 ? "검토 표본 · 전체 코퍼스 아님 · D1과 분리 · 저장되지 않음"
                   : showcaseActive
                   ? "읽기 전용 · 저장되지 않음 · 실제 지식 데이터 아님"
+                  : documentScopeActive
+                    ? "문서 직접 노드 중심 · 저장된 관계만 표시 · 1·2단계 확장 · 화면용 연결선 0개"
                   : `실제 D1 읽기 전용 투영 · 화면 상한 500노드 / 2,000선${(graphData.meta.displayEdgeCount ?? 0) > 0 ? ` · 화면용 ${graphData.meta.displayEdgeCount?.toLocaleString()}선은 비저장` : ""}`}
             </footer>
           </section>

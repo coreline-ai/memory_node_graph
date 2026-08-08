@@ -5,7 +5,7 @@ import {
   assertD1AtomicBatchLimit,
   chunkD1Statements,
   D1_GRAPH_BATCH_STATEMENT_LIMIT,
-} from "../.connector-dist/app/lib/storage/d1-batch-policy.js";
+} from "../.runtime-dist/app/lib/storage/d1-batch-policy.js";
 
 test("D1 Graph stage는 90문장씩 분할하고 원자 commit은 상한 초과를 거부한다", () => {
   const statements = Array.from({ length: 181 }, (_, index) => index);

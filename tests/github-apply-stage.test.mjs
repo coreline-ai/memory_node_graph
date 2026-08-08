@@ -5,8 +5,8 @@ import {
   GITHUB_APPLY_CHUNK_MAX_FILES,
   hydrateGitHubApplyStageSubmission,
   parseGitHubApplyStageChunk,
-} from "../.connector-dist/app/lib/github/apply-stage-contracts.js";
-import { ConnectorClient } from "../.connector-dist/connector/client.js";
+} from "../.runtime-dist/app/lib/github/apply-stage-contracts.js";
+import { IntegratedRuntimeClient } from "../.runtime-dist/server/runtime/client.js";
 
 const document = (index) => {
   const content = `# Chunk ${index}\n\n${"가".repeat(620_000)}`;
@@ -71,7 +71,7 @@ test("65개 Markdown은 최대 20개 문서씩 4개 stage chunk로 분할된다"
   assert.deepEqual(staged.chunks.flatMap((chunk) => chunk.documents), documents);
 });
 
-test("Connector client는 512KB 초과 Apply 원문을 stage로 보내고 finalize에는 참조만 전송한다", async () => {
+test("통합 런타임 client는 512KB 초과 Apply 원문을 stage로 보내고 finalize에는 참조만 전송한다", async () => {
   const jobId = "github-source:apply:client-stage-test";
   const large = {
     repositoryId: "1001",
@@ -98,10 +98,9 @@ test("Connector client는 512KB 초과 Apply 원문을 stage로 보내고 finali
     return Response.json({ job: { id: jobId, status: "completed" } });
   };
   try {
-    const client = new ConnectorClient({
+    const client = new IntegratedRuntimeClient({
       baseUrl: "http://localhost:3000",
-      token: "",
-      connectorId: "stage-client-test",
+      runtimeId: "stage-client-test",
     });
     await client.submitGitHubSource(jobId, {
       jobId,
@@ -140,7 +139,7 @@ test("Connector client는 512KB 초과 Apply 원문을 stage로 보내고 finali
   }
 });
 
-test("Connector client는 작은 문서도 20개를 초과하면 stage 전송한다", async () => {
+test("통합 런타임 client는 작은 문서도 20개를 초과하면 stage 전송한다", async () => {
   const jobId = "github-source:apply:client-21-files";
   const documents = Array.from({ length: 21 }, (_, index) => ({
     repositoryId: "1001",
@@ -167,10 +166,9 @@ test("Connector client는 작은 문서도 20개를 초과하면 stage 전송한
     return Response.json({ job: { id: jobId, status: "completed" } });
   };
   try {
-    const client = new ConnectorClient({
+    const client = new IntegratedRuntimeClient({
       baseUrl: "http://localhost:3000",
-      token: "",
-      connectorId: "stage-client-21-files",
+      runtimeId: "stage-client-21-files",
     });
     await client.submitGitHubSource(jobId, {
       jobId,

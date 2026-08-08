@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAtlasConnectorAccess } from "../../../../../lib/auth/connector-access";
+import { requireAtlasRuntimeAccess } from "../../../../../lib/auth/runtime-access";
 import { githubSourceApiError } from "../../../../../lib/http/github-source-api";
 import { readLimitedJson } from "../../../../../lib/http/enrichment-api";
 import { getGitHubSourceJobRepository } from "../../../../../lib/storage/github-source-job-repository";
@@ -7,7 +7,7 @@ import { getGitHubSourceJobRepository } from "../../../../../lib/storage/github-
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
-  const access = await requireAtlasConnectorAccess(request);
+  const access = await requireAtlasRuntimeAccess(request);
   if ("response" in access) return access.response;
   try {
     const { jobId } = await context.params;
@@ -18,7 +18,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     );
     const job = await (await getGitHubSourceJobRepository()).renewLease({
       jobId,
-      connectorId: access.connectorId,
+      runtimeId: access.runtimeId,
       leaseDurationMs,
     });
     return NextResponse.json({ job });

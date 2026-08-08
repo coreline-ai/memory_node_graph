@@ -3,12 +3,12 @@ import test from "node:test";
 
 import {
   resolveGitHubCapabilityGuidance,
-} from "../.connector-dist/app/lib/github/capability-guidance.js";
+} from "../.runtime-dist/app/lib/github/capability-guidance.js";
 
 const checkedAt = "2026-08-05T06:40:00.000Z";
 const currentTime = Date.parse("2026-08-05T06:40:20.000Z");
 const capability = (status, overrides = {}) => ({
-  connectorId: "connector-fixture",
+  runtimeId: "runtime-fixture",
   capability: "github-source",
   status,
   checkedAt,
@@ -16,29 +16,29 @@ const capability = (status, overrides = {}) => ({
   ...overrides,
 });
 
-test("신호 없음과 Connector 오프라인은 서로 다른 복구 안내를 제공한다", () => {
+test("초기 상태와 통합 런타임 오프라인은 서로 다른 복구 안내를 제공한다", () => {
   const noSignal = resolveGitHubCapabilityGuidance(undefined);
   const offline = resolveGitHubCapabilityGuidance(capability("offline", {
-    errorCode: "connector_offline",
+    errorCode: "runtime_unavailable",
   }), currentTime);
 
-  assert.equal(noSignal.status, "no_signal");
-  assert.match(noSignal.title, /신호/);
-  assert.equal(noSignal.command, "npm run connector:start");
+  assert.equal(noSignal.status, "unavailable");
+  assert.match(noSignal.title, /확인/);
+  assert.equal(noSignal.command, undefined);
   assert.equal(offline.status, "offline");
   assert.match(offline.title, /오프라인/);
   assert.notEqual(offline.title, noSignal.title);
 });
 
-test("오래된 온라인 capability는 현재 연결로 오인하지 않고 신호 없음으로 전환한다", () => {
+test("오래된 온라인 capability는 현재 연결로 오인하지 않고 갱신 대기로 전환한다", () => {
   const stale = resolveGitHubCapabilityGuidance(capability("online", {
     accountLogin: "coreline-ai",
     lastSeenAt: "2026-08-05T06:40:00.000Z",
   }), Date.parse("2026-08-05T06:41:00.000Z"));
 
-  assert.equal(stale.status, "no_signal");
-  assert.match(stale.title, /오래/);
-  assert.equal(stale.command, "npm run connector:start");
+  assert.equal(stale.status, "unavailable");
+  assert.match(stale.title, /갱신/);
+  assert.equal(stale.command, undefined);
 });
 
 test("로그인과 권한 부족은 자격 증명을 노출하지 않는 별도 로컬 조치를 안내한다", () => {

@@ -3,7 +3,7 @@ import {
   canTransitionGitHubSourceJob,
   MAX_MANUAL_GITHUB_SOURCE_RETRIES,
   validateGitHubSourceJobResult,
-  type GitHubConnectorCapabilityRecord,
+  type GitHubRuntimeCapabilityRecord,
   type GitHubSourceErrorCode,
   type GitHubSourceJobInput,
   type GitHubSourceJobRecord,
@@ -16,8 +16,13 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_LEASE_MS = 60_000;
 
 type EnqueueOptions = { now?: string; maxAttempts?: number };
-type ClaimOptions = { connectorId: string; leaseDurationMs?: number; now?: string };
-type LeaseMutation = { jobId: string; connectorId: string; now?: string };
+type ClaimOptions = {
+  runtimeId: string;
+  leaseDurationMs?: number;
+  runtimeVersion?: string;
+  now?: string;
+};
+type LeaseMutation = { jobId: string; runtimeId: string; now?: string };
 type RenewLeaseInput = LeaseMutation & { leaseDurationMs?: number };
 type CompleteInput = LeaseMutation & { result: unknown };
 type FailInput = LeaseMutation & {
@@ -25,7 +30,7 @@ type FailInput = LeaseMutation & {
   errorMessage: string;
   retryable: boolean;
 };
-type CapabilityInput = Omit<GitHubConnectorCapabilityRecord, "lastSeenAt"> & { now?: string };
+type RuntimeCapabilityInput = Omit<GitHubRuntimeCapabilityRecord, "lastSeenAt"> & { now?: string };
 
 export type EnqueueGitHubSourceJobResult = {
   job: GitHubSourceJobRecord;
@@ -43,9 +48,9 @@ export interface GitHubSourceJobRepository {
   fail(input: FailInput): Promise<GitHubSourceJobRecord>;
   cancel(jobId: string, now?: string): Promise<GitHubSourceJobRecord>;
   retry(jobId: string, now?: string): Promise<GitHubSourceJobRecord>;
-  recordCapability(input: CapabilityInput): Promise<GitHubConnectorCapabilityRecord>;
-  getCapability(connectorId: string): Promise<GitHubConnectorCapabilityRecord | null>;
-  listCapabilities(): Promise<GitHubConnectorCapabilityRecord[]>;
+  recordRuntimeCapability(input: RuntimeCapabilityInput): Promise<GitHubRuntimeCapabilityRecord>;
+  getRuntimeCapability(runtimeId: string): Promise<GitHubRuntimeCapabilityRecord | null>;
+  listRuntimeCapabilities(): Promise<GitHubRuntimeCapabilityRecord[]>;
   putApplyStageChunk(chunk: GitHubApplyStageChunk): Promise<number>;
   listApplyStageChunks(jobId: string): Promise<GitHubApplyStageChunk[]>;
   deleteApplyStageChunks(jobId: string): Promise<void>;
@@ -84,9 +89,9 @@ function assertTransition(from: GitHubSourceJobStatus, to: GitHubSourceJobStatus
   }
 }
 
-function assertLease(job: GitHubSourceJobRecord, connectorId: string, now: string) {
-  if (!isLeaseStatus(job.status) || job.leaseOwner !== connectorId) {
-    throw new GitHubSourceRepositoryError("lease_conflict", "현재 Connector가 소유한 Lease가 아닙니다.");
+function assertLease(job: GitHubSourceJobRecord, runtimeId: string, now: string) {
+  if (!isLeaseStatus(job.status) || job.leaseOwner !== runtimeId) {
+    throw new GitHubSourceRepositoryError("lease_conflict", "현재 통합 런타임이 소유한 Lease가 아닙니다.");
   }
   if (isExpired(job, now)) {
     throw new GitHubSourceRepositoryError("lease_expired", "GitHub source 작업 Lease가 만료되었습니다.");
@@ -124,7 +129,7 @@ function newJob(input: GitHubSourceJobInput, options: EnqueueOptions = {}): GitH
 export class MemoryGitHubSourceJobRepository implements GitHubSourceJobRepository {
   constructor(
     private readonly jobs = new Map<string, GitHubSourceJobRecord>(),
-    private readonly capabilities = new Map<string, GitHubConnectorCapabilityRecord>(),
+    private readonly capabilities = new Map<string, GitHubRuntimeCapabilityRecord>(),
     private readonly applyStageChunks = new Map<string, Map<number, GitHubApplyStageChunk>>(),
   ) {}
 
@@ -154,12 +159,13 @@ export class MemoryGitHubSourceJobRepository implements GitHubSourceJobRepositor
   }
 
   async claim(options: ClaimOptions) {
-    const capability = this.capabilities.get(options.connectorId);
+    const capability = this.capabilities.get(options.runtimeId);
     if (capability?.status !== "online") return null;
     const now = timestamp(options.now);
     for (const job of [...this.jobs.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
       const claimable = job.status === "queued" || (isLeaseStatus(job.status) && isExpired(job, now));
       if (!claimable) continue;
+      if (options.runtimeVersion && job.input.runtimeVersion !== options.runtimeVersion) continue;
       if (job.attemptCount >= job.maxAttempts) {
         if (isLeaseStatus(job.status)) {
           job.status = "failed";
@@ -176,7 +182,7 @@ export class MemoryGitHubSourceJobRepository implements GitHubSourceJobRepositor
       assertTransition(job.status, "leased");
       job.status = "leased";
       job.attemptCount += 1;
-      job.leaseOwner = options.connectorId;
+      job.leaseOwner = options.runtimeId;
       job.leaseExpiresAt = expiresAt(now, options.leaseDurationMs);
       job.errorCode = undefined;
       job.errorMessage = undefined;
@@ -189,7 +195,7 @@ export class MemoryGitHubSourceJobRepository implements GitHubSourceJobRepositor
   async renewLease(input: RenewLeaseInput) {
     const now = timestamp(input.now);
     const stored = requireJob(this.jobs.get(input.jobId) ?? null);
-    assertLease(stored, input.connectorId, now);
+    assertLease(stored, input.runtimeId, now);
     stored.leaseExpiresAt = expiresAt(now, input.leaseDurationMs);
     stored.updatedAt = now;
     return clone(stored);
@@ -198,7 +204,7 @@ export class MemoryGitHubSourceJobRepository implements GitHubSourceJobRepositor
   async markRunning(input: LeaseMutation) {
     const now = timestamp(input.now);
     const stored = requireJob(this.jobs.get(input.jobId) ?? null);
-    assertLease(stored, input.connectorId, now);
+    assertLease(stored, input.runtimeId, now);
     if (stored.status !== "leased") {
       throw new GitHubSourceRepositoryError("invalid_input", "leased 작업만 running으로 전환할 수 있습니다.");
     }
@@ -212,7 +218,7 @@ export class MemoryGitHubSourceJobRepository implements GitHubSourceJobRepositor
   async complete(input: CompleteInput) {
     const now = timestamp(input.now);
     const stored = requireJob(this.jobs.get(input.jobId) ?? null);
-    assertLease(stored, input.connectorId, now);
+    assertLease(stored, input.runtimeId, now);
     const result = validateGitHubSourceJobResult(input.result, stored);
     failCompletionOnceForTest(input.jobId);
     assertTransition(stored.status, "completed");
@@ -232,7 +238,7 @@ export class MemoryGitHubSourceJobRepository implements GitHubSourceJobRepositor
     assertCredentialFreePayload(input);
     const now = timestamp(input.now);
     const stored = requireJob(this.jobs.get(input.jobId) ?? null);
-    assertLease(stored, input.connectorId, now);
+    assertLease(stored, input.runtimeId, now);
     const nextStatus: GitHubSourceJobStatus =
       input.retryable && stored.attemptCount < stored.maxAttempts ? "queued" : "failed";
     assertTransition(stored.status, nextStatus);
@@ -288,11 +294,11 @@ export class MemoryGitHubSourceJobRepository implements GitHubSourceJobRepositor
     return clone(stored);
   }
 
-  async recordCapability(input: CapabilityInput) {
+  async recordRuntimeCapability(input: RuntimeCapabilityInput) {
     assertCredentialFreePayload(input);
     const now = timestamp(input.now);
-    const record: GitHubConnectorCapabilityRecord = {
-      connectorId: input.connectorId,
+    const record: GitHubRuntimeCapabilityRecord = {
+      runtimeId: input.runtimeId,
       capability: "github-source",
       status: input.status,
       errorCode: input.errorCode,
@@ -303,16 +309,16 @@ export class MemoryGitHubSourceJobRepository implements GitHubSourceJobRepositor
       checkedAt: input.checkedAt,
       lastSeenAt: now,
     };
-    this.capabilities.set(input.connectorId, record);
+    this.capabilities.set(input.runtimeId, record);
     return clone(record);
   }
 
-  async getCapability(connectorId: string) {
-    const record = this.capabilities.get(connectorId);
+  async getRuntimeCapability(runtimeId: string) {
+    const record = this.capabilities.get(runtimeId);
     return record ? clone(record) : null;
   }
 
-  async listCapabilities() {
+  async listRuntimeCapabilities() {
     return [...this.capabilities.values()]
       .sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt))
       .map(clone);
@@ -379,10 +385,10 @@ const asD1Job = (row: D1Row): GitHubSourceJobRecord => ({
   completedAt: row.completed_at ? String(row.completed_at) : undefined,
 });
 
-const asD1Capability = (row: D1Row): GitHubConnectorCapabilityRecord => ({
-  connectorId: String(row.connector_id),
+const asD1RuntimeCapability = (row: D1Row): GitHubRuntimeCapabilityRecord => ({
+  runtimeId: String(row.runtime_id),
   capability: "github-source",
-  status: String(row.status) as GitHubConnectorCapabilityRecord["status"],
+  status: String(row.status) as GitHubRuntimeCapabilityRecord["status"],
   errorCode: row.error_code ? String(row.error_code) as GitHubSourceErrorCode : undefined,
   accountLogin: row.account_login ? String(row.account_login) : undefined,
   host: row.host ? String(row.host) : undefined,
@@ -393,12 +399,12 @@ const asD1Capability = (row: D1Row): GitHubConnectorCapabilityRecord => ({
 });
 
 export const githubSourceSchemaStatements = [
-  `CREATE TABLE IF NOT EXISTS github_source_jobs (id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL, kind TEXT NOT NULL, owner TEXT NOT NULL, repository_id TEXT, status TEXT NOT NULL, input_json TEXT NOT NULL, result_json TEXT, attempt_count INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3, manual_retry_count INTEGER NOT NULL DEFAULT 0, last_manual_retry_at TEXT, lease_owner TEXT, lease_expires_at TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT)`,
-  `CREATE TABLE IF NOT EXISTS github_connector_capabilities (connector_id TEXT NOT NULL, capability TEXT NOT NULL, status TEXT NOT NULL, error_code TEXT, account_login TEXT, host TEXT, rate_limit_reset_at TEXT, message TEXT, checked_at TEXT NOT NULL, last_seen_at TEXT NOT NULL, PRIMARY KEY (connector_id, capability))`,
+  `CREATE TABLE IF NOT EXISTS github_source_jobs (id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL, kind TEXT NOT NULL, owner TEXT NOT NULL, repository_id TEXT, runtime_version TEXT, status TEXT NOT NULL, input_json TEXT NOT NULL, result_json TEXT, attempt_count INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3, manual_retry_count INTEGER NOT NULL DEFAULT 0, last_manual_retry_at TEXT, lease_owner TEXT, lease_expires_at TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT)`,
+  `CREATE TABLE IF NOT EXISTS github_runtime_status (runtime_id TEXT NOT NULL, capability TEXT NOT NULL, status TEXT NOT NULL, error_code TEXT, account_login TEXT, host TEXT, rate_limit_reset_at TEXT, message TEXT, checked_at TEXT NOT NULL, last_seen_at TEXT NOT NULL, PRIMARY KEY (runtime_id, capability))`,
   `CREATE TABLE IF NOT EXISTS github_apply_stage_chunks (job_id TEXT NOT NULL, chunk_index INTEGER NOT NULL, total_chunks INTEGER NOT NULL, checksum TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (job_id, chunk_index))`,
   `CREATE INDEX IF NOT EXISTS github_source_jobs_claim_idx ON github_source_jobs(status, lease_expires_at, created_at)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS github_source_jobs_idempotency_unique ON github_source_jobs(idempotency_key)`,
-  `CREATE INDEX IF NOT EXISTS github_connector_capabilities_seen_idx ON github_connector_capabilities(status, last_seen_at)`,
+  `CREATE INDEX IF NOT EXISTS github_runtime_status_seen_idx ON github_runtime_status(status, last_seen_at)`,
   `CREATE INDEX IF NOT EXISTS github_apply_stage_chunks_job_idx ON github_apply_stage_chunks(job_id, chunk_index)`,
 ] as const;
 
@@ -417,12 +423,37 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
             if (!String(error).toLowerCase().includes("duplicate column")) throw error;
           });
       }
+      if (!info.results.some((column) => String(column.name) === "runtime_version")) {
+        await this.db.prepare("ALTER TABLE github_source_jobs ADD COLUMN runtime_version TEXT").run()
+          .catch((error) => {
+            if (!String(error).toLowerCase().includes("duplicate column")) throw error;
+          });
+      }
       await this.db.prepare(`UPDATE github_source_jobs
         SET repository_id = json_extract(input_json, '$.selectedRepositoryIds[0]')
         WHERE kind = 'apply' AND repository_id IS NULL`).run();
       await this.db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS github_source_jobs_active_apply_unique
         ON github_source_jobs(repository_id)
         WHERE kind = 'apply' AND status IN ('queued', 'leased', 'running')`).run();
+      await this.db.prepare(`CREATE INDEX IF NOT EXISTS github_source_jobs_runtime_claim_idx
+        ON github_source_jobs(runtime_version, status, lease_expires_at, created_at)`).run();
+      const legacyTable = await this.db.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'github_connector_capabilities' LIMIT 1",
+      ).first<{ name: string }>();
+      if (legacyTable) {
+        await this.db.prepare(`INSERT INTO github_runtime_status
+          (runtime_id, capability, status, error_code, account_login, host,
+           rate_limit_reset_at, message, checked_at, last_seen_at)
+          SELECT connector_id, capability, status, error_code, account_login, host,
+            rate_limit_reset_at, message, checked_at, last_seen_at
+          FROM github_connector_capabilities
+          WHERE 1 = 1
+          ON CONFLICT(runtime_id, capability) DO UPDATE SET
+            status=excluded.status, error_code=excluded.error_code, account_login=excluded.account_login,
+            host=excluded.host, rate_limit_reset_at=excluded.rate_limit_reset_at,
+            message=excluded.message, checked_at=excluded.checked_at, last_seen_at=excluded.last_seen_at
+          WHERE excluded.last_seen_at > github_runtime_status.last_seen_at`).run();
+      }
     })();
     await this.readyPromise;
   }
@@ -431,16 +462,17 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
     await this.ready();
     const job = newJob(input, options);
     const outcome = await this.db.prepare(`INSERT OR IGNORE INTO github_source_jobs
-      (id, idempotency_key, kind, owner, repository_id, status, input_json, result_json, attempt_count,
+      (id, idempotency_key, kind, owner, repository_id, runtime_version, status, input_json, result_json, attempt_count,
        max_attempts, manual_retry_count, last_manual_retry_at, lease_owner, lease_expires_at,
        error_code, error_message, created_at, updated_at, started_at, completed_at)
-      VALUES (?, ?, ?, ?, ?, 'queued', ?, NULL, 0, ?, 0, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, NULL)`)
+      VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, NULL, 0, ?, 0, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL, NULL)`)
       .bind(
         job.id,
         job.idempotencyKey,
         job.kind,
         job.owner,
         applyRepositoryId(job.input) ?? null,
+        job.input.runtimeVersion ?? null,
         JSON.stringify(job.input),
         job.maxAttempts,
         job.createdAt,
@@ -478,36 +510,50 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
 
   async claim(options: ClaimOptions) {
     await this.ready();
-    const capability = await this.getCapability(options.connectorId);
+    const capability = await this.getRuntimeCapability(options.runtimeId);
     if (capability?.status !== "online") return null;
     const now = timestamp(options.now);
+    const runtimeVersion = options.runtimeVersion ?? null;
     await this.db.batch([
       this.db.prepare(`DELETE FROM github_apply_stage_chunks WHERE job_id IN (
         SELECT id FROM github_source_jobs
         WHERE status IN ('leased', 'running') AND lease_expires_at <= ? AND attempt_count >= max_attempts
-      )`).bind(now),
+          AND (? IS NULL OR runtime_version = ?)
+      )`).bind(now, runtimeVersion, runtimeVersion),
       this.db.prepare(`UPDATE github_source_jobs SET status = 'failed', error_code = 'retry_exhausted', error_message = '최대 GitHub source 재시도 횟수를 초과했습니다.', lease_owner = NULL, lease_expires_at = NULL, updated_at = ?, completed_at = ?
-        WHERE status IN ('leased', 'running') AND lease_expires_at <= ? AND attempt_count >= max_attempts`)
-        .bind(now, now, now),
+        WHERE status IN ('leased', 'running') AND lease_expires_at <= ? AND attempt_count >= max_attempts
+          AND (? IS NULL OR runtime_version = ?)`)
+        .bind(now, now, now, runtimeVersion, runtimeVersion),
     ]);
     for (let attempt = 0; attempt < 4; attempt += 1) {
       const row = await this.db.prepare(`SELECT * FROM github_source_jobs
         WHERE attempt_count < max_attempts AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))
-        ORDER BY created_at LIMIT 1`).bind(now).first<D1Row>();
+          AND (? IS NULL OR runtime_version = ?)
+        ORDER BY created_at LIMIT 1`).bind(now, runtimeVersion, runtimeVersion).first<D1Row>();
       if (!row) return null;
       const job = asD1Job(row);
       const outcome = await this.db.prepare(`UPDATE github_source_jobs
         SET status = 'leased', attempt_count = attempt_count + 1, lease_owner = ?, lease_expires_at = ?, error_code = NULL, error_message = NULL, updated_at = ?
-        WHERE id = ? AND attempt_count = ? AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))`)
-        .bind(options.connectorId, expiresAt(now, options.leaseDurationMs), now, job.id, job.attemptCount, now).run();
+        WHERE id = ? AND attempt_count = ? AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))
+          AND (? IS NULL OR runtime_version = ?)`)
+        .bind(
+          options.runtimeId,
+          expiresAt(now, options.leaseDurationMs),
+          now,
+          job.id,
+          job.attemptCount,
+          now,
+          runtimeVersion,
+          runtimeVersion,
+        ).run();
       if (Number(outcome.meta.changes ?? 0) === 1) return requireJob(await this.get(job.id));
     }
     return null;
   }
 
-  private async classifyLeaseFailure(jobId: string, connectorId: string, now: string): Promise<never> {
+  private async classifyLeaseFailure(jobId: string, runtimeId: string, now: string): Promise<never> {
     const job = requireJob(await this.get(jobId));
-    assertLease(job, connectorId, now);
+    assertLease(job, runtimeId, now);
     throw new GitHubSourceRepositoryError("lease_conflict", "동시 상태 변경으로 Lease 갱신에 실패했습니다.");
   }
 
@@ -516,9 +562,9 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
     const now = timestamp(input.now);
     const outcome = await this.db.prepare(`UPDATE github_source_jobs SET lease_expires_at = ?, updated_at = ?
       WHERE id = ? AND lease_owner = ? AND status IN ('leased', 'running') AND lease_expires_at > ?`)
-      .bind(expiresAt(now, input.leaseDurationMs), now, input.jobId, input.connectorId, now).run();
+      .bind(expiresAt(now, input.leaseDurationMs), now, input.jobId, input.runtimeId, now).run();
     if (Number(outcome.meta.changes ?? 0) !== 1) {
-      return this.classifyLeaseFailure(input.jobId, input.connectorId, now);
+      return this.classifyLeaseFailure(input.jobId, input.runtimeId, now);
     }
     return requireJob(await this.get(input.jobId));
   }
@@ -528,10 +574,10 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
     const now = timestamp(input.now);
     const outcome = await this.db.prepare(`UPDATE github_source_jobs SET status = 'running', started_at = COALESCE(started_at, ?), updated_at = ?
       WHERE id = ? AND lease_owner = ? AND status = 'leased' AND lease_expires_at > ?`)
-      .bind(now, now, input.jobId, input.connectorId, now).run();
+      .bind(now, now, input.jobId, input.runtimeId, now).run();
     if (Number(outcome.meta.changes ?? 0) !== 1) {
       const job = requireJob(await this.get(input.jobId));
-      assertLease(job, input.connectorId, now);
+      assertLease(job, input.runtimeId, now);
       throw new GitHubSourceRepositoryError("invalid_input", "leased 작업만 running으로 전환할 수 있습니다.");
     }
     return requireJob(await this.get(input.jobId));
@@ -541,7 +587,7 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
     await this.ready();
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const result = validateGitHubSourceJobResult(input.result, job);
     failCompletionOnceForTest(input.jobId);
     const [outcome] = await this.db.batch([
@@ -549,11 +595,11 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
         SET status = 'completed', result_json = ?, lease_owner = NULL, lease_expires_at = NULL,
             error_code = NULL, error_message = NULL, updated_at = ?, completed_at = ?
         WHERE id = ? AND lease_owner = ? AND status IN ('leased', 'running') AND lease_expires_at > ?`)
-        .bind(JSON.stringify(result), now, now, input.jobId, input.connectorId, now),
+        .bind(JSON.stringify(result), now, now, input.jobId, input.runtimeId, now),
       this.db.prepare("DELETE FROM github_apply_stage_chunks WHERE job_id = ?").bind(input.jobId),
     ]);
     if (Number(outcome.meta.changes ?? 0) !== 1) {
-      return this.classifyLeaseFailure(input.jobId, input.connectorId, now);
+      return this.classifyLeaseFailure(input.jobId, input.runtimeId, now);
     }
     return requireJob(await this.get(input.jobId));
   }
@@ -563,7 +609,7 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
     assertCredentialFreePayload(input);
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const nextStatus: GitHubSourceJobStatus =
       input.retryable && job.attemptCount < job.maxAttempts ? "queued" : "failed";
     assertTransition(job.status, nextStatus);
@@ -571,13 +617,13 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
       SET status = ?, error_code = ?, error_message = ?, lease_owner = NULL,
           lease_expires_at = NULL, updated_at = ?, completed_at = ?
       WHERE id = ? AND lease_owner = ? AND status IN ('leased', 'running') AND lease_expires_at > ?`)
-      .bind(nextStatus, input.errorCode, input.errorMessage.slice(0, 1_000), now, nextStatus === "failed" ? now : null, input.jobId, input.connectorId, now)];
+      .bind(nextStatus, input.errorCode, input.errorMessage.slice(0, 1_000), now, nextStatus === "failed" ? now : null, input.jobId, input.runtimeId, now)];
     if (nextStatus === "failed") {
       statements.push(this.db.prepare("DELETE FROM github_apply_stage_chunks WHERE job_id = ?").bind(input.jobId));
     }
     const [outcome] = await this.db.batch(statements);
     if (Number(outcome.meta.changes ?? 0) !== 1) {
-      return this.classifyLeaseFailure(input.jobId, input.connectorId, now);
+      return this.classifyLeaseFailure(input.jobId, input.runtimeId, now);
     }
     return requireJob(await this.get(input.jobId));
   }
@@ -622,20 +668,20 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
     return requireJob(await this.get(jobId));
   }
 
-  async recordCapability(input: CapabilityInput) {
+  async recordRuntimeCapability(input: RuntimeCapabilityInput) {
     await this.ready();
     assertCredentialFreePayload(input);
     const now = timestamp(input.now);
-    await this.db.prepare(`INSERT INTO github_connector_capabilities
-      (connector_id, capability, status, error_code, account_login, host,
+    await this.db.prepare(`INSERT INTO github_runtime_status
+      (runtime_id, capability, status, error_code, account_login, host,
        rate_limit_reset_at, message, checked_at, last_seen_at)
       VALUES (?, 'github-source', ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(connector_id, capability) DO UPDATE SET status=excluded.status,
+      ON CONFLICT(runtime_id, capability) DO UPDATE SET status=excluded.status,
         error_code=excluded.error_code, account_login=excluded.account_login, host=excluded.host,
         rate_limit_reset_at=excluded.rate_limit_reset_at, message=excluded.message,
         checked_at=excluded.checked_at, last_seen_at=excluded.last_seen_at`)
       .bind(
-        input.connectorId,
+        input.runtimeId,
         input.status,
         input.errorCode ?? null,
         input.accountLogin ?? null,
@@ -645,22 +691,22 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
         input.checkedAt,
         now,
       ).run();
-    return requireCapability(await this.getCapability(input.connectorId));
+    return requireCapability(await this.getRuntimeCapability(input.runtimeId));
   }
 
-  async getCapability(connectorId: string) {
+  async getRuntimeCapability(runtimeId: string) {
     await this.ready();
-    const row = await this.db.prepare(`SELECT * FROM github_connector_capabilities
-      WHERE connector_id = ? AND capability = 'github-source' LIMIT 1`)
-      .bind(connectorId).first<D1Row>();
-    return row ? asD1Capability(row) : null;
+    const row = await this.db.prepare(`SELECT * FROM github_runtime_status
+      WHERE runtime_id = ? AND capability = 'github-source' LIMIT 1`)
+      .bind(runtimeId).first<D1Row>();
+    return row ? asD1RuntimeCapability(row) : null;
   }
 
-  async listCapabilities() {
+  async listRuntimeCapabilities() {
     await this.ready();
-    const result = await this.db.prepare("SELECT * FROM github_connector_capabilities ORDER BY last_seen_at DESC")
+    const result = await this.db.prepare("SELECT * FROM github_runtime_status ORDER BY last_seen_at DESC")
       .all<D1Row>();
-    return result.results.map(asD1Capability);
+    return result.results.map(asD1RuntimeCapability);
   }
 
   async putApplyStageChunk(chunk: GitHubApplyStageChunk) {
@@ -720,7 +766,7 @@ export class D1GitHubSourceJobRepository implements GitHubSourceJobRepository {
   }
 }
 
-function requireCapability(capability: GitHubConnectorCapabilityRecord | null) {
+function requireCapability(capability: GitHubRuntimeCapabilityRecord | null) {
   if (!capability) throw new GitHubSourceRepositoryError("invalid_input", "GitHub capability를 찾을 수 없습니다.");
   return capability;
 }

@@ -9,6 +9,7 @@ import {
 export const GITHUB_SOURCE_JOB_KINDS = ["discovery", "preview", "apply"] as const;
 export type GitHubSourceJobKind = (typeof GITHUB_SOURCE_JOB_KINDS)[number];
 export const MAX_MANUAL_GITHUB_SOURCE_RETRIES = 2;
+export const INTEGRATED_GITHUB_RUNTIME_VERSION = "atlas-integrated-github-runtime-1";
 
 export const GITHUB_SYNC_TRIGGERS = ["manual", "schedule", "webhook"] as const;
 export type GitHubSyncTrigger = (typeof GITHUB_SYNC_TRIGGERS)[number];
@@ -28,7 +29,7 @@ export const GITHUB_SOURCE_ERROR_CODES = [
   "gh_auth_required",
   "github_forbidden",
   "github_rate_limited",
-  "connector_offline",
+  "runtime_unavailable",
   "lease_conflict",
   "lease_expired",
   "invalid_input",
@@ -60,6 +61,7 @@ export type GitHubSourceJobInput = {
   idempotencyKey: string;
   kind: GitHubSourceJobKind;
   owner: "coreline-ai";
+  runtimeVersion?: string;
   selectedRepositoryIds: string[];
   manifestDigest?: string;
   requestNonce?: string;
@@ -99,8 +101,8 @@ export type GitHubApplyReceipt = {
   appliedAt: string;
 };
 
-export type GitHubConnectorCapabilityRecord = {
-  connectorId: string;
+export type GitHubRuntimeCapabilityRecord = {
+  runtimeId: string;
   capability: "github-source";
   status: GitHubCapabilityStatus;
   errorCode?: GitHubSourceErrorCode;
@@ -117,7 +119,7 @@ export type GitHubSourceJobResult = {
   idempotencyKey: string;
   kind: GitHubSourceJobKind;
   status: "completed";
-  capability: Omit<GitHubConnectorCapabilityRecord, "connectorId" | "lastSeenAt">;
+  capability: Omit<GitHubRuntimeCapabilityRecord, "runtimeId" | "lastSeenAt">;
   summary: GitHubSourceJobSummary;
   discovery?: GitHubDiscoverySnapshot;
   preview?: GitHubPreviewSnapshot;
@@ -305,6 +307,7 @@ export async function parseGitHubSourceJobRequest(value: unknown): Promise<GitHu
   const canonical = JSON.stringify({
     kind,
     owner,
+    runtimeVersion: INTEGRATED_GITHUB_RUNTIME_VERSION,
     selectedRepositoryIds,
     manifestDigest,
     requestNonce,
@@ -317,6 +320,7 @@ export async function parseGitHubSourceJobRequest(value: unknown): Promise<GitHu
     idempotencyKey,
     kind,
     owner: "coreline-ai",
+    runtimeVersion: INTEGRATED_GITHUB_RUNTIME_VERSION,
     selectedRepositoryIds,
     manifestDigest,
     requestNonce,
@@ -461,13 +465,13 @@ export function validateGitHubSourceJobResult(
 }
 
 export function normalizeGitHubCapability(input: {
-  connectorOnline: boolean;
+  runtimeOnline: boolean;
   ghInstalled: boolean;
   authenticated: boolean;
   authorized: boolean;
   rateLimited?: boolean;
 }): { status: GitHubCapabilityStatus; errorCode?: GitHubSourceErrorCode } {
-  if (!input.connectorOnline) return { status: "offline", errorCode: "connector_offline" };
+  if (!input.runtimeOnline) return { status: "offline", errorCode: "runtime_unavailable" };
   if (!input.ghInstalled) return { status: "offline", errorCode: "gh_missing" };
   if (!input.authenticated) return { status: "login_required", errorCode: "gh_auth_required" };
   if (!input.authorized) return { status: "forbidden", errorCode: "github_forbidden" };
@@ -477,7 +481,7 @@ export function normalizeGitHubCapability(input: {
 
 export function parseGitHubCapabilityReport(
   value: unknown,
-): Omit<GitHubConnectorCapabilityRecord, "connectorId" | "lastSeenAt"> {
+): Omit<GitHubRuntimeCapabilityRecord, "runtimeId" | "lastSeenAt"> {
   assertCredentialFreePayload(value);
   const object = objectValue(value);
   if (!object) throw new GitHubSourceContractError("GitHub capability 보고는 객체여야 합니다.");
@@ -507,7 +511,7 @@ export function parseGitHubCapabilityReport(
     login_required: ["gh_auth_required"],
     forbidden: ["github_forbidden"],
     rate_limited: ["github_rate_limited"],
-    offline: ["connector_offline", "gh_missing"],
+    offline: ["runtime_unavailable", "gh_missing"],
   };
   if (
     (status === "online" && errorCode !== undefined) ||

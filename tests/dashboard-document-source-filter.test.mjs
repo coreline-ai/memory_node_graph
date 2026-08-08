@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   countDashboardDocumentsBySource,
   filterDashboardDocumentsBySource,
-} from "../.connector-dist/app/lib/dashboard/document-source-filter.js";
+} from "../.runtime-dist/app/lib/dashboard/document-source-filter.js";
 
 const documents = [
   { id: "manual-guide", sourceType: "manual", sourceLabel: "수동 업로드" },

@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { createLocalD1Backup } from "./lib/local-d1-baseline.mjs";
 import { resolveLocalD1Database } from "./lib/local-d1.mjs";
 
 process.env.ATLAS_TEST_MODE = "true";
@@ -96,12 +97,13 @@ try {
     process.exitCode = 0;
   } else {
     const stamp = new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-");
-    const backupDirectory = join(dirname(databasePath), "backups");
-    await mkdir(backupDirectory, { recursive: true });
-    const backupPath = join(backupDirectory, `${basename(databasePath, ".sqlite")}.${stamp}.sqlite`);
-    adapter.database.exec("PRAGMA wal_checkpoint(FULL)");
-    adapter.database.exec(`VACUUM INTO '${backupPath.replaceAll("'", "''")}'`);
+    const backup = await createLocalD1Backup({
+      databasePath,
+      reportDirectory: join(root, ".wrangler", "reports"),
+    });
+    const backupPath = backup.backupPath;
     console.log(`Backup: ${backupPath}`);
+    console.log(`Backup receipt: ${backup.receiptPath}`);
 
     let completed = 0;
     let failed = 0;
@@ -128,6 +130,9 @@ try {
       generatedAt: new Date().toISOString(),
       databasePath,
       backupPath,
+      backupReceiptPath: backup.receiptPath,
+      backupSha256: backup.sha256,
+      backupDataFingerprint: backup.dataFingerprint,
       preview: preview.totals,
       completed,
       failed,

@@ -7,7 +7,7 @@ import {
 } from "../../../lib/graph/graph-retrieval";
 import { asObject, readLimitedJson } from "../../../lib/http/enrichment-api";
 import { requireAtlasWriteAccess } from "../../../lib/auth/write-access";
-import { getCodexConnectorAvailability } from "../../../lib/llm/connector-availability";
+import { getCodexRuntimeAvailability } from "../../../lib/llm/runtime-availability";
 import {
   buildGraphAnswerJobInput,
   GRAPH_ANSWER_PROVIDER_VERSION,
@@ -75,16 +75,16 @@ export async function POST(request: Request) {
         },
       }, { headers: { "cache-control": "no-store" } });
     }
-    const connector = await getCodexConnectorAvailability();
-    if (connector.status !== "online") {
+    const runtime = await getCodexRuntimeAvailability();
+    if (runtime.status !== "online") {
       return NextResponse.json({
         ...retrieval,
         answer: {
-          status: "connector_offline",
+          status: "runtime_unavailable",
           jobId: null,
           result: null,
-          connector,
-          message: "로컬 OAuth Connector가 오프라인이라 검색 근거만 반환했습니다.",
+          runtime,
+          message: "로컬 OAuth 통합 런타임이 현재 준비되지 않아 검색 근거만 반환했습니다.",
         },
       }, { headers: { "cache-control": "no-store" } });
     }
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         status: job.status,
         jobId: job.id,
         result: job.result ?? null,
-        connector,
+        runtime,
         created,
         message: job.status === "completed"
           ? "검색 context와 다시 검증된 Codex 답변입니다."

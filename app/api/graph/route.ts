@@ -3,7 +3,12 @@ import { createPerformanceGraphSnapshot } from "../../lib/graph/performance-fixt
 import { createGoldGraphSnapshot } from "../../lib/graph/gold-graph-fixture";
 import { consolidateGraphSnapshot } from "../../lib/graph/consolidation";
 import { analyzeGraphSnapshot } from "../../lib/graph/analytics";
-import { projectGraphCorpus, projectGraphOverview, projectGraphRepository } from "../../lib/graph/scope-projection";
+import {
+  projectGraphCorpus,
+  projectGraphDocument,
+  projectGraphOverview,
+  projectGraphRepository,
+} from "../../lib/graph/scope-projection";
 import { getGraphSnapshotForScope } from "../../lib/storage/graph-repository";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +19,7 @@ export async function GET(request: Request) {
     const showcase = params.get("showcase");
     const fixture = params.get("fixture");
     const scope = params.get("scope");
-    if (scope !== null && scope !== "corpus" && scope !== "overview" && scope !== "repository") {
+    if (scope !== null && scope !== "corpus" && scope !== "overview" && scope !== "repository" && scope !== "document") {
       return NextResponse.json(
         { error: "지원하지 않는 그래프 scope입니다.", code: "invalid_scope" },
         { status: 400 },
@@ -30,6 +35,19 @@ export async function GET(request: Request) {
     if (scope === "repository" && !/^[1-9][0-9]*$/.test(repositoryId!)) {
       return NextResponse.json(
         { error: "repositoryId는 0이 아닌 숫자 문자열이어야 합니다.", code: "invalid_repository_id" },
+        { status: 400 },
+      );
+    }
+    const documentId = params.get("documentId");
+    if (scope === "document" && documentId === null) {
+      return NextResponse.json(
+        { error: "document scope에는 documentId가 필요합니다.", code: "document_id_required" },
+        { status: 400 },
+      );
+    }
+    if (scope === "document" && !/^[A-Za-z0-9:_-]{8,220}$/.test(documentId!)) {
+      return NextResponse.json(
+        { error: "documentId 형식이 올바르지 않습니다.", code: "invalid_document_id" },
         { status: 400 },
       );
     }
@@ -52,6 +70,7 @@ export async function GET(request: Request) {
     const storedSnapshot = await getGraphSnapshotForScope({
       scope: effectiveScope,
       repositoryId: repositoryId ?? undefined,
+      documentId: documentId ?? undefined,
     });
     const snapshot = consolidateGraphSnapshot(storedSnapshot);
     if (scope === "repository") {
@@ -59,6 +78,16 @@ export async function GET(request: Request) {
       if (!projected) {
         return NextResponse.json(
           { error: "동기화된 GitHub 저장소를 찾을 수 없습니다.", code: "repository_not_found" },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json(analyzeGraphSnapshot(projected), { headers: { "cache-control": "no-store" } });
+    }
+    if (scope === "document") {
+      const projected = projectGraphDocument(snapshot, documentId!);
+      if (!projected) {
+        return NextResponse.json(
+          { error: "분석 완료된 Markdown 문서를 찾을 수 없습니다.", code: "document_not_found" },
           { status: 404 },
         );
       }

@@ -17,7 +17,7 @@
 [![Knowledge Nodes](https://img.shields.io/badge/nodes-89%2C669-8250DF?style=flat-square&logo=databricks&logoColor=white)](#-데이터-기준선)
 [![Knowledge Relations](https://img.shields.io/badge/relations-94%2C488-1F6FEB?style=flat-square&logo=graphql&logoColor=white)](#-데이터-기준선)
 [![OpenAI API Key](https://img.shields.io/badge/OpenAI%20API%20Key-not%20required-2EA043?style=flat-square&logo=openai&logoColor=white)](#-oauth와-api-경계)
-[![Tests](https://img.shields.io/badge/tests-153%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
+[![Tests](https://img.shields.io/badge/tests-176%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
 [![Last Commit](https://img.shields.io/github/last-commit/coreline-ai/memory_node_graph?style=flat-square&logo=github&label=last%20commit)](https://github.com/coreline-ai/memory_node_graph/commits/main)
 
 [빠른 시작](#-빠른-시작) · [화면 갤러리](#-화면-갤러리) · [처리 구조](#-처리-구조) · [대시보드](#-atlas-control-room) · [문서](#-관련-문서)
@@ -25,10 +25,10 @@
 </div>
 
 > [!IMPORTANT]
-> **OpenAI API와 API Key를 사용하지 않습니다.** 기본 그래프는 Markdown AST와 규칙 추출만으로 완성됩니다. 현재 릴리스의 선택형 Codex 보강은 공식 `@openai/codex-sdk`와 기존 `codex login` OAuth 세션을 사용하는 로컬 Connector 방식입니다.
+> **OpenAI API와 API Key를 사용하지 않습니다.** 기본 그래프는 Markdown AST와 규칙 추출만으로 완성됩니다. 선택형 Codex 보강은 공식 `@openai/codex-sdk`와 기존 `codex login` OAuth 세션을 사용하며 `npm run dev`가 웹앱과 통합 작업 런타임을 함께 시작합니다.
 
 > [!NOTE]
-> 승인된 다음 구조는 동일한 OAuth·검증 계약을 웹앱과 함께 실행되는 **통합 OAuth 런타임**으로 이전하여 수동 `npm run connector:start`, heartbeat, `NO SIGNAL` UI를 제거하는 것입니다. 기준 문서는 [현재 OAuth 런타임 방향](./docs/current-oauth-runtime.md)과 [최신 개발 계획](./dev-plan/implement_20260807_203534.md)입니다.
+> Codex·GitHub 런타임 통합, Phase 5 대시보드 전환, Phase 6 전체 노드 검색·문서 중심 그래프를 완료했습니다. 화면은 두 OAuth 상태, 문서 파이프라인, 실제 저장 수량과 500노드·2,000선 화면 투영을 구분합니다. 화면 밖 노드는 상단 검색으로 찾아 출처 Markdown 중심 1·2단계 궤도로 열 수 있습니다.
 
 ## 🌌 프로젝트 개요
 
@@ -48,11 +48,12 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 - 🧠 **Markdown 지식 추출** — README와 개발 계획 전용 parser profile
 - 🔗 **근거 관계** — commit·path·line이 고정된 GitHub source evidence
 - 🧬 **관계 계층** — 구조, 명시, 추론, 비저장 화면 연결을 시각적으로 구분
-- 🔭 **다중 Scope** — 전체 corpus, 저장소 overview, 단일 repository, Gold/max showcase
+- 🔭 **다중 Scope** — 전체 corpus, 저장소 overview, 단일 repository, 단일 document, Gold/max showcase
 - 🎛️ **발광 제어** — 기본·브라이트·초신성·커스텀 프리셋
 - 📚 **문서 관제실** — 업로드·재인덱싱·삭제·GitHub 동기화·작업 상태
 - 🛡️ **안전한 기본값** — LLM/OAuth가 없어도 규칙 기반 그래프 정상 동작
-- 🔍 **Graph RAG 검색** — FTS, 1/2-hop 확장, 관계 confidence, 인용 근거 반환
+- 🔍 **전체 노드 검색** — D1 FTS, 화면 밖 노드 출처 문서, 클릭 시 1/2-hop 문서 궤도
+- 🧾 **문서 중심 검증** — 최근 Markdown 또는 문서 ID의 직접 노드와 저장 관계만 최대 500×2,000 투영
 
 ## 🖼️ 화면 갤러리
 
@@ -106,7 +107,7 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 ### Atlas Control Room
 
 > [!WARNING]
-> 아래 대시보드 캡처의 `NO SIGNAL`은 현재 분리형 Connector의 과거 운영 상태입니다. OAuth 통합 런타임 전환 후에는 `OAuth 연결됨`, `로그인 필요`, `처리 중`, `완료`, `재로그인 필요` 상태로 교체됩니다.
+> 아래 대시보드 캡처는 Phase 5 이전 운영 화면을 보존한 자료입니다. 현재 앱은 Codex·GitHub별 `OAuth 연결됨`, `로그인 필요`, `처리 중`, `재로그인 필요`와 실제 문서 작업 상태를 표시합니다.
 
 <table>
   <tr>
@@ -151,6 +152,7 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 - 스크롤: 확대·축소
 - 노드 클릭: 상세·근거·연결 관계 열기
 - `⌘ K`: 지식 노드 검색
+- 화면 밖 검색 결과 클릭: 출처 Markdown 중심 1·2단계 `orbit` 열기
 - `V`: 그래프 보기 순환
 - URL 공유: scope·view·선택 node·showcase 상태 유지
 
@@ -189,6 +191,7 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 | 전체 `corpus` | 500노드 · 1,539 실제 관계 · 461 비저장 화면 연결 |
 | 저장소 `overview` | 130노드 · 176관계 |
 | `memory_node_graph` repository | 최대 500노드 · 관계 예산 내 투영 |
+| 단일 `document` | 문서 직접 노드 + 1·2단계 저장 관계 · 비저장 화면선 0 |
 | Gold Graph | 68노드 · 101관계 |
 | Max fixture | 500노드 · 2,000관계 |
 
@@ -210,16 +213,16 @@ flowchart LR
   G --> R["Three.js 3-View Renderer"]
 
   D --> Q["Codex Enrichment Job"]
-  LC["로컬 OAuth Connector"] -->|"Claim·Lease"| Q
-  LC --> SDK["Codex SDK·codex login"]
-  LC -->|"검증된 관계"| D
+  RUNTIME["통합 Codex OAuth 런타임"] -->|"Claim·Lease"| Q
+  RUNTIME --> SDK["Codex SDK·codex login"]
+  RUNTIME -->|"검증된 관계"| D
 
-  GH["로컬 gh auth"] --> GS["GitHub Source Connector"]
-  GS --> M["Manifest Preview·승인"]
+  GH["서버 전용 gh keyring OAuth"] --> RUNTIME
+  RUNTIME --> M["Manifest Preview·승인"]
   M --> D
 ```
 
-### 승인된 목표
+### 통합 OAuth 런타임
 
 ```mermaid
 flowchart LR
@@ -232,7 +235,7 @@ flowchart LR
   R --> D
 ```
 
-목표 구조는 외부 Connector 신호가 아니라 OAuth 세션과 실제 작업 상태만 표시합니다. 브라우저에는 Codex·GitHub 액세스 토큰을 전달하지 않습니다.
+Codex와 GitHub 작업 및 대시보드 상태 표현은 이 구조로 전환됐습니다. 브라우저에는 Codex·GitHub 액세스 토큰을 전달하지 않습니다.
 
 ## 🧠 Markdown 지식 추출
 
@@ -326,29 +329,37 @@ npm run dev
 | 500×2,000 성능 fixture | `http://localhost:3000/?fixture=500x2000&perf=1` |
 | Gold Graph | `http://localhost:3000/?showcase=gold&view=constellation` |
 
-### 현재 분리형 OAuth Connector
+### 통합 Codex·GitHub OAuth 실행
 
-> [!CAUTION]
-> 다음 명령은 현재 릴리스용입니다. 통합 OAuth 런타임 전환이 완료되면 제거됩니다.
+`npm run dev` 한 번으로 웹앱과 단일 Codex·GitHub 작업 런타임이 함께 시작됩니다. 관계 보강과 GitHub 문서 동기화에 별도 프로세스 실행은 필요하지 않습니다.
 
 ```bash
 codex login status
-npm run connector:start
+gh auth status --hostname github.com
+npm run dev
 ```
 
-제한 실행:
+OAuth 구조화 출력 fixture만 독립 검증:
 
 ```bash
-npm run connector:dry-run
-npm run connector:batch
-npm run connector:batch -- --max-jobs=5 --max-runtime-ms=900000
+npm run runtime:smoke
 ```
+
+신규 GitHub 작업은 통합 runtime generation만 claim합니다. 기존 분리 실행 스크립트와 공개 상태 경로는 현재 앱의 실행 경로에 포함하지 않습니다.
 
 ## ♻️ 문서 갱신과 전체 재처리
 
 동일 파일은 SHA-256과 parser version을 비교해 `unchanged`로 처리합니다. 문서가 바뀌면 graph fingerprint가 변경되어 다음 corpus 요청에서 cache를 다시 계산합니다.
 
+업로드·재인덱싱·삭제 응답은 파일별 노드·관계 delta가 포함된 동일한 영수증 계약을 사용합니다. 여러 파일 중 일부만 실패하면 정상 문서는 유지하고 HTTP `207 Multi-Status`로 결과를 분리합니다. 대시보드는 영수증을 즉시 표시하며, 열린 실제 데이터 그래프는 graph revision을 감지해 최대 5초 안에 자동으로 다시 조회합니다.
+
 ```bash
+# 로컬 D1 수량·orphan·fingerprint 읽기 전용 감사
+npm run db:baseline
+
+# 검증된 backup·SHA-256 영수증·임시 복구 점검
+npm run db:baseline -- --backup --restore-check
+
 # 대상·블록·예상 청크 preview만 확인
 npm run graph:reprocess
 
@@ -414,7 +425,9 @@ app/
     ├── github/                    # Preview·Apply·증분 동기화
     └── storage/                   # D1·메모리 저장소
 
-connector/                         # 현재 분리형 OAuth 작업 실행기
+server/codex/                      # Node 전용 Codex SDK·OAuth 실행기
+server/github/                     # Node 전용 gh keyring OAuth·문서 동기화 실행기
+server/runtime/                    # 단일 poller·singleton·graceful shutdown
 db/                                # Drizzle schema
 drizzle/                           # D1 migrations
 docs/                              # 설계·QA·스크린샷
@@ -432,14 +445,7 @@ tests/                             # 계약·API·D1·시각 데이터 테스트
 ATLAS_WRITE_ACCESS=authenticated
 ```
 
-현재 분리형 Connector 호스팅 호환 설정:
-
-```bash
-ATLAS_CONNECTOR_TOKEN=
-ATLAS_BASE_URL=http://localhost:3000
-```
-
-`ATLAS_CONNECTOR_TOKEN`은 OpenAI API Key가 아니라 현재 Atlas 작업 Route만 보호하는 애플리케이션 자격증명입니다. 통합 OAuth 런타임 완료 후 외부 Connector 인증과 함께 제거할 대상입니다.
+통합 런타임은 외부 비밀 환경 변수를 요구하지 않습니다. 실행기가 프로세스 내부 통신용 일회성 값을 자동 생성하며 브라우저·D1·Codex 자식 환경에 전달하지 않습니다.
 
 ## 🧪 검증
 
@@ -452,7 +458,7 @@ npm run graph:audit
 
 검증 범위:
 
-- production·Connector build
+- production·통합 runtime build
 - corpus·overview·repository 예산과 cache fingerprint
 - Gold Graph·500×2,000 fixture
 - Markdown API·parser profile·evidence
@@ -461,7 +467,7 @@ npm run graph:audit
 - GitHub preview·stage·apply·증분 변경 판정
 - 대시보드·필터·URL 상태·Three.js 관계선
 
-현재 전체 **153개 테스트를 통과**합니다.
+현재 전체 **178개 테스트를 통과**합니다.
 
 ## 🗺️ Roadmap
 
@@ -473,9 +479,11 @@ npm run graph:audit
 - [x] 전체 corpus 500노드·2,000선 투영
 - [x] Graph RAG retrieval·검증된 OAuth answer job
 - [x] 저장소별 증분 Preview·승인 Apply
-- [ ] 분리형 Connector를 통합 OAuth 런타임으로 이전
-- [ ] `NO SIGNAL`·heartbeat·Connector token 제거
-- [ ] GitHub `gh auth`를 서버 측 GitHub OAuth로 이전
+- [x] Codex SDK를 통합 OAuth 런타임으로 이전
+- [x] `npm run dev` 단일 실행·singleton poller·graceful shutdown
+- [x] 대시보드 분리 실행기 신호·heartbeat 표현 제거
+- [x] GitHub `gh auth`를 통합 서버 작업 런타임으로 이전
+- [x] 전체 D1 노드 검색·문서 중심 1/2-hop graph scope
 - [ ] 공유 웹 공개 읽기·인증 쓰기 배포 검증
 
 ## 📚 관련 문서
@@ -483,8 +491,9 @@ npm run graph:audit
 | 문서 | 역할 |
 |---|---|
 | [현재 OAuth 런타임 방향](./docs/current-oauth-runtime.md) | 인증·배포·Markdown 갱신 정본 |
-| [최신 구현 계획](./dev-plan/implement_20260807_203534.md) | Connector 제거와 통합 OAuth 단계 |
+| [최신 구현 계획](./dev-plan/implement_20260807_220621.md) | Markdown 자동 갱신·통합 OAuth·분리 실행 구조 정리 핵심 단계 |
 | [Knowledge Graph Ontology v1](./docs/knowledge-graph-ontology-v1.md) | 노드·관계·근거 계약 |
+| [로컬 D1 기준선·백업·복구](./docs/local-d1-baseline.md) | 정본 탐색·감사·검증 backup·복구 점검 |
 | [Gold Graph 시각 QA](./docs/gold-graph-visual-qa-20260806.md) | GUI 시각 회귀 기준 |
 | [스크린샷 카탈로그](./docs/screenshots/README.md) | 현재 앱 화면과 재촬영 기준 |
 
@@ -507,6 +516,6 @@ npm run graph:audit
 
 **AI Systems Atlas** · Evidence-backed Markdown Knowledge Graph
 
-[Repository](https://github.com/coreline-ai/memory_node_graph) · [Issues](https://github.com/coreline-ai/memory_node_graph/issues) · [Roadmap](./dev-plan/implement_20260807_203534.md)
+[Repository](https://github.com/coreline-ai/memory_node_graph) · [Issues](https://github.com/coreline-ai/memory_node_graph/issues) · [Roadmap](./dev-plan/implement_20260807_220621.md)
 
 </div>

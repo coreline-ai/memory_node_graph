@@ -138,7 +138,12 @@ const baseNode = (index) => ({
   tags: ["test"],
 });
 
-async function makeInput(contracts, documentHash = "hash-v1", documentId = "document-1") {
+async function makeInput(
+  contracts,
+  documentHash = "hash-v1",
+  documentId = "document-1",
+  providerVersion = "codex-sdk-0.146.0",
+) {
   return contracts.buildEnrichmentJobInput({
     document: {
       id: documentId,
@@ -146,7 +151,7 @@ async function makeInput(contracts, documentHash = "hash-v1", documentId = "docu
       hash: documentHash,
       parserVersion: "markdown-ast-v1",
     },
-    providerVersion: "codex-sdk-0.146.0",
+    providerVersion,
     nodes: [baseNode(1), baseNode(2)],
     existingRelations: [],
     blocks: [
@@ -229,6 +234,41 @@ test("forced reindex invalidates matching-hash enrichment jobs before enqueueing
   }
 });
 
+test("통합 런타임 claim은 현재 provider 버전만 가져오고 기존 대기열을 보존한다", async () => {
+  const { contracts, repository } = await enrichmentModules();
+  const memory = repository.createMemoryEnrichmentJobRepository();
+  const sqlite = new SqliteD1Database();
+  try {
+    const d1 = repository.createD1EnrichmentJobRepository(sqlite);
+    for (const candidate of [memory, d1]) {
+      const suffix = candidate === memory ? "memory" : "d1";
+      const legacy = await makeInput(contracts, "legacy-hash", `legacy-${suffix}`, "codex-sdk-0.146.0");
+      const integrated = await makeInput(
+        contracts,
+        "runtime-hash",
+        `runtime-${suffix}`,
+        "codex-sdk-0.146.0+atlas-runtime.1",
+      );
+      await candidate.enqueue(legacy, { now: "2026-08-08T00:00:00.000Z" });
+      await candidate.enqueue(integrated, { now: "2026-08-08T00:00:01.000Z" });
+      assert.equal((await candidate.statusCounts()).queued, 2);
+      assert.equal(
+        (await candidate.statusCounts("codex-sdk-0.146.0+atlas-runtime.1")).queued,
+        1,
+      );
+      const claimed = await candidate.claim({
+        runtimeId: "atlas-runtime-test",
+        providerVersion: "codex-sdk-0.146.0+atlas-runtime.1",
+        now: "2026-08-08T00:00:02.000Z",
+      });
+      assert.equal(claimed.id, integrated.jobId);
+      assert.equal((await candidate.get(legacy.jobId)).status, "queued");
+    }
+  } finally {
+    sqlite.close();
+  }
+});
+
 async function exerciseRepository(repository, contracts, setDocumentHash = () => {}) {
   const trace = [];
   const input = await makeInput(contracts);
@@ -238,7 +278,7 @@ async function exerciseRepository(repository, contracts, setDocumentHash = () =>
   trace.push(first.created, duplicate.created, (await repository.list()).length);
 
   const leased = await repository.claim({
-    connectorId: "connector-a",
+    runtimeId: "runtime-a",
     leaseDurationMs: 1_000,
     now: "2026-08-02T00:00:02.000Z",
   });
@@ -247,7 +287,7 @@ async function exerciseRepository(repository, contracts, setDocumentHash = () =>
   await assert.rejects(
     repository.renewLease({
       jobId: input.jobId,
-      connectorId: "connector-b",
+      runtimeId: "runtime-b",
       now: "2026-08-02T00:00:02.100Z",
     }),
     (error) => error.code === "lease_conflict",
@@ -255,7 +295,7 @@ async function exerciseRepository(repository, contracts, setDocumentHash = () =>
   await assert.rejects(
     repository.complete({
       jobId: input.jobId,
-      connectorId: "connector-b",
+      runtimeId: "runtime-b",
       currentDocumentHash: input.document.hash,
       result: resultFor(input),
       now: "2026-08-02T00:00:02.200Z",
@@ -264,24 +304,24 @@ async function exerciseRepository(repository, contracts, setDocumentHash = () =>
   );
 
   const blocked = await repository.claim({
-    connectorId: "connector-b",
+    runtimeId: "runtime-b",
     now: "2026-08-02T00:00:02.500Z",
   });
   trace.push(blocked);
   const reclaimed = await repository.claim({
-    connectorId: "connector-b",
+    runtimeId: "runtime-b",
     now: "2026-08-02T00:00:03.001Z",
   });
   trace.push(reclaimed.status, reclaimed.leaseOwner, reclaimed.attemptCount);
   await repository.markRunning({
     jobId: input.jobId,
-    connectorId: "connector-b",
+    runtimeId: "runtime-b",
     now: "2026-08-02T00:00:03.100Z",
   });
   setDocumentHash(input.document.id, "hash-v2");
   const stale = await repository.complete({
     jobId: input.jobId,
-    connectorId: "connector-b",
+    runtimeId: "runtime-b",
     currentDocumentHash: "hash-v2",
     result: resultFor(input),
     now: "2026-08-02T00:00:03.200Z",
@@ -293,20 +333,20 @@ async function exerciseRepository(repository, contracts, setDocumentHash = () =>
     now: "2026-08-02T00:00:04.000Z",
     maxAttempts: 2,
   });
-  await repository.claim({ connectorId: "connector-a", now: "2026-08-02T00:00:04.100Z" });
+  await repository.claim({ runtimeId: "runtime-a", now: "2026-08-02T00:00:04.100Z" });
   const requeued = await repository.fail({
     jobId: retryInput.jobId,
-    connectorId: "connector-a",
+    runtimeId: "runtime-a",
     errorCode: "provider_timeout",
     errorMessage: "retry",
     retryable: true,
     now: "2026-08-02T00:00:04.200Z",
   });
   trace.push(requeued.status);
-  await repository.claim({ connectorId: "connector-a", now: "2026-08-02T00:00:04.300Z" });
+  await repository.claim({ runtimeId: "runtime-a", now: "2026-08-02T00:00:04.300Z" });
   const failed = await repository.fail({
     jobId: retryInput.jobId,
-    connectorId: "connector-a",
+    runtimeId: "runtime-a",
     errorCode: "provider_timeout",
     errorMessage: "stop",
     retryable: true,
@@ -321,10 +361,10 @@ async function exerciseRepository(repository, contracts, setDocumentHash = () =>
   const completedInput = await makeInput(contracts, "hash-complete", "document-complete");
   setDocumentHash(completedInput.document.id, completedInput.document.hash);
   await repository.enqueue(completedInput, { now: "2026-08-02T00:00:06.000Z" });
-  await repository.claim({ connectorId: "connector-a", now: "2026-08-02T00:00:06.100Z" });
+  await repository.claim({ runtimeId: "runtime-a", now: "2026-08-02T00:00:06.100Z" });
   const completed = await repository.complete({
     jobId: completedInput.jobId,
-    connectorId: "connector-a",
+    runtimeId: "runtime-a",
     currentDocumentHash: completedInput.document.hash,
     result: resultFor(completedInput),
     now: "2026-08-02T00:00:06.200Z",
@@ -352,7 +392,7 @@ test("memory and D1 repositories share idempotency, lease, retry, cancel, and st
       true, false, 1,
       "leased", 1,
       null,
-      "leased", "connector-b", 2,
+      "leased", "runtime-b", 2,
       "stale", "document_stale", false,
       "queued",
       "failed", 2,
@@ -374,10 +414,10 @@ test("D1 result merge rolls back relations when completion update fails", async 
     const input = await makeInput(contracts, "hash-atomic", "document-atomic");
     sqlite.setDocumentHash(input.document.id, input.document.hash);
     await d1.enqueue(input, { now: "2026-08-02T01:00:00.000Z" });
-    await d1.claim({ connectorId: "connector-a", now: "2026-08-02T01:00:00.100Z" });
+    await d1.claim({ runtimeId: "runtime-a", now: "2026-08-02T01:00:00.100Z" });
     await d1.markRunning({
       jobId: input.jobId,
-      connectorId: "connector-a",
+      runtimeId: "runtime-a",
       now: "2026-08-02T01:00:00.200Z",
     });
     const result = {
@@ -396,7 +436,7 @@ test("D1 result merge rolls back relations when completion update fails", async 
     await assert.rejects(
       d1.complete({
         jobId: input.jobId,
-        connectorId: "connector-a",
+        runtimeId: "runtime-a",
         currentDocumentHash: input.document.hash,
         result,
         now: "2026-08-02T01:00:00.300Z",
@@ -408,7 +448,7 @@ test("D1 result merge rolls back relations when completion update fails", async 
 
     const completed = await d1.complete({
       jobId: input.jobId,
-      connectorId: "connector-a",
+      runtimeId: "runtime-a",
       currentDocumentHash: input.document.hash,
       result,
       now: "2026-08-02T01:00:00.400Z",
@@ -437,10 +477,10 @@ test("겹침 청크의 동일 관계는 confidence와 evidence를 유실 없이 
     await d1.enqueue(secondInput, { now: "2026-08-02T01:10:00.010Z" });
 
     for (const [index, input] of [firstInput, secondInput].entries()) {
-      await d1.claim({ connectorId: "connector-a", now: `2026-08-02T01:10:0${index}.100Z` });
+      await d1.claim({ runtimeId: "runtime-a", now: `2026-08-02T01:10:0${index}.100Z` });
       await d1.complete({
         jobId: input.jobId,
-        connectorId: "connector-a",
+        runtimeId: "runtime-a",
         currentDocumentHash: input.document.hash,
         result: {
           ...resultFor(input),
@@ -481,10 +521,10 @@ test("D1 warning retry atomically removes the previous Codex relations", async (
     const input = await makeInput(contracts, "hash-warning-retry", "document-warning-retry");
     sqlite.setDocumentHash(input.document.id, input.document.hash);
     await d1.enqueue(input, { now: "2026-08-02T01:30:00.000Z" });
-    await d1.claim({ connectorId: "connector-a", now: "2026-08-02T01:30:00.100Z" });
+    await d1.claim({ runtimeId: "runtime-a", now: "2026-08-02T01:30:00.100Z" });
     const warning = await d1.complete({
       jobId: input.jobId,
-      connectorId: "connector-a",
+      runtimeId: "runtime-a",
       currentDocumentHash: input.document.hash,
       result: {
         ...resultFor(input),
@@ -518,10 +558,10 @@ async function exerciseManualRetryAndHeartbeat(repository, contracts) {
   await repository.enqueue(input, { now: "2026-08-02T02:00:00.000Z", maxAttempts: 1 });
 
   for (let retry = 1; retry <= 2; retry += 1) {
-    await repository.claim({ connectorId: "connector-a", now: `2026-08-02T02:00:0${retry}.000Z` });
+    await repository.claim({ runtimeId: "runtime-a", now: `2026-08-02T02:00:0${retry}.000Z` });
     await repository.fail({
       jobId: input.jobId,
-      connectorId: "connector-a",
+      runtimeId: "runtime-a",
       errorCode: "provider_error",
       errorMessage: "manual retry fixture",
       retryable: false,
@@ -533,10 +573,10 @@ async function exerciseManualRetryAndHeartbeat(repository, contracts) {
     assert.equal(queued.attemptCount, 0);
   }
 
-  await repository.claim({ connectorId: "connector-a", now: "2026-08-02T02:00:10.000Z" });
+  await repository.claim({ runtimeId: "runtime-a", now: "2026-08-02T02:00:10.000Z" });
   await repository.fail({
     jobId: input.jobId,
-    connectorId: "connector-a",
+    runtimeId: "runtime-a",
     errorCode: "provider_error",
     errorMessage: "retry exhausted fixture",
     retryable: false,
@@ -547,15 +587,15 @@ async function exerciseManualRetryAndHeartbeat(repository, contracts) {
     (error) => error.code === "retry_exhausted",
   );
 
-  await repository.recordConnectorHeartbeat({
-    connectorId: "connector-heartbeat",
+  await repository.recordRuntimeStatus({
+    runtimeId: "runtime-heartbeat",
     status: "online",
     version: "test-v1",
     currentJobId: input.jobId,
     now: "2026-08-02T02:01:00.000Z",
   });
-  const offline = await repository.recordConnectorHeartbeat({
-    connectorId: "connector-heartbeat",
+  const offline = await repository.recordRuntimeStatus({
+    runtimeId: "runtime-heartbeat",
     status: "offline",
     version: "test-v1",
     runMode: "bounded",
@@ -575,12 +615,12 @@ async function exerciseManualRetryAndHeartbeat(repository, contracts) {
   assert.equal(offline.processedJobs, 2);
   assert.equal(offline.warningJobs, 1);
   assert.equal(offline.stopReason, "job_limit");
-  const heartbeats = await repository.listConnectorHeartbeats();
+  const heartbeats = await repository.listRuntimeStatuses();
   assert.equal(heartbeats.length, 1);
   assert.equal(heartbeats[0].lastSeenAt, "2026-08-02T02:01:10.000Z");
 }
 
-test("manual retry is bounded and Connector heartbeat is persisted in memory and D1", async () => {
+test("manual retry is bounded and 통합 런타임 heartbeat is persisted in memory and D1", async () => {
   const { contracts, repository } = await enrichmentModules();
   const memory = repository.createMemoryEnrichmentJobRepository();
   const sqlite = new SqliteD1Database();
@@ -590,6 +630,34 @@ test("manual retry is bounded and Connector heartbeat is persisted in memory and
       repository.createD1EnrichmentJobRepository(sqlite),
       contracts,
     );
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("기존 분리 실행 상태는 통합 runtime 상태 테이블로 안전하게 이관된다", async () => {
+  const { repository } = await enrichmentModules();
+  const sqlite = new SqliteD1Database();
+  try {
+    sqlite.database.exec(`
+      CREATE TABLE connector_heartbeats (
+        connector_id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        version TEXT NOT NULL,
+        current_job_id TEXT,
+        started_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
+      );
+      INSERT INTO connector_heartbeats
+        (connector_id, status, version, current_job_id, started_at, last_seen_at)
+      VALUES
+        ('legacy-runtime', 'online', 'legacy-v1', 'job-1',
+         '2026-08-08T00:00:00.000Z', '2026-08-08T00:00:10.000Z');
+    `);
+    const statuses = await repository.createD1EnrichmentJobRepository(sqlite).listRuntimeStatuses();
+    assert.equal(statuses.length, 1);
+    assert.equal(statuses[0].runtimeId, "legacy-runtime");
+    assert.equal(statuses[0].lastSeenAt, "2026-08-08T00:00:10.000Z");
   } finally {
     sqlite.close();
   }

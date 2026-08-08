@@ -169,23 +169,23 @@ async function exerciseRepository(candidate, contracts) {
   assert.equal((await candidate.enqueue(input, { now: "2026-08-07T01:00:00.000Z" })).created, true);
   assert.equal((await candidate.enqueue(input, { now: "2026-08-07T01:00:01.000Z" })).created, false);
   const leased = await candidate.claim({
-    connectorId: "connector-answer",
+    runtimeId: "runtime-answer",
     leaseDurationMs: 1_000,
     now: "2026-08-07T01:00:02.000Z",
   });
   assert.equal(leased.status, "leased");
   await assert.rejects(
-    candidate.renewLease({ jobId: input.jobId, connectorId: "other", now: "2026-08-07T01:00:02.100Z" }),
+    candidate.renewLease({ jobId: input.jobId, runtimeId: "other", now: "2026-08-07T01:00:02.100Z" }),
     (error) => error.code === "lease_conflict",
   );
   assert.equal((await candidate.markRunning({
     jobId: input.jobId,
-    connectorId: "connector-answer",
+    runtimeId: "runtime-answer",
     now: "2026-08-07T01:00:02.200Z",
   })).status, "running");
   assert.equal((await candidate.complete({
     jobId: input.jobId,
-    connectorId: "connector-answer",
+    runtimeId: "runtime-answer",
     result: resultFor(input),
     now: "2026-08-07T01:00:02.300Z",
   })).status, "completed");
@@ -195,10 +195,10 @@ async function exerciseRepository(candidate, contracts) {
     providerVersion: contracts.GRAPH_ANSWER_PROVIDER_VERSION,
   });
   await candidate.enqueue(retryInput, { now: "2026-08-07T01:00:03.000Z", maxAttempts: 1 });
-  await candidate.claim({ connectorId: "connector-answer", now: "2026-08-07T01:00:03.100Z" });
+  await candidate.claim({ runtimeId: "runtime-answer", now: "2026-08-07T01:00:03.100Z" });
   assert.equal((await candidate.fail({
     jobId: retryInput.jobId,
-    connectorId: "connector-answer",
+    runtimeId: "runtime-answer",
     errorCode: "provider_timeout",
     errorMessage: "timeout",
     retryable: true,

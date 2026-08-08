@@ -4,12 +4,11 @@ import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import {
   createGitHubApplyStageChunks,
-} from "../.connector-dist/app/lib/github/apply-stage-contracts.js";
+} from "../.runtime-dist/app/lib/github/apply-stage-contracts.js";
 
 delete process.env.ATLAS_MEMORY_STORAGE;
 process.env.ATLAS_TEST_MODE = "true";
 process.env.ATLAS_WRITE_ACCESS = "public";
-process.env.ATLAS_CONNECTOR_TOKEN = "d1-graph-sync-secret";
 
 class SqliteD1Statement {
   constructor(database, sql, bindings = []) {
@@ -77,10 +76,10 @@ let workerPromise;
 const worker = () => workerPromise ??= import(new URL("../dist/server/index.js", import.meta.url).href)
   .then((module) => module.default);
 
-const connectorHeaders = {
+const runtimeHeaders = {
   authorization: "Bearer d1-graph-sync-secret",
   "content-type": "application/json",
-  "x-atlas-connector-id": "d1-graph-sync-connector",
+  "x-atlas-runtime-id": "d1-graph-sync-runtime",
 };
 const capability = {
   capability: "github-source",
@@ -190,14 +189,14 @@ async function runApply(database, { payload, nonce }) {
   });
   assert.equal(created.status, 201, await created.clone().text());
   const queued = (await created.json()).job;
-  await request(database, "/api/github/source-jobs/capability", {
+  await request(database, "/api/runtime/status", {
     method: "POST",
-    headers: connectorHeaders,
+    headers: runtimeHeaders,
     body: JSON.stringify(capability),
   });
   const claimedResponse = await request(database, "/api/github/source-jobs/claim", {
     method: "POST",
-    headers: connectorHeaders,
+    headers: runtimeHeaders,
     body: "{}",
   });
   assert.equal(claimedResponse.status, 200, await claimedResponse.clone().text());
@@ -205,7 +204,7 @@ async function runApply(database, { payload, nonce }) {
   assert.equal(claimed.id, queued.id);
   await request(database, `/api/github/source-jobs/${encodeURIComponent(claimed.id)}/start`, {
     method: "POST",
-    headers: connectorHeaders,
+    headers: runtimeHeaders,
     body: "{}",
   });
   const reusable = queued.input.reusableDocuments ?? [];
@@ -227,7 +226,7 @@ async function runApply(database, { payload, nonce }) {
         `/api/github/source-jobs/${encodeURIComponent(claimed.id)}/stage`,
         {
           method: "POST",
-          headers: connectorHeaders,
+          headers: runtimeHeaders,
           body: JSON.stringify(chunk),
         },
       );
@@ -236,7 +235,7 @@ async function runApply(database, { payload, nonce }) {
   }
   const result = await request(database, `/api/github/source-jobs/${encodeURIComponent(claimed.id)}/result`, {
     method: "POST",
-    headers: connectorHeaders,
+    headers: runtimeHeaders,
     body: JSON.stringify({
       jobId: claimed.id,
       idempotencyKey: claimed.idempotencyKey,
@@ -341,7 +340,7 @@ test("D1 Graph commit은 20·65문서 저장소를 90문장 이내에서 원자 
     ).get(failed.claimed.id).count, 0);
     const failedJob = await request(database, `/api/github/source-jobs/${encodeURIComponent(failed.claimed.id)}/fail`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify({
         errorCode: "invalid_result",
         errorMessage: "D1 batch rollback fixture",
@@ -452,20 +451,20 @@ test("D1 Graph commit은 20·65문서 저장소를 90문장 이내에서 원자 
     });
     assert.equal(dryRunPreviewCreated.status, 201, await dryRunPreviewCreated.clone().text());
     const dryRunPreviewJob = (await dryRunPreviewCreated.json()).job;
-    await request(database, "/api/github/source-jobs/capability", {
+    await request(database, "/api/runtime/status", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify(capability),
     });
     const dryRunPreviewClaimed = await request(database, "/api/github/source-jobs/claim", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     assert.equal((await dryRunPreviewClaimed.clone().json()).job.id, dryRunPreviewJob.id);
     await request(database, `/api/github/source-jobs/${encodeURIComponent(dryRunPreviewJob.id)}/start`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     const dryRunPreviewCompleted = await request(
@@ -473,7 +472,7 @@ test("D1 Graph commit은 20·65문서 저장소를 90문장 이내에서 원자 
       `/api/github/source-jobs/${encodeURIComponent(dryRunPreviewJob.id)}/result`,
       {
         method: "POST",
-        headers: connectorHeaders,
+        headers: runtimeHeaders,
         body: JSON.stringify({
           jobId: dryRunPreviewJob.id,
           idempotencyKey: dryRunPreviewJob.idempotencyKey,
@@ -551,14 +550,14 @@ test("D1 Graph commit은 20·65문서 저장소를 90문장 이내에서 원자 
     const incrementalPreviewJobId = (await incrementalPreviewResponse.json()).operations[0].jobId;
     const incrementalClaimResponse = await request(database, "/api/github/source-jobs/claim", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     const incrementalClaim = (await incrementalClaimResponse.json()).job;
     assert.equal(incrementalClaim.id, incrementalPreviewJobId);
     await request(database, `/api/github/source-jobs/${encodeURIComponent(incrementalClaim.id)}/start`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     const incrementalPreviewCompleted = await request(
@@ -566,7 +565,7 @@ test("D1 Graph commit은 20·65문서 저장소를 90문장 이내에서 원자 
       `/api/github/source-jobs/${encodeURIComponent(incrementalClaim.id)}/result`,
       {
         method: "POST",
-        headers: connectorHeaders,
+        headers: runtimeHeaders,
         body: JSON.stringify({
           jobId: incrementalClaim.id,
           idempotencyKey: incrementalClaim.idempotencyKey,
@@ -699,6 +698,5 @@ test("D1 Graph commit은 20·65문서 저장소를 90문장 이내에서 원자 
   } finally {
     delete globalThis.__AI_ATLAS_TEST_D1__;
     database.close();
-    delete process.env.ATLAS_CONNECTOR_TOKEN;
-  }
+    }
 });

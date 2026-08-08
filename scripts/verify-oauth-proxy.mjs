@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const argument = process.argv.find((value) => value.startsWith("--base-url="));
-const baseUrl = (argument?.slice("--base-url=".length) || process.env.ATLAS_BASE_URL || "").replace(/\/+$/, "");
+const baseUrl = (argument?.slice("--base-url=".length) || process.env.ATLAS_RUNTIME_ORIGIN || "").replace(/\/+$/, "");
 
 if (!baseUrl) {
   console.error("사용법: npm run verify:oauth -- --base-url=https://staging.example.com");

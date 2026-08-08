@@ -5,13 +5,13 @@ import {
   GITHUB_REPOSITORY_APPLY_MAX_BYTES,
   GITHUB_REPOSITORY_APPLY_MAX_FILES,
   type GitHubApplySubmission,
-} from "../app/lib/github/apply-contracts.js";
+} from "../../app/lib/github/apply-contracts.js";
 import {
   buildGitHubDiscoverySnapshot,
   GITHUB_SOURCE_OWNER,
   parseGitHubRepositoryDescriptor,
   type GitHubRepositoryDescriptor,
-} from "../app/lib/github/discovery-contracts.js";
+} from "../../app/lib/github/discovery-contracts.js";
 import {
   buildGitHubPreviewSnapshot,
   buildGitHubRepositoryManifest,
@@ -19,18 +19,18 @@ import {
   type GitHubPreviewSnapshot,
   type GitHubTreeEntry,
   type GitHubTreeSnapshot,
-} from "../app/lib/github/repository-manifest.js";
+} from "../../app/lib/github/repository-manifest.js";
 import type {
-  GitHubConnectorCapabilityRecord,
+  GitHubRuntimeCapabilityRecord,
   GitHubSourceErrorCode,
   GitHubSourceJobRecord,
   GitHubSourceJobResult,
-} from "../app/lib/github/source-job-contracts.js";
-import type { ConnectorConfig } from "./config.js";
+} from "../../app/lib/github/source-job-contracts.js";
+import type { IntegratedRuntimeConfig } from "../runtime/config.js";
 
 const execFileAsync = promisify(execFile);
 
-type CapabilityReport = Omit<GitHubConnectorCapabilityRecord, "connectorId" | "lastSeenAt">;
+type CapabilityReport = Omit<GitHubRuntimeCapabilityRecord, "runtimeId" | "lastSeenAt">;
 type CommandOptions = {
   timeout: number;
   env: NodeJS.ProcessEnv;
@@ -51,17 +51,23 @@ const executeCommand: GitHubCommandExecutor = async (command, args, options) => 
   return { stdout: String(result.stdout), stderr: String(result.stderr) };
 };
 
-const cleanGitHubEnvironment = (): NodeJS.ProcessEnv & Record<string, string> => {
+export const cleanGitHubEnvironment = (): NodeJS.ProcessEnv & Record<string, string> => {
   const removed = new Set([
     "GH_TOKEN",
     "GITHUB_TOKEN",
     "GH_ENTERPRISE_TOKEN",
     "GITHUB_ENTERPRISE_TOKEN",
     "GH_DEBUG",
+    "ATLAS_INTERNAL_RUNTIME_SECRET",
+    "OPENAI_API_KEY",
+    "LIGHTRAG_API_KEY",
+    "CODEX_API_KEY",
   ]);
   return {
     ...Object.fromEntries(
-    Object.entries(process.env).filter(([key, value]) => value !== undefined && !removed.has(key)),
+    Object.entries(process.env).filter(([key, value]) =>
+      value !== undefined && !removed.has(key) && !key.startsWith("ATLAS_RUNTIME_"),
+    ),
     ),
     NODE_ENV: process.env.NODE_ENV ?? "production",
   } as NodeJS.ProcessEnv & Record<string, string>;
@@ -112,7 +118,7 @@ function mappedError(error: unknown): GitHubSourceEngineError {
     return new GitHubSourceEngineError("gh_missing", false, "GitHub CLI(gh)를 찾을 수 없습니다.");
   }
   if (text.includes("timed out") || text.includes("timeout") || text.includes("abort")) {
-    return new GitHubSourceEngineError("connector_offline", true, "GitHub CLI 응답 시간이 초과되었습니다.");
+    return new GitHubSourceEngineError("runtime_unavailable", true, "GitHub CLI 응답 시간이 초과되었습니다.");
   }
   if (text.includes("rate limit") || text.includes("secondary rate")) {
     return new GitHubSourceEngineError("github_rate_limited", true, "GitHub 요청 제한에 도달했습니다.");
@@ -126,7 +132,7 @@ function mappedError(error: unknown): GitHubSourceEngineError {
   if (text.includes("http 404")) {
     return new GitHubSourceEngineError("github_forbidden", false, "선택한 저장소 또는 기본 브랜치에 접근할 수 없습니다.");
   }
-  return new GitHubSourceEngineError("connector_offline", true, "GitHub CLI 요청에 실패했습니다.");
+  return new GitHubSourceEngineError("runtime_unavailable", true, "GitHub CLI 요청에 실패했습니다.");
 }
 
 const objectValue = (value: unknown) => value !== null && typeof value === "object" && !Array.isArray(value)
@@ -146,7 +152,7 @@ function parseActiveAccount(value: unknown) {
 
 export class GitHubSourceEngine {
   constructor(
-    private readonly config: ConnectorConfig,
+    private readonly config: IntegratedRuntimeConfig,
     private readonly dependencies: {
       execute?: GitHubCommandExecutor;
       now?: () => string;
@@ -176,7 +182,11 @@ export class GitHubSourceEngine {
 
   private async apiJson(endpoint: string, jq: string, signal?: AbortSignal) {
     try {
-      const { stdout } = await this.execute(this.command(), ["api", endpoint, "--jq", jq], this.options(signal));
+      const { stdout } = await this.execute(
+        this.command(),
+        ["api", endpoint, "--method", "GET", "--jq", jq],
+        this.options(signal),
+      );
       return JSON.parse(stdout) as unknown;
     } catch (error) {
       if (error instanceof SyntaxError) {
@@ -188,7 +198,11 @@ export class GitHubSourceEngine {
 
   private async apiJsonOrNull(endpoint: string, jq: string, signal?: AbortSignal) {
     try {
-      const { stdout } = await this.execute(this.command(), ["api", endpoint, "--jq", jq], this.options(signal));
+      const { stdout } = await this.execute(
+        this.command(),
+        ["api", endpoint, "--method", "GET", "--jq", jq],
+        this.options(signal),
+      );
       return JSON.parse(stdout) as unknown;
     } catch (error) {
       if (errorText(error).includes("http 404")) return null;
@@ -388,7 +402,7 @@ export class GitHubSourceEngine {
       return {
         capability: "github-source",
         status: "offline",
-        errorCode: mapped.code === "gh_missing" ? "gh_missing" : "connector_offline",
+        errorCode: mapped.code === "gh_missing" ? "gh_missing" : "runtime_unavailable",
         host: "github.com",
         message: mapped.message,
         checkedAt,
@@ -459,7 +473,7 @@ export class GitHubSourceEngine {
     const capability = await this.checkCapability(signal);
     if (capability.status !== "online" || !capability.accountLogin) {
       throw new GitHubSourceEngineError(
-        capability.errorCode ?? "connector_offline",
+        capability.errorCode ?? "runtime_unavailable",
         capability.status === "offline" || capability.status === "rate_limited",
         capability.message ?? "GitHub source capability를 사용할 수 없습니다.",
       );
@@ -471,6 +485,8 @@ export class GitHubSourceEngine {
         "api",
         "--paginate",
         "user/repos?per_page=100&affiliation=owner&visibility=all",
+        "--method",
+        "GET",
         "--jq",
         repositoryJq,
       ], this.options(signal)));
@@ -525,7 +541,7 @@ export class GitHubSourceEngine {
     const capability = await this.checkCapability(signal);
     if (capability.status !== "online" || !capability.accountLogin) {
       throw new GitHubSourceEngineError(
-        capability.errorCode ?? "connector_offline",
+        capability.errorCode ?? "runtime_unavailable",
         capability.status === "offline" || capability.status === "rate_limited",
         capability.message ?? "GitHub source capability를 사용할 수 없습니다.",
       );
@@ -561,7 +577,7 @@ export class GitHubSourceEngine {
     const capability = await this.checkCapability(signal);
     if (capability.status !== "online") {
       throw new GitHubSourceEngineError(
-        capability.errorCode ?? "connector_offline",
+        capability.errorCode ?? "runtime_unavailable",
         capability.status === "offline" || capability.status === "rate_limited",
         capability.message ?? "GitHub source capability를 사용할 수 없습니다.",
       );

@@ -12,8 +12,13 @@ export type GraphSnapshot = {
     generatedAt: string;
     documentCount?: number;
     message?: string;
-    scope?: "corpus" | "overview" | "repository";
+    scope?: "corpus" | "overview" | "repository" | "document";
     repositoryId?: string;
+    documentId?: string;
+    documentName?: string;
+    documentSourceLabel?: string;
+    documentUpdatedAt?: string;
+    documentSeedNodeIds?: string[];
     repositoryCount?: number;
     nodeBudget?: number;
     edgeBudget?: number;
@@ -25,7 +30,8 @@ export type GraphSnapshot = {
     displayEdgeCount?: number;
     corpusNodeCount?: number;
     corpusEdgeCount?: number;
-    projectionMode?: "full-corpus-knowledge-map" | "single-repository-knowledge-map" | "multi-repository-shared-knowledge" | "repository-evidence-graph";
+    graphRevision?: string;
+    projectionMode?: "full-corpus-knowledge-map" | "single-repository-knowledge-map" | "multi-repository-shared-knowledge" | "repository-evidence-graph" | "document-evidence-graph";
     analytics?: {
       algorithm: string;
       communityCount: number;
@@ -109,7 +115,7 @@ export type DashboardSnapshot = {
   documents: DocumentRecord[];
   jobs: IngestionJob[];
   enrichmentJobs: DashboardEnrichmentJob[];
-  connector: ConnectorStatusSummary;
+  runtime: RuntimeStatusSummary;
   totals: {
     documents: number;
     nodes: number;
@@ -119,8 +125,14 @@ export type DashboardSnapshot = {
     enrichmentQueued: number;
     enrichmentActive: number;
     enrichmentWarnings: number;
+    legacyEnrichmentQueued: number;
+    storedNodes: number;
+    storedEdges: number;
+    projectionNodeLimit: number;
+    projectionEdgeLimit: number;
   };
   storage: "d1" | "memory";
+  graphRevision: string;
 };
 
 export type GitHubRepositoryStorageSummary = {
@@ -159,7 +171,7 @@ export type DashboardEnrichmentJob = {
   completedAt?: string;
 };
 
-export type ConnectorStatusSummary = {
+export type RuntimeStatusSummary = {
   status: "online" | "offline";
   onlineCount: number;
   queuedJobs: number;
@@ -174,4 +186,20 @@ export type ConnectorStatusSummary = {
   warningJobs?: number;
   failedJobs?: number;
   stopReason?: "dry_run" | "job_limit" | "runtime_limit" | "idle" | "once" | "signal" | "fatal";
+};
+
+export type GraphDocumentSummary = {
+  id: string;
+  fileName: string;
+  sourceType: DocumentSourceDescriptor["type"];
+  sourceLabel: string;
+  updatedAt: string;
+  nodeCount: number;
+  edgeCount: number;
+};
+
+export type GraphNodeSearchResult = {
+  node: KnowledgeNode;
+  document?: GraphDocumentSummary;
+  score: number;
 };

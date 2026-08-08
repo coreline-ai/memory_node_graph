@@ -39,8 +39,8 @@
 
 - 대표 이미지는 `02-corpus-constellation-min.png`을 사용한다.
 - 갤러리는 그래프 보기, 검토 fixture, 대시보드 운영 흐름 순서로 배치한다.
-- 현재 대시보드의 `NO SIGNAL`은 분리형 Connector 구현 이력임을 명시한다.
-- 통합 OAuth 런타임 구현 후 Connector UI가 사라지면 대시보드 캡처 5장을 다시 촬영한다.
+- 기존 대시보드의 장치 신호 캡처는 분리 실행 구조의 구현 이력임을 명시한다.
+- Phase 5에서 분리 실행 상태 UI가 제거됐으므로 최종 문서 감사에서 OAuth 상태 대시보드 캡처 5장을 다시 촬영한다.
 - 데이터 수량, 최저 발광 범위, 하단 제어판, dashboard section 구조가 바뀌면 해당 화면만 재촬영한다.
 
 ## 관련 문서
@@ -48,4 +48,4 @@
 - [프로젝트 README](../../README.md)
 - [현재 OAuth 런타임 방향](../current-oauth-runtime.md)
 - [Gold Graph 시각 QA](../gold-graph-visual-qa-20260806.md)
-- [최신 구현 계획](../../dev-plan/implement_20260807_203534.md)
+- [최신 구현 계획](../../dev-plan/implement_20260807_220621.md)

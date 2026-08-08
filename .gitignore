@@ -40,7 +40,7 @@ next-env.d.ts
 *.tsbuildinfo
 /dist/
 /.wrangler/
-/.connector-dist/
+/.runtime-dist/
 /outputs/
 /work/
 

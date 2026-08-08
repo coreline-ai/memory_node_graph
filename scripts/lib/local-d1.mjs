@@ -1,8 +1,23 @@
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 export async function resolveLocalD1Database(input = {}) {
-  if (input.requested) return resolve(input.requested);
+  if (input.requested) {
+    const requested = resolve(input.requested);
+    let requestedStat;
+    try {
+      requestedStat = await stat(requested);
+    } catch {
+      throw new Error(`지정한 로컬 D1 파일을 찾을 수 없습니다: ${requested}`);
+    }
+    if (!requestedStat.isFile()) {
+      throw new Error(`지정한 로컬 D1 경로가 파일이 아닙니다: ${requested}`);
+    }
+    if (!requested.endsWith(".sqlite") || requested.endsWith("/metadata.sqlite")) {
+      throw new Error(`지정한 파일은 로컬 D1 SQLite 정본이 아닙니다: ${requested}`);
+    }
+    return requested;
+  }
   const root = resolve(input.root ?? process.cwd());
   const directory = join(root, ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
   let entries;

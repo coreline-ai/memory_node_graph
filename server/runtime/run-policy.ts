@@ -1,7 +1,7 @@
-export const CONNECTOR_RUN_MAX_JOBS = 100;
-export const CONNECTOR_RUN_MAX_RUNTIME_MS = 24 * 60 * 60 * 1_000;
+export const RUNTIME_RUN_MAX_JOBS = 100;
+export const RUNTIME_RUN_MAX_RUNTIME_MS = 24 * 60 * 60 * 1_000;
 
-export type ConnectorRunStopReason =
+export type RuntimeRunStopReason =
   | "dry_run"
   | "job_limit"
   | "runtime_limit"
@@ -10,7 +10,7 @@ export type ConnectorRunStopReason =
   | "signal"
   | "fatal";
 
-export type ConnectorRunOptions = {
+export type RuntimeRunOptions = {
   once?: boolean;
   maxJobs?: number;
   maxRuntimeMs?: number;
@@ -18,7 +18,7 @@ export type ConnectorRunOptions = {
   stopWhenIdle?: boolean;
 };
 
-export type ConnectorRunReceipt = {
+export type RuntimeRunReceipt = {
   mode: "continuous" | "bounded";
   startedAt: string;
   completedAt: string;
@@ -32,7 +32,7 @@ export type ConnectorRunReceipt = {
   failedJobs: number;
   initialQueuedJobs?: number;
   remainingQueuedJobs?: number;
-  stopReason: ConnectorRunStopReason;
+  stopReason: RuntimeRunStopReason;
 };
 
 const optionValue = (arguments_: readonly string[], name: string) => {
@@ -57,25 +57,25 @@ const boundedInteger = (
   return parsed;
 };
 
-export function parseConnectorRunOptions(
+export function parseRuntimeRunOptions(
   arguments_: readonly string[],
   environment: Record<string, string | undefined> = process.env,
-): ConnectorRunOptions {
+): RuntimeRunOptions {
   const once = arguments_.includes("--once");
   const batch = arguments_.includes("--batch");
   const maxJobs = boundedInteger(
-    optionValue(arguments_, "--max-jobs") ?? environment.ATLAS_CONNECTOR_MAX_JOBS ?? (batch ? "1" : undefined),
+    optionValue(arguments_, "--max-jobs") ?? environment.ATLAS_RUNTIME_MAX_JOBS ?? (batch ? "1" : undefined),
     "max jobs",
     0,
-    CONNECTOR_RUN_MAX_JOBS,
+    RUNTIME_RUN_MAX_JOBS,
   );
   const maxRuntimeMs = boundedInteger(
     optionValue(arguments_, "--max-runtime-ms")
-      ?? environment.ATLAS_CONNECTOR_MAX_RUNTIME_MS
+      ?? environment.ATLAS_RUNTIME_MAX_RUNTIME_MS
       ?? (batch ? "300000" : undefined),
     "max runtime",
     1_000,
-    CONNECTOR_RUN_MAX_RUNTIME_MS,
+    RUNTIME_RUN_MAX_RUNTIME_MS,
   );
   const bounded = once || batch || maxJobs !== undefined || maxRuntimeMs !== undefined;
   return {

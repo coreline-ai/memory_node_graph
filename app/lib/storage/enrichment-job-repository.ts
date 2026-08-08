@@ -1,8 +1,9 @@
 import {
   canTransitionEnrichmentJob,
-  type ConnectorHeartbeatRecord,
-  type ConnectorHeartbeatStatus,
-  type ConnectorRunTelemetry,
+  type RuntimeStatusRecord,
+  type RuntimeStatusKind,
+  type CodexRuntimeState,
+  type RuntimeRunTelemetry,
   type EnrichmentErrorCode,
   type EnrichmentJobInput,
   type EnrichmentJobRecord,
@@ -21,14 +22,15 @@ type EnqueueOptions = {
 };
 
 type ClaimOptions = {
-  connectorId: string;
+  runtimeId: string;
   leaseDurationMs?: number;
+  providerVersion?: string;
   now?: string;
 };
 
 type LeaseMutation = {
   jobId: string;
-  connectorId: string;
+  runtimeId: string;
   now?: string;
 };
 
@@ -47,10 +49,12 @@ type FailInput = LeaseMutation & {
   retryable: boolean;
 };
 
-type ConnectorHeartbeatInput = ConnectorRunTelemetry & {
-  connectorId: string;
-  status: ConnectorHeartbeatStatus;
+type RuntimeStatusInput = RuntimeRunTelemetry & {
+  runtimeId: string;
+  status: RuntimeStatusKind;
   version: string;
+  runtimeState?: CodexRuntimeState;
+  runtimeMessage?: string;
   currentJobId?: string;
   now?: string;
 };
@@ -77,7 +81,7 @@ export interface EnrichmentJobRepository {
   enqueue(input: EnrichmentJobInput, options?: EnqueueOptions): Promise<EnqueueEnrichmentJobResult>;
   get(jobId: string): Promise<EnrichmentJobRecord | null>;
   list(documentId?: string, limit?: number): Promise<EnrichmentJobRecord[]>;
-  statusCounts(): Promise<EnrichmentJobStatusCounts>;
+  statusCounts(providerVersion?: string): Promise<EnrichmentJobStatusCounts>;
   claim(options: ClaimOptions): Promise<EnrichmentJobRecord | null>;
   renewLease(input: RenewLeaseInput): Promise<EnrichmentJobRecord>;
   markRunning(input: LeaseMutation): Promise<EnrichmentJobRecord>;
@@ -85,8 +89,8 @@ export interface EnrichmentJobRepository {
   fail(input: FailInput): Promise<EnrichmentJobRecord>;
   cancel(jobId: string, now?: string): Promise<EnrichmentJobRecord>;
   retry(jobId: string, now?: string): Promise<EnrichmentJobRecord>;
-  recordConnectorHeartbeat(input: ConnectorHeartbeatInput): Promise<ConnectorHeartbeatRecord>;
-  listConnectorHeartbeats(): Promise<ConnectorHeartbeatRecord[]>;
+  recordRuntimeStatus(input: RuntimeStatusInput): Promise<RuntimeStatusRecord>;
+  listRuntimeStatuses(): Promise<RuntimeStatusRecord[]>;
   markDocumentStale(
     documentId: string,
     currentDocumentHash: string,
@@ -120,11 +124,11 @@ function requireJob(job: EnrichmentJobRecord | null): EnrichmentJobRecord {
   return job;
 }
 
-function assertLease(job: EnrichmentJobRecord, connectorId: string, now: string) {
-  if (!isLeaseStatus(job.status) || job.leaseOwner !== connectorId) {
+function assertLease(job: EnrichmentJobRecord, runtimeId: string, now: string) {
+  if (!isLeaseStatus(job.status) || job.leaseOwner !== runtimeId) {
     throw new EnrichmentRepositoryError(
       "lease_conflict",
-      "현재 Connector가 소유한 Lease가 아닙니다.",
+      "현재 통합 런타임이 소유한 Lease가 아닙니다.",
     );
   }
   if (isExpired(job, now)) {
@@ -165,7 +169,7 @@ function newJob(input: EnrichmentJobInput, options: EnqueueOptions = {}): Enrich
 export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
   constructor(
     private readonly jobs = new Map<string, EnrichmentJobRecord>(),
-    private readonly heartbeats = new Map<string, ConnectorHeartbeatRecord>(),
+    private readonly heartbeats = new Map<string, RuntimeStatusRecord>(),
   ) {}
 
   async enqueue(input: EnrichmentJobInput, options: EnqueueOptions = {}) {
@@ -191,9 +195,12 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
     return limit ? rows.slice(-Math.max(1, Math.floor(limit))) : rows;
   }
 
-  async statusCounts() {
+  async statusCounts(providerVersion?: string) {
     const counts = emptyStatusCounts();
-    for (const job of this.jobs.values()) counts[job.status] += 1;
+    for (const job of this.jobs.values()) {
+      if (providerVersion && job.providerVersion !== providerVersion) continue;
+      counts[job.status] += 1;
+    }
     return counts;
   }
 
@@ -202,7 +209,7 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
     for (const job of [...this.jobs.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
       const claimable =
         job.status === "queued" || (isLeaseStatus(job.status) && isExpired(job, now));
-      if (!claimable) continue;
+      if (!claimable || (options.providerVersion && job.providerVersion !== options.providerVersion)) continue;
       if (job.attemptCount >= job.maxAttempts) {
         if (isLeaseStatus(job.status)) {
           job.status = "failed";
@@ -218,7 +225,7 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
       assertTransition(job.status, "leased");
       job.status = "leased";
       job.attemptCount += 1;
-      job.leaseOwner = options.connectorId;
+      job.leaseOwner = options.runtimeId;
       job.leaseExpiresAt = expiresAt(now, options.leaseDurationMs);
       job.updatedAt = now;
       job.errorCode = undefined;
@@ -231,7 +238,7 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
   async renewLease(input: RenewLeaseInput) {
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const stored = requireJob(this.jobs.get(job.id) ?? null);
     stored.leaseExpiresAt = expiresAt(now, input.leaseDurationMs);
     stored.updatedAt = now;
@@ -241,7 +248,7 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
   async markRunning(input: LeaseMutation) {
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     if (job.status !== "leased") {
       throw new EnrichmentRepositoryError("invalid_input", "leased 작업만 running으로 전환할 수 있습니다.");
     }
@@ -256,7 +263,7 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
   async complete(input: CompleteInput) {
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const stored = requireJob(this.jobs.get(job.id) ?? null);
     const nextStatus: EnrichmentJobStatus =
       input.currentDocumentHash === job.documentHash ? input.result.status : "stale";
@@ -276,7 +283,7 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
   async fail(input: FailInput) {
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const retry = input.retryable && job.attemptCount < job.maxAttempts;
     const nextStatus: EnrichmentJobStatus = retry ? "queued" : "failed";
     assertTransition(job.status, nextStatus);
@@ -331,14 +338,16 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
     return clone(stored);
   }
 
-  async recordConnectorHeartbeat(input: ConnectorHeartbeatInput) {
+  async recordRuntimeStatus(input: RuntimeStatusInput) {
     const now = timestamp(input.now);
-    const previous = this.heartbeats.get(input.connectorId);
-    const heartbeat: ConnectorHeartbeatRecord = {
-      connectorId: input.connectorId,
+    const previous = this.heartbeats.get(input.runtimeId);
+    const heartbeat: RuntimeStatusRecord = {
+      runtimeId: input.runtimeId,
       status: input.status,
       version: input.version,
       currentJobId: input.currentJobId,
+      runtimeState: input.runtimeState,
+      runtimeMessage: input.runtimeMessage,
       runMode: input.runMode,
       maxJobs: input.maxJobs,
       maxRuntimeMs: input.maxRuntimeMs,
@@ -350,11 +359,11 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
       startedAt: previous?.startedAt ?? now,
       lastSeenAt: now,
     };
-    this.heartbeats.set(input.connectorId, heartbeat);
+    this.heartbeats.set(input.runtimeId, heartbeat);
     return clone(heartbeat);
   }
 
-  async listConnectorHeartbeats() {
+  async listRuntimeStatuses() {
     return [...this.heartbeats.values()]
       .sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt))
       .map(clone);
@@ -447,10 +456,14 @@ const asD1Job = (row: D1Row): EnrichmentJobRecord => ({
   completedAt: row.completed_at ? String(row.completed_at) : undefined,
 });
 
-const asD1Heartbeat = (row: D1Row): ConnectorHeartbeatRecord => ({
-  connectorId: String(row.connector_id),
-  status: String(row.status) as ConnectorHeartbeatStatus,
+const asD1RuntimeStatus = (row: D1Row): RuntimeStatusRecord => ({
+  runtimeId: String(row.runtime_id),
+  status: String(row.status) as RuntimeStatusKind,
   version: String(row.version),
+  runtimeState: typeof row.runtime_state === "string"
+    ? row.runtime_state as RuntimeStatusRecord["runtimeState"]
+    : undefined,
+  runtimeMessage: row.runtime_message ? String(row.runtime_message) : undefined,
   currentJobId: row.current_job_id ? String(row.current_job_id) : undefined,
   runMode: row.run_mode === "continuous" || row.run_mode === "bounded"
     ? row.run_mode
@@ -472,7 +485,7 @@ const asD1Heartbeat = (row: D1Row): ConnectorHeartbeatRecord => ({
     ? undefined
     : Number(row.failed_jobs),
   stopReason: typeof row.stop_reason === "string"
-    ? row.stop_reason as ConnectorHeartbeatRecord["stopReason"]
+    ? row.stop_reason as RuntimeStatusRecord["stopReason"]
     : undefined,
   startedAt: String(row.started_at),
   lastSeenAt: String(row.last_seen_at),
@@ -480,10 +493,11 @@ const asD1Heartbeat = (row: D1Row): ConnectorHeartbeatRecord => ({
 
 export const enrichmentSchemaStatements = [
   `CREATE TABLE IF NOT EXISTS enrichment_jobs (id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, document_id TEXT NOT NULL, document_hash TEXT NOT NULL, parser_version TEXT NOT NULL, provider TEXT NOT NULL, provider_version TEXT NOT NULL, prompt_version TEXT NOT NULL, status TEXT NOT NULL, input_json TEXT NOT NULL, result_json TEXT, attempt_count INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3, lease_owner TEXT, lease_expires_at TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT)`,
-  `CREATE TABLE IF NOT EXISTS connector_heartbeats (connector_id TEXT PRIMARY KEY, status TEXT NOT NULL, version TEXT NOT NULL, current_job_id TEXT, run_mode TEXT, max_jobs INTEGER, max_runtime_ms INTEGER, processed_jobs INTEGER, succeeded_jobs INTEGER, warning_jobs INTEGER, failed_jobs INTEGER, stop_reason TEXT, started_at TEXT NOT NULL, last_seen_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS runtime_status (runtime_id TEXT PRIMARY KEY, status TEXT NOT NULL, version TEXT NOT NULL, current_job_id TEXT, runtime_state TEXT, runtime_message TEXT, run_mode TEXT, max_jobs INTEGER, max_runtime_ms INTEGER, processed_jobs INTEGER, succeeded_jobs INTEGER, warning_jobs INTEGER, failed_jobs INTEGER, stop_reason TEXT, started_at TEXT NOT NULL, last_seen_at TEXT NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS enrichment_jobs_claim_idx ON enrichment_jobs(status, lease_expires_at, created_at)`,
+  `CREATE INDEX IF NOT EXISTS enrichment_jobs_provider_claim_idx ON enrichment_jobs(provider_version, status, lease_expires_at, created_at)`,
   `CREATE INDEX IF NOT EXISTS enrichment_jobs_document_idx ON enrichment_jobs(document_id, created_at)`,
-  `CREATE INDEX IF NOT EXISTS connector_heartbeats_seen_idx ON connector_heartbeats(last_seen_at)`,
+  `CREATE INDEX IF NOT EXISTS runtime_status_seen_idx ON runtime_status(last_seen_at)`,
 ] as const;
 
 export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
@@ -508,10 +522,12 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
             if (!String(error).toLowerCase().includes("duplicate column")) throw error;
           });
       }
-      const heartbeatInfo = await this.db.prepare("PRAGMA table_info(connector_heartbeats)")
+      const heartbeatInfo = await this.db.prepare("PRAGMA table_info(runtime_status)")
         .all<{ name: string }>();
       const heartbeatColumns = new Set(heartbeatInfo.results.map((column) => String(column.name)));
       const telemetryColumns = [
+        ["runtime_state", "TEXT"],
+        ["runtime_message", "TEXT"],
         ["run_mode", "TEXT"],
         ["max_jobs", "INTEGER"],
         ["max_runtime_ms", "INTEGER"],
@@ -523,10 +539,42 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
       ] as const;
       for (const [name, type] of telemetryColumns) {
         if (heartbeatColumns.has(name)) continue;
-        await this.db.prepare(`ALTER TABLE connector_heartbeats ADD COLUMN ${name} ${type}`).run()
+        await this.db.prepare(`ALTER TABLE runtime_status ADD COLUMN ${name} ${type}`).run()
           .catch((error) => {
             if (!String(error).toLowerCase().includes("duplicate column")) throw error;
           });
+      }
+      // Older local/remote D1 instances may have status written by the
+      // previously separate process. Keep it as a read-only migration source
+      // so the unified runtime continues to show the last meaningful state.
+      const legacyTable = await this.db.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'connector_heartbeats' LIMIT 1",
+      ).first<{ name: string }>();
+      if (legacyTable) {
+        const legacyInfo = await this.db.prepare("PRAGMA table_info(connector_heartbeats)")
+          .all<{ name: string }>();
+        const legacyColumns = new Set(legacyInfo.results.map((column) => String(column.name)));
+        const column = (name: string, fallback = "NULL") => legacyColumns.has(name) ? name : fallback;
+        await this.db.prepare(`INSERT OR REPLACE INTO runtime_status
+          (runtime_id, status, version, current_job_id, runtime_state, runtime_message, run_mode,
+           max_jobs, max_runtime_ms, processed_jobs, succeeded_jobs, warning_jobs, failed_jobs,
+           stop_reason, started_at, last_seen_at)
+          SELECT ${column("connector_id")}, ${column("status", "'offline'")}, ${column("version", "'legacy'")},
+            ${column("current_job_id")}, ${column("runtime_state")}, ${column("runtime_message")},
+            ${column("run_mode")}, ${column("max_jobs")}, ${column("max_runtime_ms")},
+            ${column("processed_jobs")}, ${column("succeeded_jobs")}, ${column("warning_jobs")},
+            ${column("failed_jobs")}, ${column("stop_reason")}, ${column("started_at", "CURRENT_TIMESTAMP")},
+            ${column("last_seen_at", "CURRENT_TIMESTAMP")}
+          FROM connector_heartbeats
+          WHERE 1 = 1
+          ON CONFLICT(runtime_id) DO UPDATE SET
+            status=excluded.status, version=excluded.version, current_job_id=excluded.current_job_id,
+            runtime_state=excluded.runtime_state, runtime_message=excluded.runtime_message,
+            run_mode=excluded.run_mode, max_jobs=excluded.max_jobs, max_runtime_ms=excluded.max_runtime_ms,
+            processed_jobs=excluded.processed_jobs, succeeded_jobs=excluded.succeeded_jobs,
+            warning_jobs=excluded.warning_jobs, failed_jobs=excluded.failed_jobs,
+            stop_reason=excluded.stop_reason, last_seen_at=excluded.last_seen_at
+          WHERE excluded.last_seen_at > runtime_status.last_seen_at`).run();
       }
     })();
     await this.readyPromise;
@@ -577,11 +625,14 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     return safeLimit ? jobs.sort((left, right) => left.createdAt.localeCompare(right.createdAt)) : jobs;
   }
 
-  async statusCounts() {
+  async statusCounts(providerVersion?: string) {
     await this.ready();
     const counts = emptyStatusCounts();
-    const result = await this.db.prepare("SELECT status, COUNT(*) AS count FROM enrichment_jobs GROUP BY status")
-      .all<{ status: string; count: number }>();
+    const result = providerVersion
+      ? await this.db.prepare("SELECT status, COUNT(*) AS count FROM enrichment_jobs WHERE provider_version = ? GROUP BY status")
+        .bind(providerVersion).all<{ status: string; count: number }>()
+      : await this.db.prepare("SELECT status, COUNT(*) AS count FROM enrichment_jobs GROUP BY status")
+        .all<{ status: string; count: number }>();
     for (const row of result.results) {
       if (row.status in counts) counts[row.status as EnrichmentJobStatus] = Number(row.count);
     }
@@ -596,24 +647,40 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
       .bind(now, now, now).run();
 
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      const row = await this.db.prepare(`SELECT * FROM enrichment_jobs
-        WHERE attempt_count < max_attempts AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))
-        ORDER BY created_at LIMIT 1`).bind(now).first<D1Row>();
+      const row = options.providerVersion
+        ? await this.db.prepare(`SELECT * FROM enrichment_jobs
+          WHERE provider_version = ? AND attempt_count < max_attempts
+            AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))
+          ORDER BY created_at LIMIT 1`).bind(options.providerVersion, now).first<D1Row>()
+        : await this.db.prepare(`SELECT * FROM enrichment_jobs
+          WHERE attempt_count < max_attempts AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))
+          ORDER BY created_at LIMIT 1`).bind(now).first<D1Row>();
       if (!row) return null;
       const job = asD1Job(row);
       const nextExpiry = expiresAt(now, options.leaseDurationMs);
       const outcome = await this.db.prepare(`UPDATE enrichment_jobs
         SET status = 'leased', attempt_count = attempt_count + 1, lease_owner = ?, lease_expires_at = ?, error_code = NULL, error_message = NULL, updated_at = ?
-        WHERE id = ? AND attempt_count = ? AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))`)
-        .bind(options.connectorId, nextExpiry, now, job.id, job.attemptCount, now).run();
+        WHERE id = ? AND attempt_count = ?
+          AND (? IS NULL OR provider_version = ?)
+          AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))`)
+        .bind(
+          options.runtimeId,
+          nextExpiry,
+          now,
+          job.id,
+          job.attemptCount,
+          options.providerVersion ?? null,
+          options.providerVersion ?? null,
+          now,
+        ).run();
       if (Number(outcome.meta.changes ?? 0) === 1) return requireJob(await this.get(job.id));
     }
     return null;
   }
 
-  private async classifyLeaseFailure(jobId: string, connectorId: string, now: string): Promise<never> {
+  private async classifyLeaseFailure(jobId: string, runtimeId: string, now: string): Promise<never> {
     const job = requireJob(await this.get(jobId));
-    assertLease(job, connectorId, now);
+    assertLease(job, runtimeId, now);
     throw new EnrichmentRepositoryError("lease_conflict", "동시 상태 변경으로 Lease 갱신에 실패했습니다.");
   }
 
@@ -622,9 +689,9 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     const now = timestamp(input.now);
     const outcome = await this.db.prepare(`UPDATE enrichment_jobs SET lease_expires_at = ?, updated_at = ?
       WHERE id = ? AND lease_owner = ? AND status IN ('leased', 'running') AND lease_expires_at > ?`)
-      .bind(expiresAt(now, input.leaseDurationMs), now, input.jobId, input.connectorId, now).run();
+      .bind(expiresAt(now, input.leaseDurationMs), now, input.jobId, input.runtimeId, now).run();
     if (Number(outcome.meta.changes ?? 0) !== 1) {
-      return this.classifyLeaseFailure(input.jobId, input.connectorId, now);
+      return this.classifyLeaseFailure(input.jobId, input.runtimeId, now);
     }
     return requireJob(await this.get(input.jobId));
   }
@@ -634,10 +701,10 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     const now = timestamp(input.now);
     const outcome = await this.db.prepare(`UPDATE enrichment_jobs SET status = 'running', started_at = COALESCE(started_at, ?), updated_at = ?
       WHERE id = ? AND lease_owner = ? AND status = 'leased' AND lease_expires_at > ?`)
-      .bind(now, now, input.jobId, input.connectorId, now).run();
+      .bind(now, now, input.jobId, input.runtimeId, now).run();
     if (Number(outcome.meta.changes ?? 0) !== 1) {
       const job = requireJob(await this.get(input.jobId));
-      assertLease(job, input.connectorId, now);
+      assertLease(job, input.runtimeId, now);
       throw new EnrichmentRepositoryError("invalid_input", "leased 작업만 running으로 전환할 수 있습니다.");
     }
     return requireJob(await this.get(input.jobId));
@@ -647,7 +714,7 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     await this.ready();
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const nextStatus: EnrichmentJobStatus =
       input.currentDocumentHash === job.documentHash ? input.result.status : "stale";
     assertTransition(job.status, nextStatus);
@@ -694,7 +761,7 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
           JSON.stringify(evidence),
           now,
           input.jobId,
-          input.connectorId,
+          input.runtimeId,
           now,
         );
     });
@@ -711,13 +778,13 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
         now,
         now,
         input.jobId,
-        input.connectorId,
+        input.runtimeId,
         now,
       );
     const outcomes = await this.db.batch([...relationStatements, completionStatement]);
     const outcome = outcomes.at(-1);
     if (Number(outcome?.meta.changes ?? 0) !== 1) {
-      return this.classifyLeaseFailure(input.jobId, input.connectorId, now);
+      return this.classifyLeaseFailure(input.jobId, input.runtimeId, now);
     }
     return requireJob(await this.get(input.jobId));
   }
@@ -726,17 +793,17 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     await this.ready();
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const nextStatus: EnrichmentJobStatus =
       input.retryable && job.attemptCount < job.maxAttempts ? "queued" : "failed";
     assertTransition(job.status, nextStatus);
     const outcome = await this.db.prepare(`UPDATE enrichment_jobs
       SET status = ?, error_code = ?, error_message = ?, lease_owner = NULL, lease_expires_at = NULL, updated_at = ?, completed_at = ?
       WHERE id = ? AND lease_owner = ? AND status IN ('leased', 'running') AND lease_expires_at > ?`)
-      .bind(nextStatus, input.errorCode, input.errorMessage.slice(0, 1_000), now, nextStatus === "failed" ? now : null, input.jobId, input.connectorId, now)
+      .bind(nextStatus, input.errorCode, input.errorMessage.slice(0, 1_000), now, nextStatus === "failed" ? now : null, input.jobId, input.runtimeId, now)
       .run();
     if (Number(outcome.meta.changes ?? 0) !== 1) {
-      return this.classifyLeaseFailure(input.jobId, input.connectorId, now);
+      return this.classifyLeaseFailure(input.jobId, input.runtimeId, now);
     }
     return requireJob(await this.get(input.jobId));
   }
@@ -785,24 +852,27 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     return requireJob(await this.get(jobId));
   }
 
-  async recordConnectorHeartbeat(input: ConnectorHeartbeatInput) {
+  async recordRuntimeStatus(input: RuntimeStatusInput) {
     await this.ready();
     const now = timestamp(input.now);
-    await this.db.prepare(`INSERT INTO connector_heartbeats
-      (connector_id, status, version, current_job_id, run_mode, max_jobs, max_runtime_ms,
+    await this.db.prepare(`INSERT INTO runtime_status
+      (runtime_id, status, version, current_job_id, runtime_state, runtime_message, run_mode, max_jobs, max_runtime_ms,
        processed_jobs, succeeded_jobs, warning_jobs, failed_jobs, stop_reason, started_at, last_seen_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(connector_id) DO UPDATE SET status=excluded.status, version=excluded.version,
-        current_job_id=excluded.current_job_id, run_mode=excluded.run_mode,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(runtime_id) DO UPDATE SET status=excluded.status, version=excluded.version,
+        current_job_id=excluded.current_job_id, runtime_state=excluded.runtime_state,
+        runtime_message=excluded.runtime_message, run_mode=excluded.run_mode,
         max_jobs=excluded.max_jobs, max_runtime_ms=excluded.max_runtime_ms,
         processed_jobs=excluded.processed_jobs, succeeded_jobs=excluded.succeeded_jobs,
         warning_jobs=excluded.warning_jobs, failed_jobs=excluded.failed_jobs,
         stop_reason=excluded.stop_reason, last_seen_at=excluded.last_seen_at`)
       .bind(
-        input.connectorId,
+        input.runtimeId,
         input.status,
         input.version,
         input.currentJobId ?? null,
+        input.runtimeState ?? null,
+        input.runtimeMessage?.slice(0, 500) ?? null,
         input.runMode ?? null,
         input.maxJobs ?? null,
         input.maxRuntimeMs ?? null,
@@ -815,16 +885,16 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
         now,
       )
       .run();
-    const row = await this.db.prepare("SELECT * FROM connector_heartbeats WHERE connector_id = ?")
-      .bind(input.connectorId).first<D1Row>();
-    return asD1Heartbeat(row ?? {});
+    const row = await this.db.prepare("SELECT * FROM runtime_status WHERE runtime_id = ?")
+      .bind(input.runtimeId).first<D1Row>();
+    return asD1RuntimeStatus(row ?? {});
   }
 
-  async listConnectorHeartbeats() {
+  async listRuntimeStatuses() {
     await this.ready();
-    const result = await this.db.prepare("SELECT * FROM connector_heartbeats ORDER BY last_seen_at DESC")
+    const result = await this.db.prepare("SELECT * FROM runtime_status ORDER BY last_seen_at DESC")
       .all<D1Row>();
-    return result.results.map(asD1Heartbeat);
+    return result.results.map(asD1RuntimeStatus);
   }
 
   async markDocumentStale(

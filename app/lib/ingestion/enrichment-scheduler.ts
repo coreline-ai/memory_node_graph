@@ -5,12 +5,16 @@ import {
   createEvidenceBlockChunks,
   ENRICHMENT_ONTOLOGY_VERSION,
 } from "../llm/enrichment-contracts";
+import { INTEGRATED_CODEX_PROVIDER_VERSION } from "../llm/codex-runtime-status";
 import {
   getEnrichmentJobRepository,
   type EnqueueEnrichmentJobResult,
 } from "../storage/enrichment-job-repository";
 
-export const DEFAULT_CODEX_PROVIDER_VERSION = "codex-sdk-0.146.0";
+// Provider version is also the queue cut-over boundary: the integrated
+// runtime claims only these jobs and leaves the historic 통합 런타임 backlog
+// untouched until an explicit migration/reprocess is approved.
+export const DEFAULT_CODEX_PROVIDER_VERSION = INTEGRATED_CODEX_PROVIDER_VERSION;
 
 export type EnrichmentScheduleResult = {
   jobs: EnqueueEnrichmentJobResult[];

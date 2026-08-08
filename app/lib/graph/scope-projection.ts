@@ -9,6 +9,8 @@ export const GRAPH_CORPUS_NODE_BUDGET = 500;
 export const GRAPH_CORPUS_EDGE_BUDGET = 2_000;
 export const GRAPH_REPOSITORY_NODE_BUDGET = 500;
 export const GRAPH_REPOSITORY_EDGE_BUDGET = 2_000;
+export const GRAPH_DOCUMENT_NODE_BUDGET = 500;
+export const GRAPH_DOCUMENT_EDGE_BUDGET = 2_000;
 export const GRAPH_SINGLE_REPOSITORY_OVERVIEW_NODE_TARGET = 120;
 export const GRAPH_SINGLE_REPOSITORY_OVERVIEW_EDGE_TARGET = 400;
 
@@ -750,6 +752,102 @@ export function projectGraphRepository(
       omittedNodeCount: Math.max(0, reachableIds.size - selectedIds.length),
       totalEdgeCount: reachableEdges.length,
       omittedEdgeCount: Math.max(0, reachableEdges.length - edges.length),
+    },
+  };
+}
+
+/**
+ * Keeps every node mentioned by one Markdown document at the center, then
+ * fills the remaining visual budget with deterministic 1-hop and 2-hop
+ * neighbours. Only stored factual edges are returned; unlike the corpus
+ * showcase projection this scope never adds a display weave.
+ */
+export function projectGraphDocument(
+  snapshot: GraphSnapshot,
+  documentId: string,
+  options: { nodeBudget?: number; edgeBudget?: number } = {},
+): GraphSnapshot | null {
+  if (snapshot.meta.documentId !== documentId) return null;
+  const nodeBudget = Math.max(1, Math.min(
+    GRAPH_DOCUMENT_NODE_BUDGET,
+    Math.floor(options.nodeBudget ?? GRAPH_DOCUMENT_NODE_BUDGET),
+  ));
+  const edgeBudget = Math.max(1, Math.min(
+    GRAPH_DOCUMENT_EDGE_BUDGET,
+    Math.floor(options.edgeBudget ?? GRAPH_DOCUMENT_EDGE_BUDGET),
+  ));
+  const nodeById = new Map(snapshot.nodes.map((node) => [node.id, node]));
+  const seedIds = [...new Set(snapshot.meta.documentSeedNodeIds ?? [])]
+    .filter((id) => nodeById.has(id));
+  if (!seedIds.length) return null;
+
+  const allEdges = mergeEdges(snapshot.edges.filter((edge) =>
+    nodeById.has(edge.source)
+    && nodeById.has(edge.target)
+    && relationLayerFor(edge) !== "display"));
+  const adjacency = new Map<string, Array<{ id: string; edge: KnowledgeEdge }>>();
+  const degree = new Map<string, number>();
+  for (const edge of allEdges) {
+    const source = adjacency.get(edge.source) ?? [];
+    source.push({ id: edge.target, edge });
+    adjacency.set(edge.source, source);
+    const target = adjacency.get(edge.target) ?? [];
+    target.push({ id: edge.source, edge });
+    adjacency.set(edge.target, target);
+    degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
+    degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
+  }
+
+  const distance = new Map<string, number>(seedIds.map((id) => [id, 0]));
+  let frontier = [...seedIds];
+  for (let depth = 1; depth <= 2 && frontier.length; depth += 1) {
+    const next: string[] = [];
+    for (const current of frontier) {
+      for (const neighbour of adjacency.get(current) ?? []) {
+        if (distance.has(neighbour.id)) continue;
+        distance.set(neighbour.id, depth);
+        next.push(neighbour.id);
+      }
+    }
+    frontier = next;
+  }
+
+  const rankedIds = [...distance.keys()].sort((leftId, rightId) => {
+    const left = nodeById.get(leftId)!;
+    const right = nodeById.get(rightId)!;
+    return (distance.get(leftId) ?? 3) - (distance.get(rightId) ?? 3)
+      || semanticNodeScore(right, degree.get(rightId) ?? 0)
+        - semanticNodeScore(left, degree.get(leftId) ?? 0)
+      || byNodeIdentity(left, right);
+  });
+  const selectedIds = new Set(rankedIds.slice(0, nodeBudget));
+  const connectedEdges = allEdges.filter((edge) =>
+    selectedIds.has(edge.source) && selectedIds.has(edge.target));
+  connectedEdges.sort((left, right) =>
+    repositoryRelationPriority(left) - repositoryRelationPriority(right)
+    || right.confidence - left.confidence
+    || edgeKey(left).localeCompare(edgeKey(right)));
+  const edges = selectEdgesWithLayerBudget(connectedEdges, edgeBudget);
+  const nodes = rankedIds.slice(0, nodeBudget).map((id) => nodeById.get(id)!);
+
+  return {
+    nodes,
+    edges,
+    meta: {
+      ...snapshot.meta,
+      scope: "document",
+      projectionMode: "document-evidence-graph",
+      documentId,
+      documentCount: 1,
+      repositoryCount: snapshot.meta.repositoryId ? 1 : 0,
+      nodeBudget,
+      edgeBudget,
+      totalNodeCount: distance.size,
+      omittedNodeCount: Math.max(0, distance.size - nodes.length),
+      totalEdgeCount: allEdges.length,
+      omittedEdgeCount: Math.max(0, allEdges.length - edges.length),
+      projectedFactualEdgeCount: edges.length,
+      displayEdgeCount: 0,
     },
   };
 }

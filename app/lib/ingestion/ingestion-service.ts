@@ -74,6 +74,8 @@ export async function prepareMarkdownIngestion(input: {
     return {
       document: toPublicDocumentRecord(existing),
       job,
+      operation: "unchanged" as const,
+      before: { nodes: existing.nodeCount, edges: existing.edgeCount },
       unchanged: true as const,
       sameHash: true,
       existed: true,
@@ -116,6 +118,8 @@ export async function prepareMarkdownIngestion(input: {
   return {
     document,
     job,
+    operation: existing ? "updated" as const : "created" as const,
+    before: { nodes: existing?.nodeCount ?? 0, edges: existing?.edgeCount ?? 0 },
     unchanged: false as const,
     sameHash,
     existed: Boolean(existing),
@@ -138,6 +142,8 @@ export async function ingestMarkdown(input: {
     return {
       document: prepared.document,
       job: prepared.job,
+      operation: prepared.operation,
+      before: prepared.before,
       unchanged: true,
     };
   }
@@ -165,6 +171,8 @@ export async function ingestMarkdown(input: {
   return {
     document,
     job,
+    operation: prepared.operation,
+    before: prepared.before,
     enrichment,
     enrichmentSchedule,
     enrichmentWarning,

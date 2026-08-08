@@ -34,7 +34,7 @@ function safeRunId(value) {
 function parseArguments(argv) {
   const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   const options = {
-    baseUrl: process.env.ATLAS_BASE_URL?.trim() || "http://localhost:3000",
+    baseUrl: process.env.ATLAS_RUNTIME_ORIGIN?.trim() || "http://localhost:3000",
     sourceReceipt: "docs/github-full-preview-20260805.json",
     checkpoint: `docs/github-full-collection-${date}.checkpoint.json`,
     outputJson: `docs/github-full-collection-${date}.json`,

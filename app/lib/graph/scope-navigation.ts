@@ -1,4 +1,4 @@
-export type GraphNavigationScope = "corpus" | "overview" | "repository";
+export type GraphNavigationScope = "corpus" | "overview" | "repository" | "document";
 
 export type GraphPresentationReturnState = {
   viewMode: "constellation" | "nebula" | "orbit";
@@ -82,6 +82,9 @@ export function graphApiRequestFromPageUrl(pageUrl: URL): GraphApiRequest {
   if (requestedScope === "repository") {
     const repositoryId = pageUrl.searchParams.get("repositoryId");
     if (repositoryId !== null) apiUrl.searchParams.set("repositoryId", repositoryId);
+  } else if (requestedScope === "document") {
+    const documentId = pageUrl.searchParams.get("documentId");
+    if (documentId !== null) apiUrl.searchParams.set("documentId", documentId);
   }
   return { path: `${apiUrl.pathname}${apiUrl.search}`, implicitScope };
 }
@@ -89,17 +92,22 @@ export function graphApiRequestFromPageUrl(pageUrl: URL): GraphApiRequest {
 export function pageUrlForGraphScope(
   pageUrl: URL,
   scope: GraphNavigationScope,
-  repositoryId?: string,
+  resourceId?: string,
 ) {
   const next = new URL(pageUrl);
   next.searchParams.delete("showcase");
   next.searchParams.delete("fixture");
   next.searchParams.delete("node");
   next.searchParams.set("scope", scope);
-  if (scope === "repository" && repositoryId) {
-    next.searchParams.set("repositoryId", repositoryId);
+  if (scope === "repository" && resourceId) {
+    next.searchParams.set("repositoryId", resourceId);
+    next.searchParams.delete("documentId");
+  } else if (scope === "document" && resourceId) {
+    next.searchParams.set("documentId", resourceId);
+    next.searchParams.delete("repositoryId");
   } else {
     next.searchParams.delete("repositoryId");
+    next.searchParams.delete("documentId");
   }
   return next;
 }
@@ -115,6 +123,7 @@ export function pageUrlForCurrentGraph(
   if (hadPresentation && !next.searchParams.has("scope")) {
     next.searchParams.set("scope", "corpus");
     next.searchParams.delete("repositoryId");
+    next.searchParams.delete("documentId");
   }
   if (returnState) {
     next.searchParams.set("view", returnState.viewMode);

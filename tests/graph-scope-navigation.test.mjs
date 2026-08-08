@@ -8,7 +8,7 @@ import {
   pageUrlForCurrentGraph,
   pageUrlForGraphScope,
   repositoryIdFromNodeId,
-} from "../.connector-dist/app/lib/graph/scope-navigation.js";
+} from "../.runtime-dist/app/lib/graph/scope-navigation.js";
 
 test("scope가 없는 일반 그래프 URL은 전체 corpus API를 기본 요청한다", () => {
   const request = graphApiRequestFromPageUrl(
@@ -30,6 +30,28 @@ test("repository scope와 presentation fixture는 충돌 없이 API로 전달된
   );
   assert.equal(showcase.path, "/api/graph?showcase=max");
   assert.equal(showcase.implicitScope, false);
+});
+
+test("document scope는 문서 ID를 API와 URL에 보존하고 다른 scope 전환 때 정리한다", () => {
+  const documentId = "document-559649afa6df34e601c8b4ffcc02151a59ba3e41f46be1f97c76cd8d92f0ad1d";
+  const request = graphApiRequestFromPageUrl(
+    new URL(`http://localhost:3000/?scope=document&documentId=${documentId}&view=orbit&node=task%3Aone`),
+  );
+  assert.equal(request.path, `/api/graph?scope=document&documentId=${documentId}`);
+  assert.equal(request.implicitScope, false);
+
+  const documentUrl = pageUrlForGraphScope(
+    new URL("http://localhost:3000/?scope=repository&repositoryId=1322252398&view=nebula"),
+    "document",
+    documentId,
+  );
+  assert.equal(documentUrl.searchParams.get("scope"), "document");
+  assert.equal(documentUrl.searchParams.get("documentId"), documentId);
+  assert.equal(documentUrl.searchParams.has("repositoryId"), false);
+  assert.equal(documentUrl.searchParams.get("view"), "nebula");
+
+  const corpusUrl = pageUrlForGraphScope(documentUrl, "corpus");
+  assert.equal(corpusUrl.searchParams.has("documentId"), false);
 });
 
 test("scope 전환 URL은 보기·연출 상태를 보존하고 선택·fixture만 정리한다", () => {

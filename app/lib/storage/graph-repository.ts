@@ -12,11 +12,18 @@ import type {
   DocumentSourceDescriptor,
   DocumentSourceKey,
   GitHubRepositoryStorageSummary,
+  GraphDocumentSummary,
+  GraphNodeSearchResult,
   GraphSnapshot,
   IngestionJob,
 } from "../graph/model";
 import type { EnrichmentResult } from "../llm/enrichment-contracts";
+import { INTEGRATED_CODEX_PROVIDER_VERSION } from "../llm/codex-runtime-status";
 import { getEnrichmentJobRepository } from "./enrichment-job-repository";
+import {
+  GRAPH_CORPUS_EDGE_BUDGET,
+  GRAPH_CORPUS_NODE_BUDGET,
+} from "../graph/scope-projection";
 import type { DocumentBlock, ExtractedGraph } from "../markdown/extract-graph";
 import {
   parseGitHubApplyReceipt,
@@ -32,6 +39,7 @@ import {
   chunkD1Statements,
 } from "./d1-batch-policy";
 import { createGraphSnapshotCache } from "../graph/snapshot-cache";
+import { graphRevisionFromState } from "../graph/graph-revision";
 import {
   graphNodeLexicalMatch,
   type GraphRetrievalCitation,
@@ -122,6 +130,63 @@ const corpusSnapshotCacheFor = (db: D1Database) => {
   return created;
 };
 
+type GraphRevisionRows = {
+  documentResult: { count?: number; version?: string } | null;
+  entityResult: { count?: number } | null;
+  mentionResult: { count?: number } | null;
+  relationResult: { count?: number; version?: number; updatedAt?: string } | null;
+};
+
+const graphRevisionFromRows = (rows: GraphRevisionRows) => graphRevisionFromState({
+  documents: Number(rows.documentResult?.count ?? 0),
+  documentVersion: String(rows.documentResult?.version ?? ""),
+  entities: Number(rows.entityResult?.count ?? 0),
+  mentions: Number(rows.mentionResult?.count ?? 0),
+  relations: Number(rows.relationResult?.count ?? 0),
+  relationVersion: Number(rows.relationResult?.version ?? 0),
+  relationUpdatedAt: String(rows.relationResult?.updatedAt ?? ""),
+});
+
+async function graphRevisionRows(db: D1Database): Promise<GraphRevisionRows> {
+  const [documentResult, entityResult, mentionResult, relationResult] = await Promise.all([
+    db.prepare(`SELECT COUNT(*) AS count, COALESCE(MAX(updated_at), '') AS version
+      FROM documents WHERE status IN ('completed', 'unchanged')`)
+      .first<{ count: number; version: string }>(),
+    db.prepare("SELECT COUNT(*) AS count FROM entities").first<{ count: number }>(),
+    db.prepare("SELECT COUNT(*) AS count FROM entity_mentions").first<{ count: number }>(),
+    db.prepare(`SELECT COUNT(*) AS count, COALESCE(MAX(rowid), 0) AS version,
+      COALESCE(MAX(created_at), '') AS updatedAt FROM relations`)
+      .first<{ count: number; version: number; updatedAt: string }>(),
+  ]);
+  return { documentResult, entityResult, mentionResult, relationResult };
+}
+
+const memoryGraphRevision = () => {
+  const documents = [...memoryStore().documents.values()];
+  return graphRevisionFromState({
+    documents: documents.length,
+    documentVersion: documents.reduce(
+      (latest, document) => document.updatedAt > latest ? document.updatedAt : latest,
+      "",
+    ),
+    entities: documents.reduce((sum, document) => sum + document.nodeCount, 0),
+    mentions: documents.reduce((sum, document) => sum + document.nodeCount, 0),
+    relations: documents.reduce((sum, document) => sum + document.edgeCount, 0),
+    relationVersion: documents.reduce((sum, document) => sum + document.edgeCount, 0),
+    relationUpdatedAt: documents.reduce(
+      (latest, document) => document.updatedAt > latest ? document.updatedAt : latest,
+      "",
+    ),
+  });
+};
+
+export async function getGraphRevision() {
+  const db = await database();
+  if (!db) return memoryGraphRevision();
+  await ensureSchema(db);
+  return graphRevisionFromRows(await graphRevisionRows(db));
+}
+
 const documentsTableSql = (table: string, ifNotExists = false) =>
   `CREATE TABLE ${ifNotExists ? "IF NOT EXISTS " : ""}${table} (` +
   "id TEXT PRIMARY KEY, file_name TEXT NOT NULL, normalized_name TEXT NOT NULL, source TEXT NOT NULL, " +
@@ -146,12 +211,13 @@ const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS staged_entity_mentions (stage_id TEXT NOT NULL, id TEXT NOT NULL, document_id TEXT NOT NULL, entity_id TEXT NOT NULL, block_id TEXT, source_url TEXT, origin TEXT NOT NULL DEFAULT 'rule', PRIMARY KEY (stage_id, id))`,
   `CREATE TABLE IF NOT EXISTS staged_relations (stage_id TEXT NOT NULL, id TEXT NOT NULL, document_id TEXT NOT NULL, source_id TEXT NOT NULL, target_id TEXT NOT NULL, type TEXT NOT NULL, confidence REAL NOT NULL, note TEXT NOT NULL, origin TEXT NOT NULL DEFAULT 'rule', provider TEXT, provider_version TEXT, prompt_version TEXT, evidence_json TEXT, created_at TEXT, PRIMARY KEY (stage_id, id))`,
   `CREATE TABLE IF NOT EXISTS enrichment_jobs (id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, document_id TEXT NOT NULL, document_hash TEXT NOT NULL, parser_version TEXT NOT NULL, provider TEXT NOT NULL, provider_version TEXT NOT NULL, prompt_version TEXT NOT NULL, status TEXT NOT NULL, input_json TEXT NOT NULL, result_json TEXT, attempt_count INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL DEFAULT 3, lease_owner TEXT, lease_expires_at TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT)`,
-  `CREATE TABLE IF NOT EXISTS connector_heartbeats (connector_id TEXT PRIMARY KEY, status TEXT NOT NULL, version TEXT NOT NULL, current_job_id TEXT, run_mode TEXT, max_jobs INTEGER, max_runtime_ms INTEGER, processed_jobs INTEGER, succeeded_jobs INTEGER, warning_jobs INTEGER, failed_jobs INTEGER, stop_reason TEXT, started_at TEXT NOT NULL, last_seen_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS runtime_status (runtime_id TEXT PRIMARY KEY, status TEXT NOT NULL, version TEXT NOT NULL, current_job_id TEXT, runtime_state TEXT, runtime_message TEXT, run_mode TEXT, max_jobs INTEGER, max_runtime_ms INTEGER, processed_jobs INTEGER, succeeded_jobs INTEGER, warning_jobs INTEGER, failed_jobs INTEGER, stop_reason TEXT, started_at TEXT NOT NULL, last_seen_at TEXT NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS github_repositories (repository_id TEXT PRIMARY KEY, owner TEXT NOT NULL, name TEXT NOT NULL, visibility TEXT NOT NULL, is_private INTEGER NOT NULL DEFAULT 0, is_fork INTEGER NOT NULL DEFAULT 0, is_archived INTEGER NOT NULL DEFAULT 0, is_template INTEGER NOT NULL DEFAULT 0, default_branch TEXT NOT NULL, sync_enabled INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'discovered', last_seen_at TEXT NOT NULL, last_synced_at TEXT, error_code TEXT, error_message TEXT)`,
   `CREATE TABLE IF NOT EXISTS github_sync_runs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, status TEXT NOT NULL, selection_digest TEXT, manifest_digest TEXT, discovered_count INTEGER NOT NULL DEFAULT 0, selected_count INTEGER NOT NULL DEFAULT 0, changed_count INTEGER NOT NULL DEFAULT 0, unchanged_count INTEGER NOT NULL DEFAULT 0, deleted_count INTEGER NOT NULL DEFAULT 0, failed_count INTEGER NOT NULL DEFAULT 0, receipt_json TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT)`,
   `CREATE INDEX IF NOT EXISTS enrichment_jobs_claim_idx ON enrichment_jobs(status, lease_expires_at, created_at)`,
+  `CREATE INDEX IF NOT EXISTS enrichment_jobs_provider_claim_idx ON enrichment_jobs(provider_version, status, lease_expires_at, created_at)`,
   `CREATE INDEX IF NOT EXISTS enrichment_jobs_document_idx ON enrichment_jobs(document_id, created_at)`,
-  `CREATE INDEX IF NOT EXISTS connector_heartbeats_seen_idx ON connector_heartbeats(last_seen_at)`,
+  `CREATE INDEX IF NOT EXISTS runtime_status_seen_idx ON runtime_status(last_seen_at)`,
   `CREATE INDEX IF NOT EXISTS github_repositories_selection_idx ON github_repositories(sync_enabled, status)`,
   `CREATE INDEX IF NOT EXISTS github_sync_runs_status_idx ON github_sync_runs(status, created_at)`,
   `CREATE INDEX IF NOT EXISTS relations_source_idx ON relations(source_id)`,
@@ -388,6 +454,16 @@ export const toPublicDocumentRecord = (
   createdAt: document.createdAt,
   updatedAt: document.updatedAt,
   error: document.error,
+});
+
+const toGraphDocumentSummary = (document: DocumentRecord): GraphDocumentSummary => ({
+  id: document.id,
+  fileName: document.fileName,
+  sourceType: document.sourceType,
+  sourceLabel: document.sourceLabel,
+  updatedAt: document.updatedAt,
+  nodeCount: document.nodeCount,
+  edgeCount: document.edgeCount,
 });
 
 const asJob = (row: Record<string, unknown>): IngestionJob => ({
@@ -1093,10 +1169,11 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     jobs = jobResult.results.map(asJob);
   }
   const enrichmentRepository = await getEnrichmentJobRepository();
-  const [enrichmentRecords, heartbeats, enrichmentCounts] = await Promise.all([
+  const [enrichmentRecords, heartbeats, enrichmentCounts, integratedEnrichmentCounts] = await Promise.all([
     enrichmentRepository.list(undefined, 50),
-    enrichmentRepository.listConnectorHeartbeats(),
+    enrichmentRepository.listRuntimeStatuses(),
     enrichmentRepository.statusCounts(),
+    enrichmentRepository.statusCounts(INTEGRATED_CODEX_PROVIDER_VERSION),
   ]);
   const recentJobs = [...jobs].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 20);
   const enrichmentJobs: DashboardEnrichmentJob[] = enrichmentRecords
@@ -1130,13 +1207,23 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     heartbeat.status === "online" && now - Date.parse(heartbeat.lastSeenAt) <= 45_000,
   );
   const latestHeartbeat = heartbeats[0];
-  const queuedJobs = enrichmentCounts.queued;
-  const activeJobs = enrichmentCounts.leased + enrichmentCounts.running;
+  const queuedJobs = integratedEnrichmentCounts.queued;
+  const activeJobs = integratedEnrichmentCounts.leased + integratedEnrichmentCounts.running;
+  const revisionRows = db ? await graphRevisionRows(db) : null;
+  const graphRevision = revisionRows
+    ? graphRevisionFromRows(revisionRows)
+    : memoryGraphRevision();
+  const memoryNodes = !db
+    ? new Set([...memoryStore().documents.values()].flatMap((document) => document.graph.nodes.map((node) => node.id))).size
+    : 0;
+  const memoryEdges = !db
+    ? new Set([...memoryStore().documents.values()].flatMap((document) => document.graph.edges.map((edge) => `${edge.source}|${edge.target}|${edge.type}`))).size
+    : 0;
   return {
     documents: [...documents].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     jobs: recentJobs,
     enrichmentJobs,
-    connector: {
+    runtime: {
       status: onlineHeartbeats.length ? "online" : "offline",
       onlineCount: onlineHeartbeats.length,
       queuedJobs,
@@ -1160,9 +1247,15 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
       failed: documents.filter((document) => document.status === "failed").length,
       enrichmentQueued: queuedJobs,
       enrichmentActive: activeJobs,
-      enrichmentWarnings: enrichmentCounts.warning + enrichmentCounts.failed,
+      enrichmentWarnings: integratedEnrichmentCounts.warning + integratedEnrichmentCounts.failed,
+      legacyEnrichmentQueued: Math.max(0, enrichmentCounts.queued - queuedJobs),
+      storedNodes: revisionRows ? Number(revisionRows.entityResult?.count ?? 0) : memoryNodes,
+      storedEdges: revisionRows ? Number(revisionRows.relationResult?.count ?? 0) : memoryEdges,
+      projectionNodeLimit: GRAPH_CORPUS_NODE_BUDGET,
+      projectionEdgeLimit: GRAPH_CORPUS_EDGE_BUDGET,
     },
     storage: db ? "d1" : "memory",
+    graphRevision,
   };
 }
 
@@ -1253,6 +1346,10 @@ export async function getGitHubRepositoryStorageSummaries(): Promise<GitHubRepos
 
 export async function getGraphSnapshot(): Promise<GraphSnapshot> {
   const db = await database();
+  if (db) await ensureSchema(db);
+  const graphRevision = db
+    ? graphRevisionFromRows(await graphRevisionRows(db))
+    : memoryGraphRevision();
   let nodes: KnowledgeNode[] = [];
   let edges: KnowledgeEdge[] = [];
   let documentCount = 0;
@@ -1268,7 +1365,6 @@ export async function getGraphSnapshot(): Promise<GraphSnapshot> {
     nodes = [...nodeMap.values()];
     edges = [...edgeMap.values()];
   } else {
-    await ensureSchema(db);
     const [documentResult, nodeResult, edgeResult] = await Promise.all([
       db.prepare("SELECT COUNT(*) AS count FROM documents WHERE status IN ('completed', 'unchanged')").first<{ count: number }>(),
       db.prepare("SELECT DISTINCT e.* FROM entities e INNER JOIN entity_mentions m ON m.entity_id = e.id").all<Record<string, unknown>>(),
@@ -1311,6 +1407,7 @@ export async function getGraphSnapshot(): Promise<GraphSnapshot> {
         provider: "built-in",
         generatedAt: new Date().toISOString(),
         documentCount: 0,
+        graphRevision,
         message: "내장 데모 데이터입니다. 대시보드에서 Markdown을 추가할 수 있습니다.",
       },
     };
@@ -1324,6 +1421,7 @@ export async function getGraphSnapshot(): Promise<GraphSnapshot> {
       provider: "markdown-ast",
       generatedAt: new Date().toISOString(),
       documentCount,
+      graphRevision,
     },
   };
 }
@@ -1417,6 +1515,29 @@ const graphRelationQuery = async (db: D1Database, nodeIds: readonly string[], li
     .bind(...nodeIds, ...nodeIds, limit)
     .all<Record<string, unknown>>();
   return result.results.map(knowledgeEdgeFromRow);
+};
+
+const graphRelationQueryChunked = async (
+  db: D1Database,
+  nodeIds: readonly string[],
+  limit: number,
+) => {
+  const uniqueIds = [...new Set(nodeIds)];
+  const edgeMap = new Map<string, KnowledgeEdge>();
+  // D1 counts both source and target bindings. Forty IDs keep the query at
+  // 81 variables (40 + 40 + LIMIT), below the 100-variable local/remote cap.
+  for (let index = 0; index < uniqueIds.length && edgeMap.size < limit; index += 40) {
+    const chunk = uniqueIds.slice(index, index + 40);
+    const edges = await graphRelationQuery(db, chunk, Math.min(limit, 2_400));
+    for (const edge of edges) {
+      edgeMap.set(`${edge.source}|${edge.target}|${edge.type}`, edge);
+    }
+  }
+  return [...edgeMap.values()]
+    .sort((left, right) => right.confidence - left.confidence
+      || `${left.source}|${left.target}|${left.type}`
+        .localeCompare(`${right.source}|${right.target}|${right.type}`))
+    .slice(0, limit);
 };
 
 const loadGraphNodesById = async (db: D1Database, nodeIds: readonly string[]) => {
@@ -1589,6 +1710,84 @@ export async function getGraphRetrievalSource(
   };
 }
 
+export async function listGraphDocuments(limit = 8): Promise<GraphDocumentSummary[]> {
+  const boundedLimit = Math.max(1, Math.min(12, Math.floor(limit)));
+  const db = await database();
+  if (!db) {
+    return [...memoryStore().documents.values()]
+      .filter((document) => document.status === "completed" || document.status === "unchanged")
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id))
+      .slice(0, boundedLimit)
+      .map(toPublicDocumentRecord)
+      .map(toGraphDocumentSummary);
+  }
+  await ensureSchema(db);
+  const result = await db.prepare(`SELECT * FROM documents
+    WHERE status IN ('completed', 'unchanged')
+    ORDER BY updated_at DESC, id
+    LIMIT ?`).bind(boundedLimit).all<Record<string, unknown>>();
+  return result.results
+    .map(asStoredDocument)
+    .map(toPublicDocumentRecord)
+    .map(toGraphDocumentSummary);
+}
+
+export async function searchGraphNodeIndex(
+  query: NormalizedGraphQuestion,
+  limit = 8,
+): Promise<GraphNodeSearchResult[]> {
+  const boundedLimit = Math.max(1, Math.min(12, Math.floor(limit)));
+  const source = await getGraphRetrievalSource(query);
+  const candidates = source.nodes
+    .map((node) => ({ node, score: graphNodeLexicalMatch(node, query).score }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score || left.node.label.localeCompare(right.node.label)
+      || left.node.id.localeCompare(right.node.id))
+    .slice(0, boundedLimit);
+  if (!candidates.length) return [];
+
+  const db = await database();
+  const documentByNodeId = new Map<string, GraphDocumentSummary>();
+  if (!db) {
+    const documents = [...memoryStore().documents.values()]
+      .filter((document) => document.status === "completed" || document.status === "unchanged")
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id));
+    for (const candidate of candidates) {
+      const document = documents.find((item) => item.graph.nodes.some((node) => node.id === candidate.node.id));
+      if (document) {
+        documentByNodeId.set(
+          candidate.node.id,
+          toGraphDocumentSummary(toPublicDocumentRecord(document)),
+        );
+      }
+    }
+  } else {
+    await ensureSchema(db);
+    const candidateIds = candidates.map((item) => item.node.id);
+    const result = await db.prepare(`SELECT mention.entity_id, document.*
+      FROM entity_mentions mention
+      INNER JOIN documents document ON document.id = mention.document_id
+      WHERE mention.entity_id IN (${candidateIds.map(() => "?").join(",")})
+        AND document.status IN ('completed', 'unchanged')
+      ORDER BY document.updated_at DESC, document.id`)
+      .bind(...candidateIds)
+      .all<Record<string, unknown>>();
+    for (const row of result.results) {
+      const nodeId = String(row.entity_id);
+      if (documentByNodeId.has(nodeId)) continue;
+      documentByNodeId.set(
+        nodeId,
+        toGraphDocumentSummary(toPublicDocumentRecord(asStoredDocument(row))),
+      );
+    }
+  }
+
+  return candidates.map((candidate) => ({
+    ...candidate,
+    document: documentByNodeId.get(candidate.node.id),
+  }));
+}
+
 /**
  * Loads only the graph slice required by the public projection. The previous
  * implementation loaded the complete corpus for every overview/repository
@@ -1596,23 +1795,55 @@ export async function getGraphRetrievalSource(
  * reduced to at most 500 nodes.
  */
 export async function getGraphSnapshotForScope(input: {
-  scope: "corpus" | "overview" | "repository";
+  scope: "corpus" | "overview" | "repository" | "document";
   repositoryId?: string;
+  documentId?: string;
 }): Promise<GraphSnapshot> {
   const db = await database();
-  if (!db) return getGraphSnapshot();
+  if (!db) {
+    const snapshot = await getGraphSnapshot();
+    if (input.scope !== "document") return snapshot;
+    const document = input.documentId
+      ? memoryStore().documents.get(input.documentId)
+      : undefined;
+    if (!document) {
+      return {
+        nodes: [],
+        edges: [],
+        meta: {
+          ...snapshot.meta,
+          scope: "document",
+          documentId: input.documentId,
+          documentSeedNodeIds: [],
+        },
+      };
+    }
+    return {
+      ...snapshot,
+      meta: {
+        ...snapshot.meta,
+        scope: "document",
+        documentId: document.id,
+        documentName: document.fileName,
+        documentSourceLabel: toPublicDocumentRecord(document).sourceLabel,
+        documentUpdatedAt: document.updatedAt,
+        documentSeedNodeIds: document.graph.nodes.map((node) => node.id),
+        repositoryId: document.sourceDescriptor.type === "github"
+          ? document.sourceDescriptor.repositoryId
+          : undefined,
+      },
+    };
+  }
   await ensureSchema(db);
-  const [documentResult, corpusNodeResult, corpusEdgeResult, repositoryCountResult] = await Promise.all([
-    db.prepare(`SELECT COUNT(*) AS count, COALESCE(MAX(updated_at), '') AS version
-      FROM documents WHERE status IN ('completed', 'unchanged')`)
-      .first<{ count: number; version: string }>(),
-    db.prepare(`SELECT COUNT(*) AS count, COALESCE(MAX(rowid), 0) AS version
-      FROM entities`).first<{ count: number; version: number }>(),
-    db.prepare(`SELECT COUNT(*) AS count, COALESCE(MAX(rowid), 0) AS version
-      FROM relations`).first<{ count: number; version: number }>(),
+  const [revisionRows, repositoryCountResult] = await Promise.all([
+    graphRevisionRows(db),
     db.prepare("SELECT COUNT(*) AS count FROM entities WHERE id LIKE 'repository:github:%'")
       .first<{ count: number }>(),
   ]);
+  const documentResult = revisionRows.documentResult;
+  const corpusNodeResult = revisionRows.entityResult;
+  const corpusEdgeResult = revisionRows.relationResult;
+  const graphRevision = graphRevisionFromRows(revisionRows);
   const snapshotFromResults = (
     nodeResult: D1Result<Record<string, unknown>>,
     edgeResult: D1Result<Record<string, unknown>>,
@@ -1631,20 +1862,87 @@ export async function getGraphSnapshotForScope(input: {
         repositoryCount: Number(repositoryCountResult?.count ?? 0),
         corpusNodeCount: Number(corpusNodeResult?.count ?? 0),
         corpusEdgeCount: Number(corpusEdgeResult?.count ?? 0),
+        graphRevision,
       },
     };
   };
 
+  if (input.scope === "document") {
+    const documentRow = input.documentId
+      ? await db.prepare(`SELECT * FROM documents
+          WHERE id = ? AND status IN ('completed', 'unchanged')`)
+        .bind(input.documentId)
+        .first<Record<string, unknown>>()
+      : null;
+    if (!documentRow) {
+      return {
+        nodes: [],
+        edges: [],
+        meta: {
+          source: "documents",
+          provider: "markdown-ast",
+          generatedAt: new Date().toISOString(),
+          documentCount: Number(documentResult?.count ?? 0),
+          repositoryCount: Number(repositoryCountResult?.count ?? 0),
+          corpusNodeCount: Number(corpusNodeResult?.count ?? 0),
+          corpusEdgeCount: Number(corpusEdgeResult?.count ?? 0),
+          graphRevision,
+          scope: "document",
+          documentId: input.documentId,
+          documentSeedNodeIds: [],
+        },
+      };
+    }
+    const storedDocument = asStoredDocument(documentRow);
+    const mentionResult = await db.prepare(`SELECT DISTINCT entity_id
+      FROM entity_mentions WHERE document_id = ? ORDER BY entity_id`)
+      .bind(storedDocument.id)
+      .all<{ entity_id: string }>();
+    const seedIds = mentionResult.results.map((row) => String(row.entity_id));
+    const firstHopEdges = await graphRelationQueryChunked(db, seedIds, 8_000);
+    const seedIdSet = new Set(seedIds);
+    const firstHopIds = [...new Set(firstHopEdges.flatMap((edge) => [edge.source, edge.target]))]
+      .filter((id) => !seedIdSet.has(id))
+      .slice(0, 800);
+    const secondHopEdges = await graphRelationQueryChunked(db, firstHopIds, 8_000);
+    const firstHopIdSet = new Set(firstHopIds);
+    const secondHopIds = [...new Set(secondHopEdges.flatMap((edge) => [edge.source, edge.target]))]
+      .filter((id) => !seedIdSet.has(id) && !firstHopIdSet.has(id))
+      .slice(0, 1_200);
+    const allowedIds = new Set([...seedIds, ...firstHopIds, ...secondHopIds]);
+    const edgeMap = new Map<string, KnowledgeEdge>();
+    for (const edge of [...firstHopEdges, ...secondHopEdges]) {
+      if (!allowedIds.has(edge.source) || !allowedIds.has(edge.target)) continue;
+      edgeMap.set(`${edge.source}|${edge.target}|${edge.type}`, edge);
+    }
+    const nodes = await loadGraphNodesById(db, [...allowedIds]);
+    return {
+      nodes,
+      edges: [...edgeMap.values()],
+      meta: {
+        source: "documents",
+        provider: "markdown-ast",
+        generatedAt: new Date().toISOString(),
+        documentCount: Number(documentResult?.count ?? 0),
+        repositoryCount: Number(repositoryCountResult?.count ?? 0),
+        corpusNodeCount: Number(corpusNodeResult?.count ?? 0),
+        corpusEdgeCount: Number(corpusEdgeResult?.count ?? 0),
+        graphRevision,
+        scope: "document",
+        documentId: storedDocument.id,
+        documentName: storedDocument.fileName,
+        documentSourceLabel: toPublicDocumentRecord(storedDocument).sourceLabel,
+        documentUpdatedAt: storedDocument.updatedAt,
+        documentSeedNodeIds: seedIds,
+        repositoryId: storedDocument.sourceDescriptor.type === "github"
+          ? storedDocument.sourceDescriptor.repositoryId
+          : undefined,
+      },
+    };
+  }
+
   if (input.scope === "corpus") {
-    const fingerprint = [
-      documentResult?.count ?? 0,
-      documentResult?.version ?? "",
-      corpusNodeResult?.count ?? 0,
-      corpusNodeResult?.version ?? 0,
-      corpusEdgeResult?.count ?? 0,
-      corpusEdgeResult?.version ?? 0,
-      repositoryCountResult?.count ?? 0,
-    ].join(":");
+    const fingerprint = `${graphRevision}:${repositoryCountResult?.count ?? 0}`;
     const corpusSelectionCte = `WITH degree AS (
       SELECT id, COUNT(*) AS degree FROM (
         SELECT source_id AS id FROM relations

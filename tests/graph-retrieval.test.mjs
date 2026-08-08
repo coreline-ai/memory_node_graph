@@ -7,7 +7,7 @@ import {
   normalizeGraphQueryLimits,
   normalizeGraphQuestion,
   retrieveGraphContext,
-} from "../.connector-dist/app/lib/graph/graph-retrieval.js";
+} from "../.runtime-dist/app/lib/graph/graph-retrieval.js";
 
 const node = (id, label, summary, tags = []) => ({
   id,

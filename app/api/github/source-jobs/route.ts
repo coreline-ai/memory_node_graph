@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     const repository = await getGitHubSourceJobRepository();
     const [jobs, capabilities, storedRepositories] = await Promise.all([
       repository.list(),
-      repository.listCapabilities(),
+      repository.listRuntimeCapabilities(),
       getGitHubRepositoryStorageSummaries(),
     ]);
     const latestPreview = [...jobs]

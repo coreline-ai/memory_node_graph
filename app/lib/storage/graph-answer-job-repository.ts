@@ -11,8 +11,8 @@ const DEFAULT_LEASE_MS = 60_000;
 export const MAX_MANUAL_GRAPH_ANSWER_RETRIES = 2;
 
 type EnqueueOptions = { now?: string; maxAttempts?: number };
-type ClaimOptions = { connectorId: string; leaseDurationMs?: number; now?: string };
-type LeaseMutation = { jobId: string; connectorId: string; now?: string };
+type ClaimOptions = { runtimeId: string; leaseDurationMs?: number; now?: string };
+type LeaseMutation = { jobId: string; runtimeId: string; now?: string };
 type RenewLeaseInput = LeaseMutation & { leaseDurationMs?: number };
 type CompleteInput = LeaseMutation & { result: GraphAnswerResult };
 type FailInput = LeaseMutation & {
@@ -86,9 +86,9 @@ const requireJob = (job: GraphAnswerJobRecord | null) => {
   return job;
 };
 
-const assertLease = (job: GraphAnswerJobRecord, connectorId: string, now: string) => {
-  if (!isLeaseStatus(job.status) || job.leaseOwner !== connectorId) {
-    throw new GraphAnswerRepositoryError("lease_conflict", "현재 Connector가 소유한 답변 작업 Lease가 아닙니다.");
+const assertLease = (job: GraphAnswerJobRecord, runtimeId: string, now: string) => {
+  if (!isLeaseStatus(job.status) || job.leaseOwner !== runtimeId) {
+    throw new GraphAnswerRepositoryError("lease_conflict", "현재 통합 런타임가 소유한 답변 작업 Lease가 아닙니다.");
   }
   if (isExpired(job, now)) {
     throw new GraphAnswerRepositoryError("lease_expired", "그래프 답변 작업 Lease가 만료되었습니다.");
@@ -152,7 +152,7 @@ export class MemoryGraphAnswerJobRepository implements GraphAnswerJobRepository 
       assertTransition(job.status, "leased");
       job.status = "leased";
       job.attemptCount += 1;
-      job.leaseOwner = options.connectorId;
+      job.leaseOwner = options.runtimeId;
       job.leaseExpiresAt = expiresAt(now, options.leaseDurationMs);
       job.errorCode = undefined;
       job.errorMessage = undefined;
@@ -165,7 +165,7 @@ export class MemoryGraphAnswerJobRepository implements GraphAnswerJobRepository 
   async renewLease(input: RenewLeaseInput) {
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const stored = requireJob(this.jobs.get(job.id) ?? null);
     stored.leaseExpiresAt = expiresAt(now, input.leaseDurationMs);
     stored.updatedAt = now;
@@ -175,7 +175,7 @@ export class MemoryGraphAnswerJobRepository implements GraphAnswerJobRepository 
   async markRunning(input: LeaseMutation) {
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     if (job.status !== "leased") {
       throw new GraphAnswerRepositoryError("invalid_input", "leased 답변 작업만 running으로 전환할 수 있습니다.");
     }
@@ -190,7 +190,7 @@ export class MemoryGraphAnswerJobRepository implements GraphAnswerJobRepository 
   async complete(input: CompleteInput) {
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     assertTransition(job.status, "completed");
     const stored = requireJob(this.jobs.get(job.id) ?? null);
     stored.status = "completed";
@@ -207,7 +207,7 @@ export class MemoryGraphAnswerJobRepository implements GraphAnswerJobRepository 
   async fail(input: FailInput) {
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const nextStatus: GraphAnswerJobStatus = input.retryable && job.attemptCount < job.maxAttempts
       ? "queued"
       : "failed";
@@ -383,7 +383,7 @@ export class D1GraphAnswerJobRepository implements GraphAnswerJobRepository {
         WHERE id = ? AND attempt_count = ?
           AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))`)
         .bind(
-          options.connectorId,
+          options.runtimeId,
           expiresAt(now, options.leaseDurationMs),
           now,
           job.id,
@@ -395,9 +395,9 @@ export class D1GraphAnswerJobRepository implements GraphAnswerJobRepository {
     return null;
   }
 
-  private async classifyLeaseFailure(jobId: string, connectorId: string, now: string): Promise<never> {
+  private async classifyLeaseFailure(jobId: string, runtimeId: string, now: string): Promise<never> {
     const job = requireJob(await this.get(jobId));
-    assertLease(job, connectorId, now);
+    assertLease(job, runtimeId, now);
     throw new GraphAnswerRepositoryError("lease_conflict", "동시 상태 변경으로 답변 작업 Lease 갱신에 실패했습니다.");
   }
 
@@ -406,9 +406,9 @@ export class D1GraphAnswerJobRepository implements GraphAnswerJobRepository {
     const now = timestamp(input.now);
     const outcome = await this.db.prepare(`UPDATE graph_answer_jobs SET lease_expires_at = ?, updated_at = ?
       WHERE id = ? AND lease_owner = ? AND status IN ('leased', 'running') AND lease_expires_at > ?`)
-      .bind(expiresAt(now, input.leaseDurationMs), now, input.jobId, input.connectorId, now).run();
+      .bind(expiresAt(now, input.leaseDurationMs), now, input.jobId, input.runtimeId, now).run();
     if (Number(outcome.meta.changes ?? 0) !== 1) {
-      return this.classifyLeaseFailure(input.jobId, input.connectorId, now);
+      return this.classifyLeaseFailure(input.jobId, input.runtimeId, now);
     }
     return requireJob(await this.get(input.jobId));
   }
@@ -419,10 +419,10 @@ export class D1GraphAnswerJobRepository implements GraphAnswerJobRepository {
     const outcome = await this.db.prepare(`UPDATE graph_answer_jobs
       SET status = 'running', started_at = COALESCE(started_at, ?), updated_at = ?
       WHERE id = ? AND lease_owner = ? AND status = 'leased' AND lease_expires_at > ?`)
-      .bind(now, now, input.jobId, input.connectorId, now).run();
+      .bind(now, now, input.jobId, input.runtimeId, now).run();
     if (Number(outcome.meta.changes ?? 0) !== 1) {
       const job = requireJob(await this.get(input.jobId));
-      assertLease(job, input.connectorId, now);
+      assertLease(job, input.runtimeId, now);
       throw new GraphAnswerRepositoryError("invalid_input", "leased 답변 작업만 running으로 전환할 수 있습니다.");
     }
     return requireJob(await this.get(input.jobId));
@@ -435,9 +435,9 @@ export class D1GraphAnswerJobRepository implements GraphAnswerJobRepository {
       SET status = 'completed', result_json = ?, error_code = NULL, error_message = NULL,
           lease_owner = NULL, lease_expires_at = NULL, updated_at = ?, completed_at = ?
       WHERE id = ? AND lease_owner = ? AND status IN ('leased', 'running') AND lease_expires_at > ?`)
-      .bind(JSON.stringify(input.result), now, now, input.jobId, input.connectorId, now).run();
+      .bind(JSON.stringify(input.result), now, now, input.jobId, input.runtimeId, now).run();
     if (Number(outcome.meta.changes ?? 0) !== 1) {
-      return this.classifyLeaseFailure(input.jobId, input.connectorId, now);
+      return this.classifyLeaseFailure(input.jobId, input.runtimeId, now);
     }
     return requireJob(await this.get(input.jobId));
   }
@@ -446,7 +446,7 @@ export class D1GraphAnswerJobRepository implements GraphAnswerJobRepository {
     await this.ready();
     const now = timestamp(input.now);
     const job = requireJob(await this.get(input.jobId));
-    assertLease(job, input.connectorId, now);
+    assertLease(job, input.runtimeId, now);
     const nextStatus: GraphAnswerJobStatus = input.retryable && job.attemptCount < job.maxAttempts
       ? "queued"
       : "failed";
@@ -461,11 +461,11 @@ export class D1GraphAnswerJobRepository implements GraphAnswerJobRepository {
         now,
         nextStatus === "failed" ? now : null,
         input.jobId,
-        input.connectorId,
+        input.runtimeId,
         now,
       ).run();
     if (Number(outcome.meta.changes ?? 0) !== 1) {
-      return this.classifyLeaseFailure(input.jobId, input.connectorId, now);
+      return this.classifyLeaseFailure(input.jobId, input.runtimeId, now);
     }
     return requireJob(await this.get(input.jobId));
   }

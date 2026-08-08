@@ -1,14 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ConnectorRunner } from "../.connector-dist/connector/runner.js";
-import { parseConnectorRunOptions } from "../.connector-dist/connector/run-policy.js";
+import { IntegratedRuntimeRunner } from "../.runtime-dist/server/runtime/runner.js";
+import { parseRuntimeRunOptions } from "../.runtime-dist/server/runtime/run-policy.js";
 
 const config = {
   baseUrl: "http://localhost:3000",
-  token: "",
-  connectorId: "connector-runner-test",
+  runtimeId: "runtime-runner-test",
   pollIntervalMs: 1,
-  heartbeatIntervalMs: 10_000,
+  statusIntervalMs: 10_000,
   leaseDurationMs: 90_000,
   codexTimeoutMs: 180_000,
   githubTimeoutMs: 120_000,
@@ -18,7 +17,7 @@ const config = {
   codexPath: undefined,
   ghPath: undefined,
   deleteSessionAfterRun: true,
-  version: "atlas-connector-test",
+  version: "atlas-runtime-test",
 };
 
 const job = (id) => ({
@@ -46,7 +45,7 @@ const job = (id) => ({
   attemptCount: 1,
   maxAttempts: 3,
   manualRetryCount: 0,
-  leaseOwner: "connector-runner-test",
+  leaseOwner: "runtime-runner-test",
   leaseExpiresAt: new Date(Date.now() + 90_000).toISOString(),
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -87,13 +86,13 @@ const graphAnswerJob = () => ({
   attemptCount: 1,
   maxAttempts: 3,
   manualRetryCount: 0,
-  leaseOwner: "connector-runner-test",
+  leaseOwner: "runtime-runner-test",
   leaseExpiresAt: new Date(Date.now() + 90_000).toISOString(),
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 });
 
-test("Connector runner processes jobs sequentially with concurrency one", async () => {
+test("Runtime runner processes jobs sequentially with concurrency one", async () => {
   const queue = [job("job-1"), job("job-2")];
   const events = [];
   let runner;
@@ -107,7 +106,7 @@ test("Connector runner processes jobs sequentially with concurrency one", async 
     async renewLease(id) { events.push(`renew:${id}`); return job(id); },
     async submit(id) { events.push(`submit:${id}`); return { ...job(id), status: "completed" }; },
     async fail(id) { events.push(`fail:${id}`); return { ...job(id), status: "failed" }; },
-    async heartbeat(status) { events.push(`heartbeat:${status}`); return { lastSeenAt: new Date().toISOString() }; },
+    async reportRuntimeStatus(status) { events.push(`heartbeat:${status}`); return { lastSeenAt: new Date().toISOString() }; },
   };
   const engine = {
     async checkAuthentication() { events.push("auth"); },
@@ -116,7 +115,7 @@ test("Connector runner processes jobs sequentially with concurrency one", async 
       return resultFor(candidate);
     },
   };
-  runner = new ConnectorRunner(config, { client, engine });
+  runner = new IntegratedRuntimeRunner(config, { client, engine });
   await runner.run();
   assert.deepEqual(events, [
     "heartbeat:online",
@@ -131,7 +130,7 @@ test("Connector runner processes jobs sequentially with concurrency one", async 
   ]);
 });
 
-test("Connector shutdown aborts active work and reports a retryable failure", async () => {
+test("통합 런타임 shutdown aborts active work and reports a retryable failure", async () => {
   const candidate = job("job-abort");
   const failures = [];
   const client = {
@@ -143,7 +142,7 @@ test("Connector shutdown aborts active work and reports a retryable failure", as
       failures.push({ id, failure });
       return { ...candidate, status: "queued" };
     },
-    async heartbeat() { return { lastSeenAt: new Date().toISOString() }; },
+    async reportRuntimeStatus() { return { lastSeenAt: new Date().toISOString() }; },
   };
   const engine = {
     async checkAuthentication() {},
@@ -152,7 +151,7 @@ test("Connector shutdown aborts active work and reports a retryable failure", as
       throw new Error("aborted");
     },
   };
-  const runner = new ConnectorRunner(config, { client, engine });
+  const runner = new IntegratedRuntimeRunner(config, { client, engine });
   const running = runner.run({ once: true });
   setTimeout(() => runner.stop(), 5);
   await running;
@@ -161,7 +160,7 @@ test("Connector shutdown aborts active work and reports a retryable failure", as
   assert.equal(failures[0].failure.retryable, true);
 });
 
-test("Connector runner는 그래프 답변을 일반 관계 보강보다 먼저 구조화 처리한다", async () => {
+test("Runtime runner는 그래프 답변을 일반 관계 보강보다 먼저 구조화 처리한다", async () => {
   const candidate = graphAnswerJob();
   const events = [];
   let claimed = false;
@@ -171,7 +170,7 @@ test("Connector runner는 그래프 답변을 일반 관계 보강보다 먼저 
     async renewLease() {},
     async submit() {},
     async fail() {},
-    async heartbeat(status) { events.push(`heartbeat:${status}`); return { lastSeenAt: new Date().toISOString() }; },
+    async reportRuntimeStatus(status) { events.push(`heartbeat:${status}`); return { lastSeenAt: new Date().toISOString() }; },
     async claimGraphAnswer() {
       events.push("claim-answer");
       if (claimed) return null;
@@ -203,7 +202,7 @@ test("Connector runner는 그래프 답변을 일반 관계 보강보다 먼저 
       };
     },
   };
-  const runner = new ConnectorRunner(config, { client, engine });
+  const runner = new IntegratedRuntimeRunner(config, { client, engine });
   await runner.run({ once: true });
   assert.deepEqual(events, [
     "heartbeat:online",
@@ -226,7 +225,7 @@ test("그래프 답변 timeout은 활성 SDK 호출을 중단하고 작업을 �
     async renewLease() {},
     async submit() {},
     async fail() {},
-    async heartbeat() { return { lastSeenAt: new Date().toISOString(), queuedJobs: failures.length ? 1 : 0 }; },
+    async reportRuntimeStatus() { return { lastSeenAt: new Date().toISOString(), queuedJobs: failures.length ? 1 : 0 }; },
     async claimGraphAnswer() {
       if (claimed) return null;
       claimed = true;
@@ -248,7 +247,7 @@ test("그래프 답변 timeout은 활성 SDK 호출을 중단하고 작업을 �
       throw new Error("graph answer timeout");
     },
   };
-  const runner = new ConnectorRunner(config, { client, engine });
+  const runner = new IntegratedRuntimeRunner(config, { client, engine });
   const receipt = await runner.run({ maxJobs: 1, maxRuntimeMs: 20, stopWhenIdle: true });
   assert.equal(receipt.stopReason, "runtime_limit");
   assert.equal(receipt.failedJobs, 1);
@@ -257,7 +256,7 @@ test("그래프 답변 timeout은 활성 SDK 호출을 중단하고 작업을 �
   assert.equal(failures[0].failure.retryable, true);
 });
 
-test("Connector runner는 GitHub discovery를 일반 보강보다 먼저 단일 처리한다", async () => {
+test("Runtime runner는 GitHub discovery를 일반 보강보다 먼저 단일 처리한다", async () => {
   const events = [];
   const source = {
     id: "github-source:discovery:runner-test",
@@ -307,8 +306,8 @@ test("Connector runner는 GitHub discovery를 일반 보강보다 먼저 단일 
     async renewLease() {},
     async submit() {},
     async fail() {},
-    async heartbeat(status) { events.push(`heartbeat:${status}`); return { lastSeenAt: new Date().toISOString() }; },
-    async reportGitHubCapability() { events.push("github-capability"); return capability; },
+    async reportRuntimeStatus(status) { events.push(`heartbeat:${status}`); return { lastSeenAt: new Date().toISOString() }; },
+    async reportGitHubRuntimeStatus() { events.push("github-capability"); return capability; },
     async claimGitHubSource() {
       events.push("claim-github");
       if (claimed) return null;
@@ -328,7 +327,7 @@ test("Connector runner는 GitHub discovery를 일반 보강보다 먼저 단일 
     async checkCapability() { events.push("check-github"); return capability; },
     async executeJob() { events.push("execute-github"); return result; },
   };
-  const runner = new ConnectorRunner(config, { client, engine, sourceEngine });
+  const runner = new IntegratedRuntimeRunner(config, { client, engine, sourceEngine });
   await runner.run({ once: true });
   assert.deepEqual(events, [
     "heartbeat:online",
@@ -344,14 +343,14 @@ test("Connector runner는 GitHub discovery를 일반 보강보다 먼저 단일 
 });
 
 test("제한 실행 CLI는 기본 연속 모드와 0·1개 안전 상한을 구분한다", () => {
-  assert.deepEqual(parseConnectorRunOptions([], {}), {
+  assert.deepEqual(parseRuntimeRunOptions([], {}), {
     once: false,
     maxJobs: undefined,
     maxRuntimeMs: undefined,
     enrichmentOnly: false,
     stopWhenIdle: false,
   });
-  assert.deepEqual(parseConnectorRunOptions([
+  assert.deepEqual(parseRuntimeRunOptions([
     "--max-jobs=0",
     "--max-runtime-ms",
     "1000",
@@ -363,13 +362,13 @@ test("제한 실행 CLI는 기본 연속 모드와 0·1개 안전 상한을 구�
     enrichmentOnly: true,
     stopWhenIdle: true,
   });
-  assert.equal(parseConnectorRunOptions(["--once"], {}).maxJobs, 1);
-  const batch = parseConnectorRunOptions(["--batch", "--max-jobs=5"], {});
+  assert.equal(parseRuntimeRunOptions(["--once"], {}).maxJobs, 1);
+  const batch = parseRuntimeRunOptions(["--batch", "--max-jobs=5"], {});
   assert.equal(batch.maxJobs, 5);
   assert.equal(batch.maxRuntimeMs, 300_000);
   assert.equal(batch.stopWhenIdle, true);
   assert.throws(
-    () => parseConnectorRunOptions(["--max-jobs=101"], {}),
+    () => parseRuntimeRunOptions(["--max-jobs=101"], {}),
     /0~100/,
   );
 });
@@ -382,7 +381,7 @@ test("max jobs 0은 작업을 claim하지 않는 dry-run 영수증을 반환한�
     async renewLease() {},
     async submit() {},
     async fail() {},
-    async heartbeat(status) {
+    async reportRuntimeStatus(status) {
       events.push(`heartbeat:${status}`);
       return { lastSeenAt: new Date().toISOString(), queuedJobs: 3, activeJobs: 0 };
     },
@@ -391,7 +390,7 @@ test("max jobs 0은 작업을 claim하지 않는 dry-run 영수증을 반환한�
     async checkAuthentication() { events.push("auth"); },
     async enrich() { throw new Error("must not run"); },
   };
-  const runner = new ConnectorRunner(config, { client, engine });
+  const runner = new IntegratedRuntimeRunner(config, { client, engine });
   const receipt = await runner.run({ maxJobs: 0, enrichmentOnly: true, stopWhenIdle: true });
   assert.deepEqual(events, ["heartbeat:online", "heartbeat:offline"]);
   assert.equal(receipt.stopReason, "dry_run");
@@ -412,7 +411,7 @@ test("max jobs N은 정확한 수량만 순차 처리하고 잔여 대기열 영
       return { ...job(id), status: id === "bounded-2" ? "warning" : "completed" };
     },
     async fail() { throw new Error("fail must not run"); },
-    async heartbeat() {
+    async reportRuntimeStatus() {
       return { lastSeenAt: new Date().toISOString(), queuedJobs: queue.length, activeJobs: 0 };
     },
   };
@@ -420,7 +419,7 @@ test("max jobs N은 정확한 수량만 순차 처리하고 잔여 대기열 영
     async checkAuthentication() {},
     async enrich(candidate) { return resultFor(candidate); },
   };
-  const runner = new ConnectorRunner(config, { client, engine });
+  const runner = new IntegratedRuntimeRunner(config, { client, engine });
   const receipt = await runner.run({ maxJobs: 2, enrichmentOnly: true, stopWhenIdle: true });
   assert.deepEqual(events, [
     "start:bounded-1",
@@ -455,7 +454,7 @@ test("max runtime 도달은 활성 작업을 중단하고 재시도 가능한 �
       failures.push({ id, failure });
       return { ...candidate, status: "queued" };
     },
-    async heartbeat() {
+    async reportRuntimeStatus() {
       return { lastSeenAt: new Date().toISOString(), queuedJobs: failures.length ? 1 : 0, activeJobs: 0 };
     },
   };
@@ -466,7 +465,7 @@ test("max runtime 도달은 활성 작업을 중단하고 재시도 가능한 �
       throw new Error("runtime limit");
     },
   };
-  const runner = new ConnectorRunner(config, { client, engine });
+  const runner = new IntegratedRuntimeRunner(config, { client, engine });
   const receipt = await runner.run({
     maxJobs: 1,
     maxRuntimeMs: 20,

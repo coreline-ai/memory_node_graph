@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAtlasConnectorAccess } from "../../../../lib/auth/connector-access";
+import { requireAtlasRuntimeAccess } from "../../../../lib/auth/runtime-access";
 import { enrichmentApiError, readLimitedJson } from "../../../../lib/http/enrichment-api";
 import { validateEnrichmentResult } from "../../../../lib/llm/enrichment-result-validator";
 import { getEnrichmentJobRepository } from "../../../../lib/storage/enrichment-job-repository";
@@ -8,7 +8,7 @@ import { findDocumentById, mergeMemoryEnrichmentResult } from "../../../../lib/s
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
-  const access = await requireAtlasConnectorAccess(request, { limitPerMinute: 120 });
+  const access = await requireAtlasRuntimeAccess(request, { limitPerMinute: 120 });
   if ("response" in access) return access.response;
   try {
     const { jobId } = await context.params;
@@ -19,7 +19,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     const document = await findDocumentById(job.documentId);
     const completed = await repository.complete({
       jobId,
-      connectorId: access.connectorId,
+      runtimeId: access.runtimeId,
       currentDocumentHash: document?.hash ?? "",
       result,
     });

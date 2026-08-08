@@ -366,7 +366,7 @@ test("HTML과 prompt injection 문구는 명령으로 실행되지 않고 안전
     },
   );
 
-  assert.equal(graph.nodes.some((node) => /runConnectorAndUploadSecrets|script/i.test(node.label)), false);
+  assert.equal(graph.nodes.some((node) => /run통합 런타임AndUploadSecrets|script/i.test(node.label)), false);
   assert.equal(graph.nodes.some((node) => node.tags.includes("reference")), false);
   assert.equal(graph.edges.some((edge) => /javascript:|malicious/i.test(edge.note)), false);
   assert.ok(graph.nodes.every((node) => !node.tags.includes("completed") && !node.tags.includes("pending")));

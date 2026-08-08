@@ -218,7 +218,7 @@ export async function validateGitHubApplySubmission(
     || summary.unchangedCount !== applyPayload.reusedDocuments.length
     || summary.deletedCount !== 0
     || summary.failedCount !== 0
-  ) throw new GitHubSourceContractError("Connector apply summary가 다운로드 payload와 일치하지 않습니다.");
+  ) throw new GitHubSourceContractError("통합 런타임 apply summary가 다운로드 payload와 일치하지 않습니다.");
   return {
     jobId: job.id,
     idempotencyKey: job.idempotencyKey,

@@ -79,6 +79,7 @@ export const githubSourceJobs = sqliteTable("github_source_jobs", {
   kind: text("kind").notNull(),
   owner: text("owner").notNull(),
   repositoryId: text("repository_id"),
+  runtimeVersion: text("runtime_version"),
   status: text("status").notNull(),
   input: text("input_json").notNull(),
   result: text("result_json"),
@@ -97,10 +98,16 @@ export const githubSourceJobs = sqliteTable("github_source_jobs", {
 }, (table) => [
   uniqueIndex("github_source_jobs_idempotency_unique").on(table.idempotencyKey),
   index("github_source_jobs_claim_idx").on(table.status, table.leaseExpiresAt, table.createdAt),
+  index("github_source_jobs_runtime_claim_idx").on(
+    table.runtimeVersion,
+    table.status,
+    table.leaseExpiresAt,
+    table.createdAt,
+  ),
 ]);
 
-export const githubConnectorCapabilities = sqliteTable("github_connector_capabilities", {
-  connectorId: text("connector_id").notNull(),
+export const githubRuntimeStatuses = sqliteTable("github_runtime_status", {
+  runtimeId: text("runtime_id").notNull(),
   capability: text("capability").notNull(),
   status: text("status").notNull(),
   errorCode: text("error_code"),
@@ -111,8 +118,8 @@ export const githubConnectorCapabilities = sqliteTable("github_connector_capabil
   checkedAt: text("checked_at").notNull(),
   lastSeenAt: text("last_seen_at").notNull(),
 }, (table) => [
-  primaryKey({ columns: [table.connectorId, table.capability] }),
-  index("github_connector_capabilities_seen_idx").on(table.status, table.lastSeenAt),
+  primaryKey({ columns: [table.runtimeId, table.capability] }),
+  index("github_runtime_status_seen_idx").on(table.status, table.lastSeenAt),
 ]);
 
 export const documentBlocks = sqliteTable("document_blocks", {
@@ -240,11 +247,13 @@ export const graphAnswerJobs = sqliteTable("graph_answer_jobs", {
   index("graph_answer_jobs_claim_idx").on(table.status, table.leaseExpiresAt, table.createdAt),
 ]);
 
-export const connectorHeartbeats = sqliteTable("connector_heartbeats", {
-  connectorId: text("connector_id").primaryKey(),
+export const runtimeStatuses = sqliteTable("runtime_status", {
+  runtimeId: text("runtime_id").primaryKey(),
   status: text("status").notNull(),
   version: text("version").notNull(),
   currentJobId: text("current_job_id"),
+  runtimeState: text("runtime_state"),
+  runtimeMessage: text("runtime_message"),
   runMode: text("run_mode"),
   maxJobs: integer("max_jobs"),
   maxRuntimeMs: integer("max_runtime_ms"),

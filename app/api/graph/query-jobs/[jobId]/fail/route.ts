@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAtlasConnectorAccess } from "../../../../../lib/auth/connector-access";
+import { requireAtlasRuntimeAccess } from "../../../../../lib/auth/runtime-access";
 import { enrichmentApiError, asObject, readLimitedJson } from "../../../../../lib/http/enrichment-api";
 import {
   GRAPH_ANSWER_ERROR_CODES,
@@ -10,7 +10,7 @@ import { getGraphAnswerJobRepository } from "../../../../../lib/storage/graph-an
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
-  const access = await requireAtlasConnectorAccess(request);
+  const access = await requireAtlasRuntimeAccess(request);
   if ("response" in access) return access.response;
   try {
     const { jobId } = await context.params;
@@ -19,9 +19,9 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     const errorCode = GRAPH_ANSWER_ERROR_CODES.includes(candidate) ? candidate : "unknown";
     const job = await (await getGraphAnswerJobRepository()).fail({
       jobId,
-      connectorId: access.connectorId,
+      runtimeId: access.runtimeId,
       errorCode,
-      errorMessage: String(body.errorMessage ?? "Connector 답변 생성 실패").slice(0, 1_000),
+      errorMessage: String(body.errorMessage ?? "통합 런타임 답변 생성 실패").slice(0, 1_000),
       retryable: body.retryable === true,
     });
     return NextResponse.json({ job });

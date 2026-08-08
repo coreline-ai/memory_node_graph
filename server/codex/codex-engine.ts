@@ -9,23 +9,23 @@ import {
   type EnrichmentErrorCode,
   type EnrichmentJobRecord,
   type EnrichmentResult,
-} from "../app/lib/llm/enrichment-contracts.js";
+} from "../../app/lib/llm/enrichment-contracts.js";
 import {
   EnrichmentValidationError,
   parseCodexEnrichmentOutput,
   validateEnrichmentResult,
-} from "../app/lib/llm/enrichment-result-validator.js";
+} from "../../app/lib/llm/enrichment-result-validator.js";
 import {
   GRAPH_ANSWER_OUTPUT_SCHEMA,
   type GraphAnswerJobRecord,
   type GraphAnswerResult,
-} from "../app/lib/llm/graph-answer-contracts.js";
+} from "../../app/lib/llm/graph-answer-contracts.js";
 import {
   GraphAnswerValidationError,
   parseCodexGraphAnswerOutput,
   validateGraphAnswerResult,
-} from "../app/lib/llm/graph-answer-result-validator.js";
-import type { ConnectorConfig } from "./config.js";
+} from "../../app/lib/llm/graph-answer-result-validator.js";
+import type { IntegratedRuntimeConfig } from "../runtime/config.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -40,9 +40,18 @@ export class CodexEngineError extends Error {
   }
 }
 
-const cleanEnvironment = (): NodeJS.ProcessEnv & Record<string, string> => ({
-  ...Object.fromEntries(Object.entries(process.env).flatMap(([key, value]) =>
-    value !== undefined && key !== "OPENAI_API_KEY" && key !== "CODEX_API_KEY"
+const SECRET_ENVIRONMENT_KEYS = new Set([
+  "OPENAI_API_KEY",
+  "CODEX_API_KEY",
+  "LIGHTRAG_API_KEY",
+  "ATLAS_INTERNAL_RUNTIME_SECRET",
+]);
+
+export const cleanCodexEnvironment = (
+  environment: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv & Record<string, string> => ({
+  ...Object.fromEntries(Object.entries(environment).flatMap(([key, value]) =>
+    value !== undefined && !SECRET_ENVIRONMENT_KEYS.has(key) && !key.startsWith("ATLAS_RUNTIME_")
       ? [[key, value]]
       : [],
   )),
@@ -120,7 +129,7 @@ function mapError(error: unknown) {
   const message = error instanceof Error ? error.message : "Codex 실행 실패";
   const normalized = message.toLowerCase();
   if (normalized.includes("not logged in") || normalized.includes("login")) {
-    return new CodexEngineError("connector_auth_required", false, "Codex 로그인이 필요합니다.");
+    return new CodexEngineError("runtime_auth_required", false, "Codex 로그인이 필요합니다.");
   }
   if (normalized.includes("abort") || normalized.includes("timeout") || normalized.includes("timed out")) {
     return new CodexEngineError("provider_timeout", true, "Codex 작업 시간이 초과되거나 중단되었습니다.");
@@ -135,14 +144,14 @@ function mapError(error: unknown) {
 }
 
 export class CodexEnrichmentEngine {
-  constructor(private readonly config: ConnectorConfig) {}
+  constructor(private readonly config: IntegratedRuntimeConfig) {}
 
   async checkAuthentication() {
     const command = this.config.codexPath || await defaultCodexCommand();
     try {
       await execFileAsync(command, ["login", "status"], {
         timeout: 15_000,
-        env: cleanEnvironment(),
+        env: cleanCodexEnvironment(),
       });
     } catch (error) {
       throw mapError(error);
@@ -162,7 +171,7 @@ export class CodexEnrichmentEngine {
       const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
       const codex = new Codex({
         codexPathOverride: this.config.codexPath,
-        env: cleanEnvironment(),
+        env: cleanCodexEnvironment(),
       });
       const thread = codex.startThread({
         model: this.config.model,
@@ -231,7 +240,7 @@ export class CodexEnrichmentEngine {
       const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
       const codex = new Codex({
         codexPathOverride: this.config.codexPath,
-        env: cleanEnvironment(),
+        env: cleanCodexEnvironment(),
       });
       const thread = codex.startThread({
         model: this.config.model,

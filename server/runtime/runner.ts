@@ -1,17 +1,17 @@
-import type { EnrichmentJobRecord } from "../app/lib/llm/enrichment-contracts.js";
+import type { EnrichmentJobRecord } from "../../app/lib/llm/enrichment-contracts.js";
 import type {
   GraphAnswerErrorCode,
   GraphAnswerJobRecord,
-} from "../app/lib/llm/graph-answer-contracts.js";
-import type { GitHubSourceJobRecord } from "../app/lib/github/source-job-contracts.js";
-import { CodexEngineError, CodexEnrichmentEngine } from "./codex-engine.js";
-import { ConnectorClient, ConnectorClientError } from "./client.js";
-import type { ConnectorConfig } from "./config.js";
-import { GitHubSourceEngine, GitHubSourceEngineError } from "./github-source-engine.js";
+} from "../../app/lib/llm/graph-answer-contracts.js";
+import type { GitHubSourceJobRecord } from "../../app/lib/github/source-job-contracts.js";
+import { CodexEngineError, CodexEnrichmentEngine } from "../codex/codex-engine.js";
+import { IntegratedRuntimeClient, IntegratedRuntimeClientError } from "./client.js";
+import type { IntegratedRuntimeConfig } from "./config.js";
+import { GitHubSourceEngine, GitHubSourceEngineError } from "../github/github-source-engine.js";
 import type {
-  ConnectorRunOptions,
-  ConnectorRunReceipt,
-  ConnectorRunStopReason,
+  RuntimeRunOptions,
+  RuntimeRunReceipt,
+  RuntimeRunStopReason,
 } from "./run-policy.js";
 
 const sleep = (milliseconds: number, signal?: AbortSignal) => new Promise<void>((resolve) => {
@@ -25,24 +25,24 @@ const sleep = (milliseconds: number, signal?: AbortSignal) => new Promise<void>(
 const safeMessage = (error: unknown) => {
   if (
     error instanceof CodexEngineError
-    || error instanceof ConnectorClientError
+    || error instanceof IntegratedRuntimeClientError
     || error instanceof GitHubSourceEngineError
   ) return error.message;
   return error instanceof Error ? error.message.slice(0, 300) : "알 수 없는 오류";
 };
 
-export class ConnectorRunner {
-  private readonly client: Pick<ConnectorClient, "claim" | "start" | "renewLease" | "submit" | "fail">
-    & Partial<Pick<ConnectorClient, "heartbeat">>;
-  private readonly sourceClient?: Pick<ConnectorClient,
-    | "reportGitHubCapability"
+export class IntegratedRuntimeRunner {
+  private readonly client: Pick<IntegratedRuntimeClient, "claim" | "start" | "renewLease" | "submit" | "fail">
+    & Partial<Pick<IntegratedRuntimeClient, "reportRuntimeStatus">>;
+  private readonly sourceClient?: Pick<IntegratedRuntimeClient,
+    | "reportGitHubRuntimeStatus"
     | "claimGitHubSource"
     | "startGitHubSource"
     | "renewGitHubSourceLease"
     | "submitGitHubSource"
     | "failGitHubSource"
   >;
-  private readonly answerClient?: Pick<ConnectorClient,
+  private readonly answerClient?: Pick<IntegratedRuntimeClient,
     | "claimGraphAnswer"
     | "startGraphAnswer"
     | "renewGraphAnswerLease"
@@ -53,19 +53,21 @@ export class ConnectorRunner {
   private readonly answerEngine?: Pick<CodexEnrichmentEngine, "answerGraphQuery">;
   private readonly sourceEngine?: Pick<GitHubSourceEngine, "checkCapability" | "executeJob">;
   private stopping = false;
-  private requestedStopReason: ConnectorRunStopReason | null = null;
+  private requestedStopReason: RuntimeRunStopReason | null = null;
   private codexAuthenticated = false;
+  private runtimeAuthenticationState: "connected" | "login_required" | "reauth_required" = "connected";
+  private readonly runtimeWasAuthenticated: boolean;
   private activeController: AbortController | null = null;
   private runController: AbortController | null = null;
   private activeJobId: string | undefined;
 
   constructor(
-    private readonly config: ConnectorConfig,
+    private readonly config: IntegratedRuntimeConfig,
     dependencies: {
-      client?: Pick<ConnectorClient, "claim" | "start" | "renewLease" | "submit" | "fail">
-        & Partial<Pick<ConnectorClient,
-          | "heartbeat"
-          | "reportGitHubCapability"
+      client?: Pick<IntegratedRuntimeClient, "claim" | "start" | "renewLease" | "submit" | "fail">
+        & Partial<Pick<IntegratedRuntimeClient,
+          | "reportRuntimeStatus"
+          | "reportGitHubRuntimeStatus"
           | "claimGitHubSource"
           | "startGitHubSource"
           | "renewGitHubSourceLease"
@@ -80,13 +82,18 @@ export class ConnectorRunner {
       engine?: Pick<CodexEnrichmentEngine, "checkAuthentication" | "enrich">
         & Partial<Pick<CodexEnrichmentEngine, "answerGraphQuery">>;
       sourceEngine?: Pick<GitHubSourceEngine, "checkCapability" | "executeJob">;
+      enableGitHubSource?: boolean;
+      runtimeWasAuthenticated?: boolean;
     } = {},
   ) {
-    this.client = dependencies.client ?? new ConnectorClient(config);
+    this.client = dependencies.client ?? new IntegratedRuntimeClient(config);
     this.engine = dependencies.engine ?? new CodexEnrichmentEngine(config);
-    const candidate = this.client as typeof this.client & Partial<ConnectorClient>;
+    this.runtimeWasAuthenticated = Boolean(dependencies.runtimeWasAuthenticated);
+    const candidate = this.client as typeof this.client & Partial<IntegratedRuntimeClient>;
     if (
-      candidate.reportGitHubCapability
+      dependencies.enableGitHubSource !== false
+      &&
+      candidate.reportGitHubRuntimeStatus
       && candidate.claimGitHubSource
       && candidate.startGitHubSource
       && candidate.renewGitHubSourceLease
@@ -110,7 +117,7 @@ export class ConnectorRunner {
     }
   }
 
-  stop(reason: ConnectorRunStopReason = "signal") {
+  stop(reason: RuntimeRunStopReason = "signal") {
     this.stopping = true;
     this.requestedStopReason ??= reason;
     this.runController?.abort(reason);
@@ -119,8 +126,18 @@ export class ConnectorRunner {
 
   private async ensureCodexAuthentication() {
     if (this.codexAuthenticated) return;
-    await this.engine.checkAuthentication();
-    this.codexAuthenticated = true;
+    try {
+      await this.engine.checkAuthentication();
+      this.codexAuthenticated = true;
+      this.runtimeAuthenticationState = "connected";
+    } catch (error) {
+      if (error instanceof CodexEngineError && error.code === "runtime_auth_required") {
+        this.runtimeAuthenticationState = this.runtimeWasAuthenticated
+          ? "reauth_required"
+          : "login_required";
+      }
+      throw error;
+    }
   }
 
   private async processEnrichment(job: EnrichmentJobRecord): Promise<"completed" | "warning" | "failed"> {
@@ -139,27 +156,27 @@ export class ConnectorRunner {
 
     try {
       await this.client.start(job.id, controller.signal);
-      console.info(`[atlas-connector] running job=${job.id} attempt=${job.attemptCount}`);
+      console.info(`[atlas-runtime] running job=${job.id} attempt=${job.attemptCount}`);
       const result = await this.engine.enrich(job, controller.signal);
       if (leaseLost) throw new CodexEngineError("lease_expired", true, "작업 Lease를 잃었습니다.");
       const completed = await this.client.submit(job.id, result, controller.signal);
       console.info(
-        `[atlas-connector] ${completed.status} job=${job.id} relations=${result.relations.length}`
+        `[atlas-runtime] ${completed.status} job=${job.id} relations=${result.relations.length}`
         + ` input_tokens=${result.usage?.inputTokens ?? 0} output_tokens=${result.usage?.outputTokens ?? 0}`,
       );
       return completed.status === "warning" ? "warning" : "completed";
     } catch (error) {
       const failure = error instanceof CodexEngineError
         ? error
-        : new CodexEngineError("connector_unavailable", true, safeMessage(error));
-      console.warn(`[atlas-connector] failed job=${job.id} code=${failure.code} message=${failure.message}`);
+        : new CodexEngineError("runtime_unavailable", true, safeMessage(error));
+      console.warn(`[atlas-runtime] failed job=${job.id} code=${failure.code} message=${failure.message}`);
       if (!leaseLost) {
         await this.client.fail(job.id, {
           errorCode: failure.code,
           errorMessage: failure.message,
           retryable: failure.retryable,
         }).catch((submitError) => {
-          console.warn(`[atlas-connector] failure-report job=${job.id} message=${safeMessage(submitError)}`);
+          console.warn(`[atlas-runtime] failure-report job=${job.id} message=${safeMessage(submitError)}`);
         });
       }
       return "failed";
@@ -187,12 +204,12 @@ export class ConnectorRunner {
 
     try {
       await this.answerClient.startGraphAnswer(job.id, controller.signal);
-      console.info(`[atlas-connector] running graph-answer job=${job.id} attempt=${job.attemptCount}`);
+      console.info(`[atlas-runtime] running graph-answer job=${job.id} attempt=${job.attemptCount}`);
       const result = await this.answerEngine.answerGraphQuery(job, controller.signal);
       if (leaseLost) throw new CodexEngineError("lease_expired", true, "그래프 답변 작업 Lease를 잃었습니다.");
       const completed = await this.answerClient.submitGraphAnswer(job.id, result, controller.signal);
       console.info(
-        `[atlas-connector] ${completed.status} graph-answer job=${job.id}`
+        `[atlas-runtime] ${completed.status} graph-answer job=${job.id}`
         + ` claims=${result.claims.length} citations=${result.citationIds.length}`
         + ` input_tokens=${result.usage?.inputTokens ?? 0} output_tokens=${result.usage?.outputTokens ?? 0}`,
       );
@@ -200,15 +217,15 @@ export class ConnectorRunner {
     } catch (error) {
       const failure = error instanceof CodexEngineError
         ? error
-        : new CodexEngineError("connector_unavailable", true, safeMessage(error));
-      console.warn(`[atlas-connector] failed graph-answer job=${job.id} code=${failure.code} message=${failure.message}`);
+        : new CodexEngineError("runtime_unavailable", true, safeMessage(error));
+      console.warn(`[atlas-runtime] failed graph-answer job=${job.id} code=${failure.code} message=${failure.message}`);
       if (!leaseLost) {
         await this.answerClient.failGraphAnswer(job.id, {
           errorCode: failure.code as GraphAnswerErrorCode,
           errorMessage: failure.message,
           retryable: failure.retryable,
         }).catch((submitError) => {
-          console.warn(`[atlas-connector] failure-report graph-answer job=${job.id} message=${safeMessage(submitError)}`);
+          console.warn(`[atlas-runtime] failure-report graph-answer job=${job.id} message=${safeMessage(submitError)}`);
         });
       }
       return "failed";
@@ -236,15 +253,15 @@ export class ConnectorRunner {
 
     try {
       await this.sourceClient.startGitHubSource(job.id, controller.signal);
-      console.info(`[atlas-connector] running github-source job=${job.id} kind=${job.kind} attempt=${job.attemptCount}`);
+      console.info(`[atlas-runtime] running github-source job=${job.id} kind=${job.kind} attempt=${job.attemptCount}`);
       const result = await this.sourceEngine.executeJob(job, controller.signal);
       if (leaseLost) {
         throw new GitHubSourceEngineError("lease_expired", true, "GitHub source 작업 Lease를 잃었습니다.");
       }
-      await this.sourceClient.reportGitHubCapability(result.capability, controller.signal);
+      await this.sourceClient.reportGitHubRuntimeStatus(result.capability, controller.signal);
       const completed = await this.sourceClient.submitGitHubSource(job.id, result, controller.signal);
       console.info(
-        `[atlas-connector] ${completed.status} github-source job=${job.id}`
+        `[atlas-runtime] ${completed.status} github-source job=${job.id}`
         + ` discovered=${result.summary.discoveredCount} selected=${result.summary.selectedCount}`
         + ` changed=${result.summary.changedCount} unchanged=${result.summary.unchangedCount}`,
       );
@@ -252,17 +269,17 @@ export class ConnectorRunner {
     } catch (error) {
       const failure = error instanceof GitHubSourceEngineError
         ? error
-        : new GitHubSourceEngineError("connector_offline", true, safeMessage(error));
-      console.warn(`[atlas-connector] failed github-source job=${job.id} code=${failure.code} message=${failure.message}`);
+        : new GitHubSourceEngineError("runtime_unavailable", true, safeMessage(error));
+      console.warn(`[atlas-runtime] failed github-source job=${job.id} code=${failure.code} message=${failure.message}`);
       if (!leaseLost) {
         const capability = await this.sourceEngine.checkCapability().catch(() => null);
-        if (capability) await this.sourceClient.reportGitHubCapability(capability).catch(() => undefined);
+        if (capability) await this.sourceClient.reportGitHubRuntimeStatus(capability).catch(() => undefined);
         await this.sourceClient.failGitHubSource(job.id, {
           errorCode: failure.code,
           errorMessage: failure.message,
           retryable: failure.retryable,
         }).catch((submitError) => {
-          console.warn(`[atlas-connector] failure-report github-source job=${job.id} message=${safeMessage(submitError)}`);
+          console.warn(`[atlas-runtime] failure-report github-source job=${job.id} message=${safeMessage(submitError)}`);
         });
       }
       return "failed";
@@ -273,20 +290,20 @@ export class ConnectorRunner {
     }
   }
 
-  async run(options: ConnectorRunOptions = {}): Promise<ConnectorRunReceipt> {
+  async run(options: RuntimeRunOptions = {}): Promise<RuntimeRunReceipt> {
     const startedAtMs = Date.now();
     const startedAt = new Date(startedAtMs).toISOString();
-    const mode: ConnectorRunReceipt["mode"] = options.once || options.maxJobs !== undefined || options.maxRuntimeMs !== undefined
+    const mode: RuntimeRunReceipt["mode"] = options.once || options.maxJobs !== undefined || options.maxRuntimeMs !== undefined
       ? "bounded"
       : "continuous";
     const counters = { claimed: 0, succeeded: 0, warning: 0, failed: 0 };
     let initialQueuedJobs: number | undefined;
     let remainingQueuedJobs: number | undefined;
-    let stopReason: ConnectorRunStopReason | null = null;
+    let stopReason: RuntimeRunStopReason | null = null;
     let fatalError: unknown;
     this.runController = new AbortController();
 
-    const telemetry = (reason?: ConnectorRunStopReason) => ({
+    const telemetry = (reason?: RuntimeRunStopReason) => ({
       runMode: mode,
       maxJobs: options.maxJobs,
       maxRuntimeMs: options.maxRuntimeMs,
@@ -296,11 +313,31 @@ export class ConnectorRunner {
       failedJobs: counters.failed,
       stopReason: reason,
     });
-    const heartbeatReport = async (status: "online" | "offline", reason?: ConnectorRunStopReason) => {
-      const response = await this.client.heartbeat?.(
+    const heartbeatReport = async (status: "online" | "offline", reason?: RuntimeRunStopReason) => {
+      const integratedRuntime = this.config.version.startsWith("atlas-integrated-codex-runtime-");
+      const runtimeState = status === "online" && this.activeJobId
+        ? "running"
+        : status === "online"
+          ? this.runtimeAuthenticationState
+          : reason === "fatal"
+            ? "failed"
+            : this.runtimeAuthenticationState;
+      const response = await this.client.reportRuntimeStatus?.(
         status,
         this.activeJobId,
         telemetry(reason),
+        integratedRuntime ? {
+          state: runtimeState,
+          message: status === "online"
+            ? this.activeJobId
+              ? "통합 작업 런타임이 작업을 처리하고 있습니다."
+              : this.runtimeAuthenticationState === "login_required"
+                ? "Codex OAuth 로그인이 필요합니다. GitHub 문서 동기화는 독립적으로 동작합니다."
+                : this.runtimeAuthenticationState === "reauth_required"
+                  ? "Codex OAuth 재로그인이 필요합니다. GitHub 문서 동기화는 독립적으로 동작합니다."
+                  : "Codex OAuth 세션이 연결되어 있습니다."
+            : "통합 Codex 작업 런타임이 중지되었습니다.",
+        } : undefined,
       );
       if (response && "queuedJobs" in response && typeof response.queuedJobs === "number") {
         remainingQueuedJobs = response.queuedJobs;
@@ -311,7 +348,7 @@ export class ConnectorRunner {
 
     await heartbeatReport("online");
     console.info(
-      `[atlas-connector] run mode=${mode} max_jobs=${options.maxJobs ?? "unlimited"}`
+      `[atlas-runtime] run mode=${mode} max_jobs=${options.maxJobs ?? "unlimited"}`
       + ` max_runtime_ms=${options.maxRuntimeMs ?? "unlimited"}`
       + ` enrichment_only=${Boolean(options.enrichmentOnly)}`
       + ` queued=${initialQueuedJobs ?? "unknown"}`,
@@ -321,16 +358,23 @@ export class ConnectorRunner {
     }
     if (!options.enrichmentOnly && this.sourceClient && this.sourceEngine) {
       const capability = await this.sourceEngine.checkCapability();
-      await this.sourceClient.reportGitHubCapability(capability);
-      console.info(`[atlas-connector] github-source status=${capability.status} account=${capability.accountLogin ?? "none"}`);
+      await this.sourceClient.reportGitHubRuntimeStatus(capability);
+      console.info(`[atlas-runtime] github-source status=${capability.status} account=${capability.accountLogin ?? "none"}`);
     }
-    console.info(`[atlas-connector] ready id=${this.config.connectorId} base=${this.config.baseUrl}`);
+    console.info(`[atlas-runtime] ready id=${this.config.runtimeId} base=${this.config.baseUrl}`);
     let failures = 0;
     const heartbeat = setInterval(() => {
       void heartbeatReport("online").catch((error) => {
-        console.warn(`[atlas-connector] heartbeat-error message=${safeMessage(error)}`);
+        console.warn(`[atlas-runtime] heartbeat-error message=${safeMessage(error)}`);
       });
-    }, this.config.heartbeatIntervalMs);
+      if (!options.enrichmentOnly && this.sourceClient && this.sourceEngine) {
+        void this.sourceEngine.checkCapability()
+          .then((capability) => this.sourceClient?.reportGitHubRuntimeStatus(capability))
+          .catch((error) => {
+            console.warn(`[atlas-runtime] github-capability-error message=${safeMessage(error)}`);
+          });
+      }
+    }, this.config.statusIntervalMs);
     heartbeat.unref?.();
     const deadline = options.maxRuntimeMs === undefined ? null : setTimeout(() => {
       this.stop("runtime_limit");
@@ -383,12 +427,15 @@ export class ConnectorRunner {
           await sleep(this.config.pollIntervalMs, this.runController.signal);
         } catch (error) {
           if (this.stopping) break;
+          if (error instanceof CodexEngineError && error.code === "runtime_auth_required") {
+            await heartbeatReport("online").catch(() => undefined);
+          }
           failures += 1;
           const delay = Math.min(
             this.config.maximumBackoffMs,
             this.config.pollIntervalMs * 2 ** Math.min(6, failures - 1),
           );
-          console.warn(`[atlas-connector] poll-error message=${safeMessage(error)} retry_ms=${delay}`);
+          console.warn(`[atlas-runtime] poll-error message=${safeMessage(error)} retry_ms=${delay}`);
           if (mode === "bounded") {
             fatalError = error;
             stopReason = "fatal";
@@ -406,7 +453,7 @@ export class ConnectorRunner {
     }
 
     const completedAtMs = Date.now();
-    const receipt: ConnectorRunReceipt = {
+    const receipt: RuntimeRunReceipt = {
       mode,
       startedAt,
       completedAt: new Date(completedAtMs).toISOString(),
@@ -423,7 +470,7 @@ export class ConnectorRunner {
       stopReason,
     };
     console.info(
-      `[atlas-connector] stopped reason=${receipt.stopReason} processed=${receipt.claimedJobs}`
+      `[atlas-runtime] stopped reason=${receipt.stopReason} processed=${receipt.claimedJobs}`
       + ` success=${receipt.succeededJobs} warning=${receipt.warningJobs}`
       + ` failed=${receipt.failedJobs} remaining=${receipt.remainingQueuedJobs ?? "unknown"}`,
     );

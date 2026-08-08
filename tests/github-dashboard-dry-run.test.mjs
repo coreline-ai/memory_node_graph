@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { projectGitHubDashboardDryRun } from "../.connector-dist/app/lib/github/dashboard-dry-run.js";
+import { projectGitHubDashboardDryRun } from "../.runtime-dist/app/lib/github/dashboard-dry-run.js";
 
 const file = (repositoryId, path, blobSha) => ({
   repositoryId,

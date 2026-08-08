@@ -30,8 +30,8 @@ export const ENRICHMENT_JOB_STATUSES = [
 export type EnrichmentJobStatus = (typeof ENRICHMENT_JOB_STATUSES)[number];
 
 export const ENRICHMENT_ERROR_CODES = [
-  "connector_auth_required",
-  "connector_unavailable",
+  "runtime_auth_required",
+  "runtime_unavailable",
   "lease_conflict",
   "lease_expired",
   "document_stale",
@@ -154,13 +154,13 @@ export type EnrichmentJobRecord = {
   completedAt?: string;
 };
 
-export const CONNECTOR_HEARTBEAT_STATUSES = ["online", "offline"] as const;
-export type ConnectorHeartbeatStatus = (typeof CONNECTOR_HEARTBEAT_STATUSES)[number];
+export const RUNTIME_STATUS_KINDS = ["online", "offline"] as const;
+export type RuntimeStatusKind = (typeof RUNTIME_STATUS_KINDS)[number];
 
-export const CONNECTOR_RUN_MODES = ["continuous", "bounded"] as const;
-export type ConnectorRunMode = (typeof CONNECTOR_RUN_MODES)[number];
+export const RUNTIME_RUN_MODES = ["continuous", "bounded"] as const;
+export type RuntimeRunMode = (typeof RUNTIME_RUN_MODES)[number];
 
-export const CONNECTOR_RUN_STOP_REASONS = [
+export const RUNTIME_RUN_STOP_REASONS = [
   "dry_run",
   "job_limit",
   "runtime_limit",
@@ -169,23 +169,34 @@ export const CONNECTOR_RUN_STOP_REASONS = [
   "signal",
   "fatal",
 ] as const;
-export type ConnectorRunStopReason = (typeof CONNECTOR_RUN_STOP_REASONS)[number];
+export type RuntimeRunStopReason = (typeof RUNTIME_RUN_STOP_REASONS)[number];
 
-export type ConnectorRunTelemetry = {
-  runMode?: ConnectorRunMode;
+export type RuntimeRunTelemetry = {
+  runMode?: RuntimeRunMode;
   maxJobs?: number;
   maxRuntimeMs?: number;
   processedJobs?: number;
   succeededJobs?: number;
   warningJobs?: number;
   failedJobs?: number;
-  stopReason?: ConnectorRunStopReason;
+  stopReason?: RuntimeRunStopReason;
 };
 
-export type ConnectorHeartbeatRecord = ConnectorRunTelemetry & {
-  connectorId: string;
-  status: ConnectorHeartbeatStatus;
+export const CODEX_RUNTIME_STATES = [
+  "connected",
+  "login_required",
+  "reauth_required",
+  "running",
+  "failed",
+] as const;
+export type CodexRuntimeState = (typeof CODEX_RUNTIME_STATES)[number];
+
+export type RuntimeStatusRecord = RuntimeRunTelemetry & {
+  runtimeId: string;
+  status: RuntimeStatusKind;
   version: string;
+  runtimeState?: CodexRuntimeState;
+  runtimeMessage?: string;
   currentJobId?: string;
   startedAt: string;
   lastSeenAt: string;

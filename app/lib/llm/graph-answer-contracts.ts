@@ -28,8 +28,8 @@ export const GRAPH_ANSWER_UNCERTAINTIES = ["low", "medium", "high"] as const;
 export type GraphAnswerUncertainty = (typeof GRAPH_ANSWER_UNCERTAINTIES)[number];
 
 export const GRAPH_ANSWER_ERROR_CODES = [
-  "connector_auth_required",
-  "connector_unavailable",
+  "runtime_auth_required",
+  "runtime_unavailable",
   "lease_conflict",
   "lease_expired",
   "insufficient_evidence",

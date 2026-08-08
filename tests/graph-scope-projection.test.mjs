@@ -8,10 +8,13 @@ import {
   GRAPH_OVERVIEW_NODE_BUDGET,
   GRAPH_REPOSITORY_EDGE_BUDGET,
   GRAPH_REPOSITORY_NODE_BUDGET,
+  GRAPH_DOCUMENT_EDGE_BUDGET,
+  GRAPH_DOCUMENT_NODE_BUDGET,
   projectGraphCorpus,
+  projectGraphDocument,
   projectGraphOverview,
   projectGraphRepository,
-} from "../.connector-dist/app/lib/graph/scope-projection.js";
+} from "../.runtime-dist/app/lib/graph/scope-projection.js";
 
 const repository = (index) => ({
   id: `repository:github:${1000 + index}`,
@@ -483,4 +486,52 @@ test("repository 상세는 대형 저장소도 기본 500노드·2,000관계 예
   assert.ok(detail.edges.every((edge) =>
     detail.nodes.some((node) => node.id === edge.source)
     && detail.nodes.some((node) => node.id === edge.target)));
+});
+
+test("문서 중심 그래프는 직접 언급 노드와 1·2단계 저장 관계만 보여준다", () => {
+  const seed = detailNode("concept:document:seed", "Document seed", ["concept", "document"]);
+  const first = detailNode("system:document:first", "First hop", ["system"]);
+  const second = detailNode("tool:document:second", "Second hop", ["tool"], "tool");
+  const third = detailNode("risk:document:third", "Third hop", ["risk"], "risk");
+  const edges = [
+    { source: seed.id, target: first.id, type: "supports", confidence: 0.98, note: "stored first", layer: "explicit" },
+    { source: first.id, target: second.id, type: "depends_on", confidence: 0.94, note: "stored second", layer: "inferred", origin: "codex" },
+    { source: second.id, target: third.id, type: "risks", confidence: 0.9, note: "stored third", layer: "explicit" },
+    { source: seed.id, target: third.id, type: "related_to", confidence: 0.3, note: "visual only", layer: "display", origin: "display" },
+  ];
+  const snapshot = {
+    nodes: [third, second, first, seed],
+    edges: [...edges].reverse(),
+    meta: {
+      source: "documents",
+      provider: "markdown-ast",
+      generatedAt: "2026-08-08T00:00:00Z",
+      documentId: "document:phase6",
+      documentName: "phase-6.md",
+      documentSeedNodeIds: [seed.id],
+      corpusNodeCount: 89_669,
+      corpusEdgeCount: 94_488,
+    },
+  };
+  const projected = projectGraphDocument(snapshot, "document:phase6");
+  const repeated = projectGraphDocument({
+    ...snapshot,
+    nodes: [...snapshot.nodes].reverse(),
+    edges: [...snapshot.edges].reverse(),
+  }, "document:phase6");
+
+  assert.ok(projected);
+  assert.equal(projected.meta.scope, "document");
+  assert.equal(projected.meta.projectionMode, "document-evidence-graph");
+  assert.equal(projected.meta.nodeBudget, GRAPH_DOCUMENT_NODE_BUDGET);
+  assert.equal(projected.meta.edgeBudget, GRAPH_DOCUMENT_EDGE_BUDGET);
+  assert.deepEqual(new Set(projected.nodes.map((node) => node.id)), new Set([seed.id, first.id, second.id]));
+  assert.equal(projected.nodes.some((node) => node.id === third.id), false);
+  assert.equal(projected.edges.length, 2);
+  assert.ok(projected.edges.every((edge) => edge.layer !== "display"));
+  assert.equal(projected.meta.displayEdgeCount, 0);
+  assert.equal(projected.meta.projectedFactualEdgeCount, 2);
+  assert.deepEqual(repeated.nodes, projected.nodes);
+  assert.deepEqual(repeated.edges, projected.edges);
+  assert.equal(projectGraphDocument(snapshot, "document:missing"), null);
 });

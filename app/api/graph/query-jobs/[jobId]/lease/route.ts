@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireAtlasConnectorAccess } from "../../../../../lib/auth/connector-access";
+import { requireAtlasRuntimeAccess } from "../../../../../lib/auth/runtime-access";
 import { enrichmentApiError, readLimitedJson } from "../../../../../lib/http/enrichment-api";
 import { getGraphAnswerJobRepository } from "../../../../../lib/storage/graph-answer-job-repository";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
-  const access = await requireAtlasConnectorAccess(request);
+  const access = await requireAtlasRuntimeAccess(request);
   if ("response" in access) return access.response;
   try {
     const { jobId } = await context.params;
@@ -14,7 +14,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     const leaseDurationMs = Math.min(300_000, Math.max(15_000, Number(body.leaseDurationMs) || 60_000));
     const job = await (await getGraphAnswerJobRepository()).renewLease({
       jobId,
-      connectorId: access.connectorId,
+      runtimeId: access.runtimeId,
       leaseDurationMs,
     });
     return NextResponse.json({ job });

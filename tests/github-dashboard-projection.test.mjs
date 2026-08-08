@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { projectGitHubRepositorySyncSummaries } from "../.connector-dist/app/lib/github/dashboard-projection.js";
+import { projectGitHubRepositorySyncSummaries } from "../.runtime-dist/app/lib/github/dashboard-projection.js";
 
 const repository = (repositoryId, name) => ({
   repositoryId,
@@ -135,8 +135,8 @@ test("실패 Apply의 수동 재시도 한도 소진 여부를 저장소별로 �
       repositoryIds: ["2"],
       status: "failed",
       updatedAt: "2026-08-04T12:01:00.000Z",
-      errorCode: "connector_offline",
-      errorMessage: "Connector 중단",
+      errorCode: "runtime_unavailable",
+      errorMessage: "통합 런타임 중단",
       manualRetryCount: 1,
     }),
   ], []);

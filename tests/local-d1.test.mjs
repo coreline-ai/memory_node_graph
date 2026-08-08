@@ -17,7 +17,12 @@ test("로컬 D1 탐색은 기기별 object ID를 하드코딩하지 않고 모�
     await writeFile(first, "database");
     assert.equal(await resolveLocalD1Database({ root }), first);
     const requested = join(root, "custom.sqlite");
+    await writeFile(requested, "database");
     assert.equal(await resolveLocalD1Database({ requested }), resolve(requested));
+    await assert.rejects(resolveLocalD1Database({ requested: join(root, "missing.sqlite") }), /찾을 수 없습니다/);
+    const invalidExtension = join(root, "custom.db");
+    await writeFile(invalidExtension, "database");
+    await assert.rejects(resolveLocalD1Database({ requested: invalidExtension }), /정본이 아닙니다/);
     await writeFile(join(directory, "worker-object-b.sqlite"), "database");
     await assert.rejects(resolveLocalD1Database({ root }), /여러 개/);
   } finally {

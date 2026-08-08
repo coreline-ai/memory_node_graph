@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAtlasConnectorAccess } from "../../../../../lib/auth/connector-access";
+import { requireAtlasRuntimeAccess } from "../../../../../lib/auth/runtime-access";
 import {
   GITHUB_APPLY_CHUNK_MAX_BYTES,
   parseGitHubApplyStageChunk,
@@ -15,7 +15,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
-  const access = await requireAtlasConnectorAccess(request, { limitPerMinute: 240 });
+  const access = await requireAtlasRuntimeAccess(request, { limitPerMinute: 240 });
   if ("response" in access) return access.response;
   try {
     const { jobId } = await context.params;
@@ -26,10 +26,10 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     }
     if (
       !["leased", "running"].includes(current.status)
-      || current.leaseOwner !== access.connectorId
+      || current.leaseOwner !== access.runtimeId
       || !current.leaseExpiresAt
       || Date.parse(current.leaseExpiresAt) <= Date.now()
-    ) throw new GitHubSourceRepositoryError("lease_conflict", "현재 Connector가 소유한 유효 Lease가 아닙니다.");
+    ) throw new GitHubSourceRepositoryError("lease_conflict", "현재 통합 런타임가 소유한 유효 Lease가 아닙니다.");
     try {
       const submitted = await readLimitedJson(request, GITHUB_APPLY_CHUNK_MAX_BYTES + 256_000);
       assertCredentialFreePayload(submitted);

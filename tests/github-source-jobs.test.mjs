@@ -236,41 +236,41 @@ test("GitHub source 요청은 결정적이며 자격 증명 필드와 값을 거
   );
 });
 
-test("gh 미설치·로그아웃·권한·rate limit·Connector 오프라인을 분리한다", async () => {
+test("gh 미설치·로그아웃·권한·rate limit·통합 런타임 오프라인을 분리한다", async () => {
   const { contracts } = await sourceModules();
   assert.deepEqual(contracts.normalizeGitHubCapability({
-    connectorOnline: false,
+    runtimeOnline: false,
     ghInstalled: true,
     authenticated: true,
     authorized: true,
-  }), { status: "offline", errorCode: "connector_offline" });
+  }), { status: "offline", errorCode: "runtime_unavailable" });
   assert.deepEqual(contracts.normalizeGitHubCapability({
-    connectorOnline: true,
+    runtimeOnline: true,
     ghInstalled: false,
     authenticated: false,
     authorized: false,
   }), { status: "offline", errorCode: "gh_missing" });
   assert.deepEqual(contracts.normalizeGitHubCapability({
-    connectorOnline: true,
+    runtimeOnline: true,
     ghInstalled: true,
     authenticated: false,
     authorized: false,
   }), { status: "login_required", errorCode: "gh_auth_required" });
   assert.deepEqual(contracts.normalizeGitHubCapability({
-    connectorOnline: true,
+    runtimeOnline: true,
     ghInstalled: true,
     authenticated: true,
     authorized: false,
   }), { status: "forbidden", errorCode: "github_forbidden" });
   assert.deepEqual(contracts.normalizeGitHubCapability({
-    connectorOnline: true,
+    runtimeOnline: true,
     ghInstalled: true,
     authenticated: true,
     authorized: true,
     rateLimited: true,
   }), { status: "rate_limited", errorCode: "github_rate_limited" });
   assert.deepEqual(contracts.normalizeGitHubCapability({
-    connectorOnline: true,
+    runtimeOnline: true,
     ghInstalled: true,
     authenticated: true,
     authorized: true,
@@ -285,7 +285,7 @@ test("gh 미설치·로그아웃·권한·rate limit·Connector 오프라인을 
 });
 
 async function exerciseRepository(candidate, contracts) {
-  const connectorId = "github-source-connector";
+  const runtimeId = "github-source-runtime";
   const discoveryInput = await contracts.parseGitHubSourceJobRequest({
     kind: "discovery",
     owner: "coreline-ai",
@@ -300,17 +300,17 @@ async function exerciseRepository(candidate, contracts) {
   assert.equal(first.created, true);
   assert.equal(duplicate.created, false);
   assert.equal(await candidate.claim({
-    connectorId,
+    runtimeId,
     now: "2026-08-04T00:00:02.000Z",
   }), null);
 
-  await candidate.recordCapability({
-    connectorId,
+  await candidate.recordRuntimeCapability({
+    runtimeId,
     ...onlineReport("2026-08-04T00:00:02.000Z"),
     now: "2026-08-04T00:00:02.000Z",
   });
   const firstLease = await candidate.claim({
-    connectorId,
+    runtimeId,
     leaseDurationMs: 2_000,
     now: "2026-08-04T00:00:03.000Z",
   });
@@ -318,36 +318,36 @@ async function exerciseRepository(candidate, contracts) {
   assert.equal(firstLease.attemptCount, 1);
   await assert.rejects(candidate.markRunning({
     jobId: firstLease.id,
-    connectorId: "other-connector",
+    runtimeId: "other-runtime",
     now: "2026-08-04T00:00:03.200Z",
   }), (error) => error.code === "lease_conflict");
   assert.equal((await candidate.markRunning({
     jobId: firstLease.id,
-    connectorId,
+    runtimeId,
     now: "2026-08-04T00:00:03.300Z",
   })).status, "running");
   assert.equal((await candidate.fail({
     jobId: firstLease.id,
-    connectorId,
-    errorCode: "connector_offline",
-    errorMessage: "일시적인 로컬 Connector 중단",
+    runtimeId,
+    errorCode: "runtime_unavailable",
+    errorMessage: "일시적인 로컬 통합 런타임 중단",
     retryable: true,
     now: "2026-08-04T00:00:03.400Z",
   })).status, "queued");
 
   const secondLease = await candidate.claim({
-    connectorId,
+    runtimeId,
     leaseDurationMs: 2_000,
     now: "2026-08-04T00:00:04.000Z",
   });
   await candidate.markRunning({
     jobId: secondLease.id,
-    connectorId,
+    runtimeId,
     now: "2026-08-04T00:00:04.100Z",
   });
   const failed = await candidate.fail({
     jobId: secondLease.id,
-    connectorId,
+    runtimeId,
     errorCode: "github_forbidden",
     errorMessage: "조직 저장소 읽기 권한이 없습니다.",
     retryable: false,
@@ -358,7 +358,7 @@ async function exerciseRepository(candidate, contracts) {
   assert.equal(retried.status, "queued");
   assert.equal(retried.manualRetryCount, 1);
   const thirdLease = await candidate.claim({
-    connectorId,
+    runtimeId,
     now: "2026-08-04T00:00:05.000Z",
   });
   assert.equal((await candidate.cancel(thirdLease.id, "2026-08-04T00:00:05.100Z")).status, "cancelled");
@@ -370,17 +370,17 @@ async function exerciseRepository(candidate, contracts) {
   });
   await candidate.enqueue(previewInput, { now: "2026-08-04T00:00:06.000Z" });
   const previewLease = await candidate.claim({
-    connectorId,
+    runtimeId,
     now: "2026-08-04T00:00:06.100Z",
   });
   await candidate.markRunning({
     jobId: previewLease.id,
-    connectorId,
+    runtimeId,
     now: "2026-08-04T00:00:06.200Z",
   });
   const completed = await candidate.complete({
     jobId: previewLease.id,
-    connectorId,
+    runtimeId,
     result: completedResult(previewLease, "2026-08-04T00:00:06.250Z"),
     now: "2026-08-04T00:00:06.300Z",
   });
@@ -431,21 +431,21 @@ async function exerciseRepository(candidate, contracts) {
   assert.equal((await candidate.listApplyStageChunks(firstApply.job.id)).length, 0);
   const applyAfterCancel = await candidate.enqueue(secondApplyInput, { now: "2026-08-04T00:00:07.300Z" });
   assert.equal(applyAfterCancel.created, true);
-  const leasedApply = await candidate.claim({ connectorId, now: "2026-08-04T00:00:07.400Z" });
-  await candidate.markRunning({ jobId: leasedApply.id, connectorId, now: "2026-08-04T00:00:07.500Z" });
+  const leasedApply = await candidate.claim({ runtimeId, now: "2026-08-04T00:00:07.400Z" });
+  await candidate.markRunning({ jobId: leasedApply.id, runtimeId, now: "2026-08-04T00:00:07.500Z" });
   const retryStage = { ...stageChunk, jobId: leasedApply.id, totalChunks: 2 };
   await candidate.putApplyStageChunk(retryStage);
   const queuedAgain = await candidate.fail({
     jobId: leasedApply.id,
-    connectorId,
-    errorCode: "connector_offline",
-    errorMessage: "chunk 업로드 중 Connector 종료",
+    runtimeId,
+    errorCode: "runtime_unavailable",
+    errorMessage: "chunk 업로드 중 통합 런타임 종료",
     retryable: true,
     now: "2026-08-04T00:00:07.600Z",
   });
   assert.equal(queuedAgain.status, "queued");
   assert.equal((await candidate.listApplyStageChunks(leasedApply.id)).length, 1);
-  const resumedApply = await candidate.claim({ connectorId, now: "2026-08-04T00:00:07.700Z" });
+  const resumedApply = await candidate.claim({ runtimeId, now: "2026-08-04T00:00:07.700Z" });
   assert.equal(resumedApply.id, leasedApply.id);
   assert.equal(await candidate.putApplyStageChunk(retryStage), 1);
   assert.equal(await candidate.putApplyStageChunk({
@@ -476,18 +476,18 @@ async function exerciseRepository(candidate, contracts) {
     maxAttempts: 2,
   });
   const expiringLease = await candidate.claim({
-    connectorId,
+    runtimeId,
     leaseDurationMs: 1_000,
     now: "2026-08-04T00:00:08.100Z",
   });
   await candidate.markRunning({
     jobId: expiringLease.id,
-    connectorId,
+    runtimeId,
     now: "2026-08-04T00:00:08.200Z",
   });
   await candidate.putApplyStageChunk({ ...stageChunk, jobId: expiring.job.id });
   const reclaimed = await candidate.claim({
-    connectorId,
+    runtimeId,
     leaseDurationMs: 1_000,
     now: "2026-08-04T00:00:09.200Z",
   });
@@ -495,7 +495,7 @@ async function exerciseRepository(candidate, contracts) {
   assert.equal(reclaimed.attemptCount, 2);
   assert.equal((await candidate.listApplyStageChunks(expiring.job.id)).length, 1);
   assert.equal(await candidate.claim({
-    connectorId,
+    runtimeId,
     leaseDurationMs: 1_000,
     now: "2026-08-04T00:00:10.300Z",
   }), null);
@@ -506,7 +506,7 @@ async function exerciseRepository(candidate, contracts) {
 
   await assert.rejects(candidate.fail({
     jobId: "missing-job",
-    connectorId,
+    runtimeId,
     errorCode: "unknown",
     errorMessage: "Bearer ghp_abcdefghijklmnopqrstuvwxyz1234567890",
     retryable: false,
@@ -532,11 +532,101 @@ test("source queue의 lease·retry·cancel은 보강 큐와 분리되고 메모�
       jobs: sqlite.database.prepare(
         "SELECT input_json, result_json, error_message FROM github_source_jobs ORDER BY created_at",
       ).all(),
-      capabilities: sqlite.database.prepare(
-        "SELECT * FROM github_connector_capabilities ORDER BY connector_id",
+      runtimeStatuses: sqlite.database.prepare(
+        "SELECT * FROM github_runtime_status ORDER BY runtime_id",
       ).all(),
     });
     assert.doesNotMatch(persisted, /authorization|github_pat_|ghp_|access[_-]?token/i);
+  } finally {
+    sqlite.close();
+  }
+});
+
+async function exerciseRuntimeGenerationBoundary(candidate, contracts) {
+  const runtimeId = "github-runtime-boundary";
+  const legacy = {
+    ...(await contracts.parseGitHubSourceJobRequest({
+      kind: "discovery",
+      owner: "coreline-ai",
+      requestNonce: "legacy-generation",
+    })),
+    jobId: "github-source:discovery:legacy-generation",
+    idempotencyKey: "legacy-generation-key",
+    runtimeVersion: undefined,
+  };
+  const integrated = await contracts.parseGitHubSourceJobRequest({
+    kind: "discovery",
+    owner: "coreline-ai",
+    requestNonce: "integrated-generation",
+  });
+  await candidate.enqueue(legacy, { now: "2026-08-08T00:00:00.000Z" });
+  await candidate.enqueue(integrated, { now: "2026-08-08T00:00:01.000Z" });
+  await candidate.recordRuntimeCapability({
+    runtimeId,
+    ...onlineReport("2026-08-08T00:00:02.000Z"),
+    now: "2026-08-08T00:00:02.000Z",
+  });
+  const claimed = await candidate.claim({
+    runtimeId,
+    runtimeVersion: contracts.INTEGRATED_GITHUB_RUNTIME_VERSION,
+    now: "2026-08-08T00:00:03.000Z",
+  });
+  assert.equal(claimed.id, integrated.jobId);
+  assert.equal(claimed.input.runtimeVersion, contracts.INTEGRATED_GITHUB_RUNTIME_VERSION);
+  await candidate.cancel(claimed.id, "2026-08-08T00:00:04.000Z");
+  const legacyClaim = await candidate.claim({
+    runtimeId,
+    now: "2026-08-08T00:00:05.000Z",
+  });
+  assert.equal(legacyClaim.id, legacy.jobId);
+}
+
+test("통합 GitHub runtime은 generation 없는 과거 작업을 자동 실행하지 않는다", async () => {
+  const { contracts, repository } = await sourceModules();
+  await exerciseRuntimeGenerationBoundary(
+    repository.createMemoryGitHubSourceJobRepository(),
+    contracts,
+  );
+  const sqlite = new SqliteD1Database();
+  try {
+    await exerciseRuntimeGenerationBoundary(
+      repository.createD1GitHubSourceJobRepository(sqlite),
+      contracts,
+    );
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("기존 GitHub 상태는 통합 runtime 상태 테이블로 안전하게 이관된다", async () => {
+  const { repository } = await sourceModules();
+  const sqlite = new SqliteD1Database();
+  try {
+    sqlite.database.exec(`
+      CREATE TABLE github_connector_capabilities (
+        connector_id TEXT NOT NULL,
+        capability TEXT NOT NULL,
+        status TEXT NOT NULL,
+        error_code TEXT,
+        account_login TEXT,
+        host TEXT,
+        rate_limit_reset_at TEXT,
+        message TEXT,
+        checked_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL,
+        PRIMARY KEY (connector_id, capability)
+      );
+      INSERT INTO github_connector_capabilities
+        (connector_id, capability, status, account_login, host, message, checked_at, last_seen_at)
+      VALUES
+        ('legacy-runtime', 'github-source', 'online', 'coreline-ai', 'github.com', 'ready',
+         '2026-08-08T00:00:00.000Z', '2026-08-08T00:00:10.000Z');
+    `);
+    const capabilities = await repository.createD1GitHubSourceJobRepository(sqlite)
+      .listRuntimeCapabilities();
+    assert.equal(capabilities.length, 1);
+    assert.equal(capabilities[0].runtimeId, "legacy-runtime");
+    assert.equal(capabilities[0].accountLogin, "coreline-ai");
   } finally {
     sqlite.close();
   }

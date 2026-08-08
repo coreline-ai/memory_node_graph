@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { createGitHubApplyStageChunks } from "../.connector-dist/app/lib/github/apply-stage-contracts.js";
+import { createGitHubApplyStageChunks } from "../.runtime-dist/app/lib/github/apply-stage-contracts.js";
 
 process.env.ATLAS_MEMORY_STORAGE = "true";
 process.env.ATLAS_TEST_MODE = "true";
@@ -115,7 +115,10 @@ test("server-renders Atlas Control Room", async () => {
   assert.match(html, /REPOSITORY SYNC STATUS/);
   assert.match(html, /저장소별 그래프 반영 상태/);
   assert.match(html, /PIPELINE ACTIVITY/);
-  assert.match(html, /Connector 오프라인/);
+  assert.match(html, /CODEX OAUTH/);
+  assert.match(html, /GITHUB OAUTH/);
+  assert.match(html, /보기별 최대/);
+  assert.doesNotMatch(html, /통합 런타임 오프라인/);
   assert.match(html, /AI 보강 작업/);
 });
 
@@ -187,7 +190,7 @@ test("Graph RAG retrieval API validates questions and returns bounded evidence c
   assert.equal((await excessive.json()).code, "invalid_limits");
 });
 
-test("Graph RAG 답변 생성은 Connector 오프라인 fallback과 context 인용 재검증을 지킨다", async () => {
+test("Graph RAG 답변 생성은 통합 런타임 오프라인 fallback과 context 인용 재검증을 지킨다", async () => {
   const phrase = "위상기억대장은 검증된 에이전트 결과를 다시 검색합니다";
   const form = new FormData();
   form.append("files", new File([
@@ -196,9 +199,9 @@ test("Graph RAG 답변 생성은 Connector 오프라인 fallback과 context 인�
   const uploaded = await request("/api/documents", { method: "POST", body: form });
   assert.equal(uploaded.status, 201);
   const documentId = (await uploaded.json()).results[0].document.id;
-  const connectorHeaders = {
+  const runtimeHeaders = {
     "content-type": "application/json",
-    "x-atlas-connector-id": "connector-graph-answer-test",
+    "x-atlas-runtime-id": "runtime-graph-answer-test",
     authorization: "Bearer graph-answer-test-secret",
   };
   try {
@@ -210,15 +213,18 @@ test("Graph RAG 답변 생성은 Connector 오프라인 fallback과 context 인�
     assert.equal(offline.status, 200);
     const offlinePayload = await offline.json();
     assert.equal(offlinePayload.meta.answerReady, true);
-    assert.equal(offlinePayload.answer.status, "connector_offline");
+    assert.equal(offlinePayload.answer.status, "runtime_unavailable");
     assert.equal(offlinePayload.answer.jobId, null);
     assert.ok(offlinePayload.context.citations.length > 0);
 
-    process.env.ATLAS_CONNECTOR_TOKEN = "graph-answer-test-secret";
-    const online = await request("/api/enrichment-jobs/heartbeat", {
+    const online = await request("/api/runtime/status", {
       method: "POST",
-      headers: connectorHeaders,
-      body: JSON.stringify({ status: "online", version: "atlas-connector-answer-test" }),
+      headers: runtimeHeaders,
+      body: JSON.stringify({
+        status: "online",
+        version: "atlas-integrated-codex-runtime-1-test",
+        runtimeState: "connected",
+      }),
     });
     assert.equal(online.status, 200);
 
@@ -233,7 +239,7 @@ test("Graph RAG 답변 생성은 Connector 오프라인 fallback과 context 인�
 
     const claimed = await request("/api/graph/query-jobs/claim", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify({ leaseDurationMs: 60_000 }),
     });
     assert.equal(claimed.status, 200);
@@ -242,7 +248,7 @@ test("Graph RAG 답변 생성은 Connector 오프라인 fallback과 context 인�
     assert.ok(job.input.constraints.allowedCitationIds.length > 0);
     assert.equal((await request(`/api/graph/query-jobs/${encodeURIComponent(job.id)}/start`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     })).status, 200);
 
@@ -262,7 +268,7 @@ test("Graph RAG 답변 생성은 Connector 오프라인 fallback과 context 인�
     };
     const invalid = await request(`/api/graph/query-jobs/${encodeURIComponent(job.id)}/result`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify({
         ...baseResult,
         claims: [{ text: answerText, citationIds: ["invented-citation"] }],
@@ -274,7 +280,7 @@ test("Graph RAG 답변 생성은 Connector 오프라인 fallback과 context 인�
 
     const completed = await request(`/api/graph/query-jobs/${encodeURIComponent(job.id)}/result`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify(baseResult),
     });
     assert.equal(completed.status, 200);
@@ -287,13 +293,16 @@ test("Graph RAG 답변 생성은 Connector 오프라인 fallback과 context 인�
     assert.equal(fetched.status, 200);
     assert.equal((await fetched.json()).job.result.answer, answerText);
   } finally {
-    await request("/api/enrichment-jobs/heartbeat", {
+    await request("/api/runtime/status", {
       method: "POST",
-      headers: connectorHeaders,
-      body: JSON.stringify({ status: "offline", version: "atlas-connector-answer-test" }),
+      headers: runtimeHeaders,
+      body: JSON.stringify({
+        status: "offline",
+        version: "atlas-integrated-codex-runtime-1-test",
+        runtimeState: "failed",
+      }),
     });
     await request(`/api/documents/${encodeURIComponent(documentId)}`, { method: "DELETE" });
-    delete process.env.ATLAS_CONNECTOR_TOKEN;
   }
 });
 
@@ -480,6 +489,47 @@ test("document API validates, parses, deduplicates, and deletes Markdown", async
   assert.equal((await removed.json()).snapshot.documents.length, 0);
 });
 
+test("새 Markdown 노드는 전체 검색에서 출처 문서를 찾고 문서 중심 1·2-hop 그래프로 열린다", async () => {
+  const form = new FormData();
+  form.append(
+    "files",
+    new File(
+      ["# Phase 6 Search Probe\n\n개념: AtlasPhaseSixProbe\n\n## 관계 확인\n\nAtlasPhaseSixProbe는 문서 중심 탐색을 지원합니다."],
+      "phase-6-search-probe.md",
+      { type: "text/markdown" },
+    ),
+  );
+  const upload = await request("/api/documents", { method: "POST", body: form });
+  assert.equal(upload.status, 201);
+  const uploaded = await upload.json();
+  const documentId = uploaded.results[0].document.id;
+
+  const recentResponse = await request("/api/graph/documents?limit=6");
+  assert.equal(recentResponse.status, 200);
+  const recent = await recentResponse.json();
+  assert.ok(recent.documents.some((document) => document.id === documentId));
+
+  const searchResponse = await request("/api/graph/search?q=AtlasPhaseSixProbe&limit=8");
+  assert.equal(searchResponse.status, 200);
+  const search = await searchResponse.json();
+  const result = search.results.find((item) => item.document?.id === documentId);
+  assert.ok(result);
+  assert.match(result.node.label, /AtlasPhaseSixProbe/);
+
+  const graphResponse = await request(
+    `/api/graph?scope=document&documentId=${encodeURIComponent(documentId)}`,
+  );
+  assert.equal(graphResponse.status, 200);
+  const graph = await graphResponse.json();
+  assert.equal(graph.meta.scope, "document");
+  assert.equal(graph.meta.documentId, documentId);
+  assert.equal(graph.meta.projectionMode, "document-evidence-graph");
+  assert.equal(graph.meta.displayEdgeCount, 0);
+  assert.ok(graph.nodes.some((node) => node.id === result.node.id));
+
+  await request(`/api/documents/${encodeURIComponent(documentId)}`, { method: "DELETE" });
+});
+
 test("shared entities survive deletion and failed replacement preserves the previous graph", async () => {
   const upload = async (name, source) => {
     const form = new FormData();
@@ -528,19 +578,18 @@ test("shared entities survive deletion and failed replacement preserves the prev
   assert.equal((await (await request("/api/documents")).json()).totals.documents, 0);
 });
 
-test("Connector API authenticates, validates evidence, and merges one idempotent result", async () => {
-  process.env.ATLAS_CONNECTOR_TOKEN = "connector-test-token";
-  const connectorHeaders = {
-    authorization: "Bearer connector-test-token",
+test("통합 런타임 API authenticates, validates evidence, and merges one idempotent result", async () => {
+  const runtimeHeaders = {
+    authorization: "Bearer runtime-test-token",
     "content-type": "application/json",
-    "x-atlas-connector-id": "connector-test-1",
+    "x-atlas-runtime-id": "runtime-test-1",
   };
   const form = new FormData();
   form.append(
     "files",
     new File(
-      ["# Connector API\n\n## 검색\n\n개념: 근거 기반 검색\n\n## 그래프\n\n개념: 관계 지식"],
-      "connector-api.md",
+      ["# 통합 런타임 API\n\n## 검색\n\n개념: 근거 기반 검색\n\n## 그래프\n\n개념: 관계 지식"],
+      "runtime-api.md",
       { type: "text/markdown" },
     ),
   );
@@ -554,14 +603,14 @@ test("Connector API authenticates, validates evidence, and merges one idempotent
 
     const unauthenticated = await request("/api/enrichment-jobs/claim", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-atlas-connector-id": "connector-test-1" },
+      headers: { "content-type": "application/json" },
       body: "{}",
     });
     assert.equal(unauthenticated.status, 401);
 
     const claim = await request("/api/enrichment-jobs/claim", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify({ leaseDurationMs: 60_000 }),
     });
     assert.equal(claim.status, 200);
@@ -571,14 +620,14 @@ test("Connector API authenticates, validates evidence, and merges one idempotent
 
     const started = await request(`/api/enrichment-jobs/${encodeURIComponent(claimed.id)}/start`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     assert.equal(started.status, 200);
 
     const mismatched = await request(`/api/enrichment-jobs/${encodeURIComponent(claimed.id)}/result`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify({
         jobId: "wrong-job",
         idempotencyKey: claimed.idempotencyKey,
@@ -653,7 +702,7 @@ test("Connector API authenticates, validates evidence, and merges one idempotent
     };
     const submitted = await request(`/api/enrichment-jobs/${encodeURIComponent(claimed.id)}/result`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify(result),
     });
     assert.equal(submitted.status, 200);
@@ -664,7 +713,7 @@ test("Connector API authenticates, validates evidence, and merges one idempotent
 
     const duplicate = await request(`/api/enrichment-jobs/${encodeURIComponent(claimed.id)}/result`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify(result),
     });
     assert.equal(duplicate.status, 409);
@@ -675,12 +724,12 @@ test("Connector API authenticates, validates evidence, and merges one idempotent
       1,
     );
 
-    const heartbeat = await request("/api/enrichment-jobs/heartbeat", {
+    const heartbeat = await request("/api/runtime/status", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify({
         status: "online",
-        version: "atlas-connector-test",
+        version: "atlas-runtime-test",
         currentJobId: claimed.id,
         run: {
           mode: "bounded",
@@ -696,11 +745,11 @@ test("Connector API authenticates, validates evidence, and merges one idempotent
     assert.equal(heartbeat.status, 200);
     const heartbeatPayload = await heartbeat.json();
     assert.equal(heartbeatPayload.queue.activeJobs, 0);
-    assert.equal(heartbeatPayload.heartbeat.runMode, "bounded");
+    assert.equal(heartbeatPayload.runtime.runMode, "bounded");
     let dashboard = await (await request("/api/documents")).json();
-    assert.equal(dashboard.connector.status, "online");
-    assert.equal(dashboard.connector.maxJobs, 1);
-    assert.equal(dashboard.connector.warningJobs, 1);
+    assert.equal(dashboard.runtime.status, "online");
+    assert.equal(dashboard.runtime.maxJobs, 1);
+    assert.equal(dashboard.runtime.warningJobs, 1);
     assert.equal(dashboard.enrichmentJobs[0].status, "warning");
 
     const retried = await request(`/api/enrichment-jobs/${encodeURIComponent(claimed.id)}/retry`, {
@@ -728,39 +777,37 @@ test("Connector API authenticates, validates evidence, and merges one idempotent
     assert.equal(cancelled.status, 200);
     assert.equal((await cancelled.json()).snapshot.enrichmentJobs[0].status, "cancelled");
 
-    await request("/api/enrichment-jobs/heartbeat", {
+    await request("/api/runtime/status", {
       method: "POST",
-      headers: connectorHeaders,
-      body: JSON.stringify({ status: "offline", version: "atlas-connector-test" }),
+      headers: runtimeHeaders,
+      body: JSON.stringify({ status: "offline", version: "atlas-runtime-test" }),
     });
     dashboard = await (await request("/api/documents")).json();
-    assert.equal(dashboard.connector.status, "offline");
+    assert.equal(dashboard.runtime.status, "offline");
 
     process.env.ATLAS_WRITE_ACCESS = "authenticated";
     const forbiddenDocumentDelete = await request(`/api/documents/${encodeURIComponent(documentId)}`, {
       method: "DELETE",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
     });
     assert.equal(forbiddenDocumentDelete.status, 401);
     process.env.ATLAS_WRITE_ACCESS = "public";
     await request(`/api/documents/${encodeURIComponent(documentId)}`, { method: "DELETE" });
   } finally {
     process.env.ATLAS_WRITE_ACCESS = "public";
-    delete process.env.ATLAS_CONNECTOR_TOKEN;
   }
 });
 
-test("GitHub source 작업 API는 OAuth 쓰기 경계와 Connector capability 경계를 분리한다", async () => {
+test("GitHub source 작업 API는 OAuth 쓰기 경계와 통합 런타임 capability 경계를 분리한다", async () => {
   process.env.ATLAS_WRITE_ACCESS = "authenticated";
-  process.env.ATLAS_CONNECTOR_TOKEN = "github-source-connector-secret";
   const userHeaders = {
     "content-type": "application/json",
     "oai-authenticated-user-id": "github-source-test-user",
   };
-  const connectorHeaders = {
-    authorization: "Bearer github-source-connector-secret",
+  const runtimeHeaders = {
+    authorization: "Bearer github-source-runtime-secret",
     "content-type": "application/json",
-    "x-atlas-connector-id": "github-source-api-test",
+    "x-atlas-runtime-id": "github-source-api-test",
   };
 
   try {
@@ -779,17 +826,22 @@ test("GitHub source 작업 API는 OAuth 쓰기 경계와 Connector capability �
     assert.equal(createdResponse.status, 201);
     const created = await createdResponse.json();
     assert.equal(created.job.status, "queued");
+    assert.equal(created.job.input.runtimeVersion, "atlas-integrated-github-runtime-1");
 
-    const unauthenticatedCapability = await request("/api/github/source-jobs/capability", {
+    const blockedListing = await request("/api/github/source-jobs");
+    assert.equal(blockedListing.status, 401);
+    assert.doesNotMatch(await blockedListing.text(), /private|repositoryName|relativePath|sourceUrl/i);
+
+    const unauthenticatedCapability = await request("/api/runtime/status", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-atlas-connector-id": "github-source-api-test" },
+      headers: { "content-type": "application/json" },
       body: "{}",
     });
     assert.equal(unauthenticatedCapability.status, 401);
 
     const claimBeforeCapability = await request("/api/github/source-jobs/claim", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     assert.equal(claimBeforeCapability.status, 200);
@@ -802,18 +854,33 @@ test("GitHub source 작업 API는 OAuth 쓰기 경계와 Connector capability �
       host: "github.com",
       checkedAt: "2026-08-04T10:00:00.000Z",
     };
-    const capability = await request("/api/github/source-jobs/capability", {
+    const capability = await request("/api/runtime/status", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify(capabilityReport),
     });
     assert.equal(capability.status, 200);
-    assert.equal((await capability.json()).capability.status, "online");
+    assert.equal((await capability.json()).github.status, "online");
+
+    const integratedCapability = await request("/api/runtime/status", {
+      method: "POST",
+      headers: { ...runtimeHeaders, "x-atlas-runtime-id": "atlas-runtime-api-test" },
+      body: JSON.stringify(capabilityReport),
+    });
+    assert.equal(integratedCapability.status, 200);
+    const publicRuntimeStatus = await request("/api/runtime/github/status");
+    assert.equal(publicRuntimeStatus.status, 200);
+    const runtimeStatusText = await publicRuntimeStatus.text();
+    assert.match(runtimeStatusText, /"state":"connected"/);
+    assert.doesNotMatch(runtimeStatusText, /accountLogin|runtimeId|repositoryName|relativePath|sourceUrl|atlas-user/i);
 
     const claimResponse = await request("/api/github/source-jobs/claim", {
       method: "POST",
-      headers: connectorHeaders,
-      body: JSON.stringify({ leaseDurationMs: 60_000 }),
+      headers: runtimeHeaders,
+      body: JSON.stringify({
+        leaseDurationMs: 60_000,
+        runtimeVersion: "atlas-integrated-github-runtime-1",
+      }),
     });
     assert.equal(claimResponse.status, 200);
     const claimed = (await claimResponse.json()).job;
@@ -822,7 +889,7 @@ test("GitHub source 작업 API는 OAuth 쓰기 경계와 Connector capability �
 
     const started = await request(
       `/api/github/source-jobs/${encodeURIComponent(claimed.id)}/start`,
-      { method: "POST", headers: connectorHeaders, body: "{}" },
+      { method: "POST", headers: runtimeHeaders, body: "{}" },
     );
     assert.equal(started.status, 200);
 
@@ -843,7 +910,7 @@ test("GitHub source 작업 API는 OAuth 쓰기 경계와 Connector capability �
     };
     const completed = await request(
       `/api/github/source-jobs/${encodeURIComponent(claimed.id)}/result`,
-      { method: "POST", headers: connectorHeaders, body: JSON.stringify(result) },
+      { method: "POST", headers: runtimeHeaders, body: JSON.stringify(result) },
     );
     assert.equal(completed.status, 200);
     assert.equal((await completed.json()).job.status, "completed");
@@ -874,18 +941,18 @@ test("GitHub source 작업 API는 OAuth 쓰기 경계와 Connector capability �
     const preview = (await previewResponse.json()).job;
     const previewClaim = await request("/api/github/source-jobs/claim", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     assert.equal((await previewClaim.clone().json()).job.id, preview.id);
     await request(`/api/github/source-jobs/${encodeURIComponent(preview.id)}/start`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     const failed = await request(`/api/github/source-jobs/${encodeURIComponent(preview.id)}/fail`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify({
         errorCode: "github_forbidden",
         errorMessage: "저장소 읽기 권한이 없습니다.",
@@ -908,10 +975,9 @@ test("GitHub source 작업 API는 OAuth 쓰기 경계와 Connector capability �
     assert.equal(listing.status, 200);
     const listingText = await listing.text();
     assert.match(listingText, /github-source-api-test/);
-    assert.doesNotMatch(listingText, /github-source-connector-secret|authorization/i);
+    assert.doesNotMatch(listingText, /github-source-runtime-secret|authorization/i);
   } finally {
     process.env.ATLAS_WRITE_ACCESS = "public";
-    delete process.env.ATLAS_CONNECTOR_TOKEN;
   }
 });
 
@@ -989,15 +1055,14 @@ test("GitHub 증분 API는 저장소마다 Preview를 분리하고 예약·Webho
 
 test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복구 후 실패 시 이전 그래프를 보존한다", async () => {
   process.env.ATLAS_WRITE_ACCESS = "authenticated";
-  process.env.ATLAS_CONNECTOR_TOKEN = "github-apply-connector-secret";
   const userHeaders = {
     "content-type": "application/json",
     "oai-authenticated-user-id": "github-apply-user",
   };
-  const connectorHeaders = {
-    authorization: "Bearer github-apply-connector-secret",
+  const runtimeHeaders = {
+    authorization: "Bearer github-apply-runtime-secret",
     "content-type": "application/json",
-    "x-atlas-connector-id": "github-apply-connector",
+    "x-atlas-runtime-id": "github-apply-runtime",
   };
   const capability = {
     capability: "github-source",
@@ -1029,21 +1094,21 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
     });
     assert.equal(created.status, 201);
     const queued = (await created.json()).job;
-    await request("/api/github/source-jobs/capability", {
+    await request("/api/runtime/status", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify(capability),
     });
     const claimedResponse = await request("/api/github/source-jobs/claim", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     const claimed = (await claimedResponse.json()).job;
     assert.equal(claimed.id, queued.id);
     await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/start`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     const payload = singleRepositoryApplyPayload(content, digest);
@@ -1057,7 +1122,7 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
       for (const chunk of stagedBundle.chunks) {
         const upload = await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/stage`, {
           method: "POST",
-          headers: connectorHeaders,
+          headers: runtimeHeaders,
           body: JSON.stringify(chunk),
         });
         assert.equal(upload.status, 200);
@@ -1095,18 +1160,18 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
       };
       integrityAttempts.push(await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/stage`, {
         method: "POST",
-        headers: connectorHeaders,
+        headers: runtimeHeaders,
         body: JSON.stringify(corrupted),
       }));
       integrityAttempts.push(await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/result`, {
         method: "POST",
-        headers: connectorHeaders,
+        headers: runtimeHeaders,
         body: submissionBody,
       }));
       for (const chunk of stagedBundle.chunks) {
         const upload = await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/stage`, {
           method: "POST",
-          headers: connectorHeaders,
+          headers: runtimeHeaders,
           body: JSON.stringify(chunk),
         });
         assert.equal(upload.status, 200);
@@ -1115,18 +1180,18 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
       staleSubmission.applyPayload.preview.manifestDigest = "9".repeat(64);
       integrityAttempts.push(await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/result`, {
         method: "POST",
-        headers: connectorHeaders,
+        headers: runtimeHeaders,
         body: JSON.stringify(staleSubmission),
       }));
       integrityAttempts.push(await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/result`, {
         method: "POST",
-        headers: connectorHeaders,
+        headers: runtimeHeaders,
         body: submissionBody,
       }));
       for (const chunk of stagedBundle.chunks) {
         const upload = await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/stage`, {
           method: "POST",
-          headers: connectorHeaders,
+          headers: runtimeHeaders,
           body: JSON.stringify(chunk),
         });
         assert.equal(upload.status, 200);
@@ -1135,13 +1200,13 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
     if (failCompletionOnce) process.env.ATLAS_TEST_FAIL_GITHUB_SOURCE_COMPLETE_ONCE = claimed.id;
     const submitted = await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/result`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: submissionBody,
     });
     const recovered = failCompletionOnce
       ? await request(`/api/github/source-jobs/${encodeURIComponent(claimed.id)}/result`, {
           method: "POST",
-          headers: connectorHeaders,
+          headers: runtimeHeaders,
           body: submissionBody,
         })
       : undefined;
@@ -1215,27 +1280,27 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
     });
     assert.equal(dryRunPreviewCreated.status, 201);
     const dryRunPreviewJob = (await dryRunPreviewCreated.json()).job;
-    await request("/api/github/source-jobs/capability", {
+    await request("/api/runtime/status", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify(capability),
     });
     const dryRunPreviewClaimed = await request("/api/github/source-jobs/claim", {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     assert.equal((await dryRunPreviewClaimed.clone().json()).job.id, dryRunPreviewJob.id);
     await request(`/api/github/source-jobs/${encodeURIComponent(dryRunPreviewJob.id)}/start`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: "{}",
     });
     const dryRunPreviewCompleted = await request(
       `/api/github/source-jobs/${encodeURIComponent(dryRunPreviewJob.id)}/result`,
       {
         method: "POST",
-        headers: connectorHeaders,
+        headers: runtimeHeaders,
         body: JSON.stringify({
           jobId: dryRunPreviewJob.id,
           idempotencyKey: dryRunPreviewJob.idempotencyKey,
@@ -1341,7 +1406,7 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
 
     const failed = await request(`/api/github/source-jobs/${encodeURIComponent(second.claimed.id)}/fail`, {
       method: "POST",
-      headers: connectorHeaders,
+      headers: runtimeHeaders,
       body: JSON.stringify({
         errorCode: "invalid_result",
         errorMessage: "원자적 apply rollback 검증",
@@ -1391,7 +1456,6 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
     await request(`/api/documents/${encodeURIComponent(dashboard.documents[0].id)}`, { method: "DELETE" });
   } finally {
     process.env.ATLAS_WRITE_ACCESS = "public";
-    delete process.env.ATLAS_CONNECTOR_TOKEN;
     delete process.env.ATLAS_TEST_FAIL_REPOSITORY_APPLY;
     delete process.env.ATLAS_TEST_FAIL_GITHUB_SOURCE_COMPLETE_ONCE;
   }

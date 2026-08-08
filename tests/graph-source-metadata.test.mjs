@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   attachRepositoryNodeSources,
   parseGitHubNodeSource,
-} from "../.connector-dist/app/lib/graph/source-metadata.js";
+} from "../.runtime-dist/app/lib/graph/source-metadata.js";
 
 const node = (id) => ({
   id,

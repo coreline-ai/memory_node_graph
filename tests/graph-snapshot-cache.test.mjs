@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createGraphSnapshotCache } from "../.connector-dist/app/lib/graph/snapshot-cache.js";
+import { createGraphSnapshotCache } from "../.runtime-dist/app/lib/graph/snapshot-cache.js";
 
 const snapshot = (label) => ({
   nodes: [{

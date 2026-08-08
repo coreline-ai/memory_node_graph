@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAtlasConnectorAccess } from "../../../../../lib/auth/connector-access";
+import { requireAtlasRuntimeAccess } from "../../../../../lib/auth/runtime-access";
 import { validateGitHubApplySubmission } from "../../../../../lib/github/apply-contracts";
 import { hydrateGitHubApplyStageSubmission } from "../../../../../lib/github/apply-stage-contracts";
 import { applySingleGitHubRepository } from "../../../../../lib/github/apply-service";
@@ -14,7 +14,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
-  const access = await requireAtlasConnectorAccess(request, { limitPerMinute: 120 });
+  const access = await requireAtlasRuntimeAccess(request, { limitPerMinute: 120 });
   if ("response" in access) return access.response;
   try {
     const { jobId } = await context.params;
@@ -23,10 +23,10 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     if (!current) throw new GitHubSourceRepositoryError("invalid_input", "GitHub source 작업을 찾을 수 없습니다.");
     if (
       !["leased", "running"].includes(current.status)
-      || current.leaseOwner !== access.connectorId
+      || current.leaseOwner !== access.runtimeId
       || !current.leaseExpiresAt
       || Date.parse(current.leaseExpiresAt) <= Date.now()
-    ) throw new GitHubSourceRepositoryError("lease_conflict", "현재 Connector가 소유한 유효 Lease가 아닙니다.");
+    ) throw new GitHubSourceRepositoryError("lease_conflict", "현재 통합 런타임가 소유한 유효 Lease가 아닙니다.");
     const submitted = await readLimitedJson(request, 12 * 1024 * 1024);
     let result: unknown = submitted;
     if (current.kind === "apply") {
@@ -69,7 +69,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
     }
     const job = await repository.complete({
       jobId,
-      connectorId: access.connectorId,
+      runtimeId: access.runtimeId,
       result,
     });
     return NextResponse.json({ job });

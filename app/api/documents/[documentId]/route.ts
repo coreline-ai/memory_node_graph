@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireAtlasWriteAccess } from "../../../lib/auth/write-access";
-import { deleteDocument, getDashboardSnapshot } from "../../../lib/storage/graph-repository";
+import {
+  deletedDocumentMutationReceipt,
+  documentMutationResponse,
+} from "../../../lib/ingestion/document-mutation-receipt";
+import {
+  deleteDocument,
+  findDocumentById,
+  getDashboardSnapshot,
+} from "../../../lib/storage/graph-repository";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +20,16 @@ export async function DELETE(
   if (unauthorized) return unauthorized;
 
   const { documentId } = await context.params;
+  const document = await findDocumentById(documentId);
+  if (!document) {
+    return NextResponse.json({ error: "문서를 찾을 수 없습니다." }, { status: 404 });
+  }
   await deleteDocument(documentId);
-  return NextResponse.json({ ok: true, snapshot: await getDashboardSnapshot() });
+  const snapshot = await getDashboardSnapshot();
+  return NextResponse.json({
+    ...documentMutationResponse([
+      deletedDocumentMutationReceipt(document),
+    ], snapshot),
+    ok: true,
+  });
 }

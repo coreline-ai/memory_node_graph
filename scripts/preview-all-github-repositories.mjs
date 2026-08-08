@@ -183,7 +183,7 @@ export function renderPreviewReport(receipt) {
 
 function parseArguments(argv) {
   const options = {
-    baseUrl: process.env.ATLAS_BASE_URL?.trim() || "http://localhost:3000",
+    baseUrl: process.env.ATLAS_RUNTIME_ORIGIN?.trim() || "http://localhost:3000",
     pollMs: 1_000,
     timeoutMs: 30 * 60 * 1_000,
     runId: `full-preview-${Date.now()}`,

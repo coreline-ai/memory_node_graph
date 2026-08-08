@@ -1,7 +1,7 @@
-import type { GitHubConnectorCapabilityRecord } from "./source-job-contracts.js";
+import type { GitHubRuntimeCapabilityRecord } from "./source-job-contracts.js";
 
 export type GitHubCapabilityGuidance = {
-  status: GitHubConnectorCapabilityRecord["status"] | "no_signal";
+  status: GitHubRuntimeCapabilityRecord["status"] | "unavailable";
   tone: "ready" | "attention" | "critical";
   title: string;
   description: string;
@@ -15,17 +15,16 @@ export type GitHubCapabilityGuidance = {
 export const GITHUB_CAPABILITY_STALE_MS = 45_000;
 
 export function resolveGitHubCapabilityGuidance(
-  capability: GitHubConnectorCapabilityRecord | undefined,
+  capability: GitHubRuntimeCapabilityRecord | undefined,
   now = Date.now(),
 ): GitHubCapabilityGuidance {
   if (!capability) {
     return {
-      status: "no_signal",
-      tone: "critical",
-      title: "GitHub Connector 신호가 없습니다.",
-      description: "저장소 목록을 읽을 로컬 Connector가 아직 capability 상태를 보고하지 않았습니다.",
-      nextStep: "별도 터미널에서 Connector를 실행한 뒤 상태를 다시 확인하세요.",
-      command: "npm run connector:start",
+      status: "unavailable",
+      tone: "attention",
+      title: "GitHub OAuth 상태를 확인하고 있습니다.",
+      description: "웹앱 시작 시 함께 실행되는 통합 런타임의 GitHub 상태를 아직 받지 못했습니다.",
+      nextStep: "잠시 후 상태 다시 확인을 누르세요. 별도 실행 프로세스는 필요하지 않습니다.",
       canRequestDiscovery: true,
       actionLabel: "상태 다시 확인",
     };
@@ -34,12 +33,11 @@ export function resolveGitHubCapabilityGuidance(
   const lastSeenAt = Date.parse(capability.lastSeenAt);
   if (!Number.isFinite(lastSeenAt) || now - lastSeenAt > GITHUB_CAPABILITY_STALE_MS) {
     return {
-      status: "no_signal",
-      tone: "critical",
-      title: "GitHub Connector 신호가 오래되었습니다.",
-      description: "마지막 capability 보고가 만료되어 이전 온라인 상태를 신뢰하지 않습니다.",
-      nextStep: "Connector를 다시 실행한 뒤 상태를 다시 확인하세요.",
-      command: "npm run connector:start",
+      status: "unavailable",
+      tone: "attention",
+      title: "GitHub OAuth 상태 갱신 대기",
+      description: "마지막 상태 정보가 오래되어 다시 확인하고 있습니다.",
+      nextStep: "통합 웹앱이 실행 중인지 확인한 뒤 상태 다시 확인을 누르세요.",
       canRequestDiscovery: true,
       actionLabel: "상태 다시 확인",
     };
@@ -49,7 +47,7 @@ export function resolveGitHubCapabilityGuidance(
     return {
       status: "online",
       tone: "ready",
-      title: "GitHub Connector가 준비되었습니다.",
+      title: "GitHub 통합 런타임이 준비되었습니다.",
       description: "현재 로컬 gh 로그인으로 discovery, preview, apply 작업을 실행할 수 있습니다.",
       nextStep: "저장소 찾기 또는 저장소 다시 찾기를 실행하세요.",
       canRequestDiscovery: true,
@@ -62,7 +60,7 @@ export function resolveGitHubCapabilityGuidance(
       status: "login_required",
       tone: "attention",
       title: "GitHub CLI 로그인이 필요합니다.",
-      description: "브라우저에 토큰을 입력하지 않습니다. Connector가 실행되는 로컬 환경에서 gh 로그인만 완료하면 됩니다.",
+      description: "브라우저에 토큰을 입력하지 않습니다. 통합 런타임이 실행되는 로컬 환경에서 gh 로그인만 완료하면 됩니다.",
       nextStep: "로그인을 마친 뒤 이 화면에서 상태를 다시 확인하세요.",
       command: "gh auth login --hostname github.com",
       canRequestDiscovery: true,
@@ -111,8 +109,8 @@ export function resolveGitHubCapabilityGuidance(
       status: "offline",
       tone: "critical",
       title: "GitHub CLI(gh)를 찾을 수 없습니다.",
-      description: "Connector는 GitHub 자격 증명을 직접 저장하지 않으며, 로컬 gh CLI만 사용합니다.",
-      nextStep: "gh를 설치한 뒤 Connector를 다시 실행하고 상태를 확인하세요.",
+      description: "통합 런타임은 GitHub 자격 증명을 직접 저장하지 않으며, 로컬 gh CLI만 사용합니다.",
+      nextStep: "gh를 설치한 뒤 통합 런타임을 다시 실행하고 상태를 확인하세요.",
       command: "gh --version",
       canRequestDiscovery: true,
       actionLabel: "설치 후 재확인",
@@ -122,11 +120,10 @@ export function resolveGitHubCapabilityGuidance(
   return {
     status: "offline",
     tone: "critical",
-    title: "GitHub Connector가 오프라인입니다.",
-    description: "대시보드는 읽기 전용으로 유지됩니다. GitHub discovery와 원문 apply는 로컬 Connector가 연결된 경우에만 실행됩니다.",
-    nextStep: "Connector를 실행하거나 연결을 복구한 뒤 상태를 다시 확인하세요.",
-    command: "npm run connector:start",
+    title: "GitHub 통합 런타임이 오프라인입니다.",
+    description: "대시보드는 읽기 전용으로 유지됩니다. GitHub discovery와 원문 apply는 로컬 통합 런타임이 연결된 경우에만 실행됩니다.",
+    nextStep: "통합 웹앱이 실행 중인지 확인한 뒤 상태를 다시 확인하세요.",
     canRequestDiscovery: true,
-    actionLabel: "Connector 재확인",
+    actionLabel: "통합 런타임 재확인",
   };
 }
