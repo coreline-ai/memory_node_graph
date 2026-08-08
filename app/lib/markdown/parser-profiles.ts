@@ -31,8 +31,8 @@ export type MarkdownParserProfile = "generic" | "github-readme" | "github-dev-pl
 
 export const MARKDOWN_PROFILE_VERSIONS: Record<MarkdownParserProfile, string> = {
   generic: MARKDOWN_PARSER_VERSION,
-  "github-readme": "remark-ast-github-readme-4",
-  "github-dev-plan": "remark-ast-github-dev-plan-4",
+  "github-readme": "remark-ast-github-readme-5",
+  "github-dev-plan": "remark-ast-github-dev-plan-5",
 };
 
 export type ProfiledExtractionContext = {
@@ -535,14 +535,18 @@ async function extractGitHubProfile(
             ? `storage:github:${sourceDescriptor.repositoryId}:${stableKey(candidate.key)}`
             : candidate.semanticType === "file"
               ? `file:github:${sourceDescriptor.repositoryId}:${stableKey(candidate.key)}`
-              : `${candidate.semanticType}:${documentId}:${stableKey(candidate.key)}`;
+              : candidate.semanticType === "component"
+                ? `component:${documentId}:${stableKey(candidate.key)}`
+                : `${candidate.semanticType}:${documentId}:${stableKey(candidate.key)}`;
       const kind: NodeKind = candidate.semanticType === "api" || candidate.semanticType === "technology"
         ? "tool"
         : candidate.semanticType === "storage"
           ? "system"
           : candidate.semanticType === "file"
             ? "tool"
-            : "practice";
+            : candidate.semanticType === "component"
+              ? "system"
+              : "practice";
       const entity = addNode(makeNode({
         id: entityId,
         label: candidate.label,
@@ -653,7 +657,7 @@ async function extractGitHubProfile(
   const structuralTypes = new Set<RelationKind>(["documents", "plans", "contains"]);
   const nodeScore = (node: KnowledgeNode) => {
     if ([repositoryNodeId, documentNodeId, planNodeId].includes(node.id)) return 10_000;
-    if (node.tags.some((tag) => ["api", "storage", "technology", "file", "test", "risk", "decision", "identifier"].includes(tag))) return 900;
+    if (node.tags.some((tag) => ["component", "api", "storage", "technology", "file", "test", "risk", "decision", "identifier"].includes(tag))) return 900;
     if (node.tags.includes("phase")) return 760;
     if (node.tags.includes("task")) return 680;
     if (node.tags.includes("feature")) return 620;

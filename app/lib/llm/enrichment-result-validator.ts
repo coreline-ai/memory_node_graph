@@ -6,6 +6,10 @@ import {
   type EnrichmentRelationCandidate,
   type EnrichmentResult,
 } from "./enrichment-contracts.js";
+import {
+  isCodexOrderRelationAllowed,
+  isCodexSemanticRelationType,
+} from "./relationship-candidate-score.js";
 
 export class EnrichmentValidationError extends Error {
   readonly code = "invalid_result" as const;
@@ -44,6 +48,17 @@ function parseRelation(
   }
   if (source === target) return { warning: `관계 ${index + 1}: 자기 자신을 연결할 수 없습니다.` };
   if (!allowedTypes.has(type)) return { warning: `관계 ${index + 1}: 허용되지 않은 관계 유형입니다.` };
+  if (!isCodexSemanticRelationType(type as EnrichmentRelationCandidate["type"])) {
+    return { warning: `관계 ${index + 1}: 구조 관계는 Codex 보강 결과로 저장하지 않습니다.` };
+  }
+  if (!isCodexOrderRelationAllowed(
+    type as EnrichmentRelationCandidate["type"],
+    source,
+    target,
+    job.input.nodes,
+  )) {
+    return { warning: `관계 ${index + 1}: Phase·Task·workflow 근거 없는 문서 순서는 저장하지 않습니다.` };
+  }
   if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
     return { warning: `관계 ${index + 1}: 신뢰도 범위가 잘못되었습니다.` };
   }

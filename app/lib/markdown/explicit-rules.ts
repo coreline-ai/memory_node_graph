@@ -11,6 +11,7 @@ export type ExplicitEntityType =
   | "file"
   | "storage"
   | "technology"
+  | "component"
   | "command"
   | "test"
   | "phase"
@@ -308,6 +309,29 @@ export function explicitEntitiesIn(
       confidence: 0.94,
     });
   }
+  // A service-like snake_case identifier is a component only when the same
+  // prose block explains an operation or responsibility. A bare command or a
+  // generic word such as "proxy" is intentionally not enough evidence.
+  const componentPattern = /\b([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\b/gi;
+  const componentSuffix = /_(?:proxy|service|worker|client|server|engine|renderer|router|store)$/i;
+  const componentContext = /(?:\b(?:calls?|uses?|produces?|handles?|serves?|publishes?|runs?|process(?:es|ing)?)\b|(?:호출|사용|생성|처리|발행|제공|연동|검증|프록시|서비스|컴포넌트))/iu;
+  if (!options.codeBlock) {
+    for (const match of text.matchAll(componentPattern)) {
+      const label = match[1];
+      if (!componentSuffix.test(label)) continue;
+      const surrounding = `${text.slice(Math.max(0, match.index - 80), match.index)} ${text.slice((match.index ?? 0) + label.length, (match.index ?? 0) + label.length + 160)}`;
+      if (!componentContext.test(surrounding)) continue;
+      addCandidate(candidates, seen, {
+        semanticType: "component",
+        key: label.toLowerCase(),
+        label,
+        relation: relationFromExplicitContext(text, "uses"),
+        direction: "owner-to-entity",
+        confidence: 0.93,
+      });
+    }
+  }
+
   const installPattern = /\b(?:npm\s+(?:install|i)|pnpm\s+add|yarn\s+add|bun\s+add)\s+([^\n;&|]+)/gi;
   for (const match of text.matchAll(installPattern)) {
     for (const rawToken of match[1].trim().split(/\s+/)) {

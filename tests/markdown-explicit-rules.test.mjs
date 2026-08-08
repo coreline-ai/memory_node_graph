@@ -105,6 +105,21 @@ test("예시 payload·일반 경로 문자열·명령이 아닌 문장은 전문
   assert.deepEqual(rules.explicitEntitiesIn("fetch 데이터를 설명하지만 명령을 실행하지 않습니다."), []);
 });
 
+test("강한 snake_case component는 책임 문맥에서만 source-local 후보가 된다", async () => {
+  const { rules } = await rulesModule();
+  const candidates = rules.explicitEntitiesIn(
+    "image_proxy는 생성 결과를 public docs로 발행하는 서비스입니다. research_proxy는 GET /v1/research를 호출합니다.",
+  );
+  assert.deepEqual(candidates.filter((candidate) => candidate.semanticType === "component").map((candidate) => candidate.label).sort(), [
+    "image_proxy",
+    "research_proxy",
+  ]);
+  assert.equal(rules.explicitEntitiesIn("proxy service module", { codeBlock: false })
+    .some((candidate) => candidate.semanticType === "component"), false);
+  assert.equal(rules.explicitEntitiesIn("image_proxy --help", { codeBlock: true })
+    .some((candidate) => candidate.semanticType === "component"), false);
+});
+
 test("Phase·P·DEV 식별자와 명시 관계를 결정적으로 정규화한다", async () => {
   const { rules } = await rulesModule();
   assert.deepEqual(rules.explicitIdentifiersIn("Phase 4-A → P5-I, DEV-001 이후 DEV-002"), [

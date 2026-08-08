@@ -96,11 +96,11 @@ test("source 경로가 generic, README, dev-plan parser profile과 version을 �
   assert.equal(profiles.parserVersionForMarkdownSource(manual), "remark-ast-1");
   assert.equal(
     profiles.parserVersionForMarkdownSource(githubDescriptor("README.md")),
-    "remark-ast-github-readme-4",
+    "remark-ast-github-readme-5",
   );
   assert.equal(
     profiles.parserVersionForMarkdownSource(githubDescriptor("dev-plan/phase.md")),
-    "remark-ast-github-dev-plan-4",
+    "remark-ast-github-dev-plan-5",
   );
   assert.equal(profiles.selectMarkdownParserProfile(githubDescriptor("README.md")), "github-readme");
   assert.equal(
@@ -148,6 +148,46 @@ test("README profile은 프로젝트·섹션·기능·기술·명시적 URL을 l
   assert.ok(Object.values(graph.nodeEvidence).every((item) =>
     blockIds.has(item.blockId) && item.sourceUrl?.startsWith(descriptor.sourceUrl),
   ));
+});
+
+test("README profile은 책임 문맥의 component를 document source-local 노드로 분리한다", async () => {
+  const { profiles, parseMarkdown } = await parserModules();
+  const source = [
+    "# Runtime",
+    "image_proxy는 생성 결과를 public docs로 발행하는 서비스입니다.",
+    "research_proxy는 GET /v1/research를 호출합니다.",
+  ].join("\n\n");
+  const graph = await profiles.extractGraphForSource(parseMarkdown(source), {
+    documentId: "document-components",
+    fileName: "README.md",
+    sourceDescriptor: githubDescriptor("README.md"),
+  });
+  const components = graph.nodes.filter((node) => node.tags.includes("component"));
+  assert.deepEqual(components.map((node) => node.label).sort(), ["image_proxy", "research_proxy"]);
+  assert.ok(components.every((node) => node.id.startsWith("component:document-components:")));
+  assert.ok(components.every((node) => graph.nodeEvidence[node.id]?.blockId));
+});
+
+test("같은 component 이름도 다른 GitHub 저장소에서는 자동 병합하지 않는다", async () => {
+  const { profiles, parseMarkdown } = await parserModules();
+  const parsed = parseMarkdown("# Runtime\n\nimage_proxy는 결과를 발행하는 서비스입니다.");
+  const [first, second] = await Promise.all([
+    profiles.extractGraphForSource(parsed, {
+      documentId: "document-component-first",
+      fileName: "README.md",
+      sourceDescriptor: githubDescriptor("README.md", { repositoryId: "1", repositoryName: "first" }),
+    }),
+    profiles.extractGraphForSource(parsed, {
+      documentId: "document-component-second",
+      fileName: "README.md",
+      sourceDescriptor: githubDescriptor("README.md", { repositoryId: "2", repositoryName: "second" }),
+    }),
+  ]);
+  const firstComponent = first.nodes.find((node) => node.tags.includes("component"));
+  const secondComponent = second.nodes.find((node) => node.tags.includes("component"));
+  assert.equal(firstComponent?.label, "image_proxy");
+  assert.equal(secondComponent?.label, "image_proxy");
+  assert.notEqual(firstComponent?.id, secondComponent?.id);
 });
 
 test("Phase 4 규칙은 API·파일·storage·패키지·검증 명령과 저장소 내부 링크를 근거 관계로 추출한다", async () => {

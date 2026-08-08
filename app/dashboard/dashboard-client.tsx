@@ -19,6 +19,7 @@ import type {
 } from "../lib/github/source-job-contracts";
 import type { GitHubRuntimeStatus } from "../lib/github/github-runtime-status";
 import type { CodexRuntimeStatus } from "../lib/llm/codex-runtime-status";
+import type { RelationshipCandidate } from "../lib/llm/relationship-candidate-score";
 import type {
   GitHubRepositorySyncStatus,
   GitHubRepositorySyncSummary,
@@ -64,6 +65,46 @@ type ReprocessPreview = {
     chunks: number;
   };
   batchLimit: number;
+};
+
+type RelationshipCandidateState = {
+  providerVersion: string;
+  candidates: RelationshipCandidate[];
+  pagination: {
+    limit: number;
+    offset: number;
+    returned: number;
+    totalRanked: number;
+    hasMore: boolean;
+  };
+  summary: {
+    availableJobs: number;
+    scannedJobs: number;
+    truncated: boolean;
+    highCount: number;
+    reviewCount: number;
+    excludedCount: number;
+    candidatesWithAnchorPair: number;
+    totalAnchors: number;
+    resolvedAnchors: number;
+    unresolvedAnchors: number;
+    selectionLimit: number;
+    message: string;
+  };
+};
+
+type RelationshipSelectionPreview = {
+  selection: RelationshipCandidate[];
+  preview: {
+    mode: "manual_runtime_command";
+    jobIds: string[];
+    maxJobs: number;
+    maxRuntimeMs: number;
+    enrichmentOnly: boolean;
+    environment: Record<string, string>;
+    command: string;
+    message: string;
+  };
 };
 
 const documentSourceFilterLabels: Record<DashboardDocumentSourceFilter, string> = {
@@ -120,6 +161,26 @@ const emptyRuntimeState: RuntimeDashboardState = {
   },
 };
 
+const emptyRelationshipCandidateState: RelationshipCandidateState = {
+  providerVersion: "codex-sdk-0.146.0+atlas-runtime.1",
+  candidates: [],
+  pagination: { limit: 12, offset: 0, returned: 0, totalRanked: 0, hasMore: false },
+  summary: {
+    availableJobs: 0,
+    scannedJobs: 0,
+    truncated: false,
+    highCount: 0,
+    reviewCount: 0,
+    excludedCount: 0,
+    candidatesWithAnchorPair: 0,
+    totalAnchors: 0,
+    resolvedAnchors: 0,
+    unresolvedAnchors: 0,
+    selectionLimit: 10,
+    message: "현재 provider 대기 작업을 확인하고 있습니다.",
+  },
+};
+
 const mutationOperationLabels: Record<DocumentMutationOperation, string> = {
   created: "신규 반영",
   updated: "내용 갱신",
@@ -138,6 +199,12 @@ const enrichmentLabels: Record<DashboardEnrichmentJob["status"], string> = {
   failed: "보강 실패",
   stale: "이전 결과",
   cancelled: "보강 취소됨",
+};
+
+const relationshipCandidateTierLabels: Record<RelationshipCandidate["tier"], string> = {
+  high: "HIGH · 선택 가능",
+  review: "REVIEW · 검토 필요",
+  excluded: "EXCLUDED · 실행 제외",
 };
 
 const activeEnrichmentStatuses = new Set<DashboardEnrichmentJob["status"]>([
@@ -209,13 +276,18 @@ export default function DashboardClient() {
   const [reprocessPreview, setReprocessPreview] = useState<ReprocessPreview | null>(null);
   const [reprocessing, setReprocessing] = useState(false);
   const [reprocessProgress, setReprocessProgress] = useState({ completed: 0, failed: 0 });
+  const [relationshipCandidates, setRelationshipCandidates] = useState(emptyRelationshipCandidateState);
+  const [relationshipSelection, setRelationshipSelection] = useState<string[]>([]);
+  const [relationshipPreview, setRelationshipPreview] = useState<RelationshipSelectionPreview | null>(null);
+  const [relationshipLoading, setRelationshipLoading] = useState(false);
+  const [relationshipPreviewing, setRelationshipPreviewing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const selectionHydrationRef = useRef("");
   const announcedGraphRevisionRef = useRef("");
 
   const load = useCallback(async () => {
     try {
-      const [nextSnapshot, nextGitHubState, nextCodexStatus, nextGitHubStatus] = await Promise.all([
+      const [nextSnapshot, nextGitHubState, nextCodexStatus, nextGitHubStatus, nextRelationshipCandidates] = await Promise.all([
         jsonRequest<DashboardSnapshot>("/api/documents", { cache: "no-store" }),
         jsonRequest<GitHubDashboardState>("/api/github/source-jobs", { cache: "no-store" }),
         jsonRequest<{ runtime: CodexRuntimeStatus }>("/api/runtime/codex/status", { cache: "no-store" })
@@ -224,6 +296,8 @@ export default function DashboardClient() {
         jsonRequest<{ runtime: GitHubRuntimeStatus }>("/api/runtime/github/status", { cache: "no-store" })
           .then((payload) => payload.runtime)
           .catch(() => null),
+        jsonRequest<RelationshipCandidateState>("/api/enrichment-jobs/candidates?limit=12", { cache: "no-store" })
+          .catch(() => null),
       ]);
       setSnapshot(nextSnapshot);
       setGitHubState(nextGitHubState);
@@ -231,6 +305,7 @@ export default function DashboardClient() {
         codex: nextCodexStatus ?? current.codex,
         github: nextGitHubStatus ?? current.github,
       }));
+      if (nextRelationshipCandidates) setRelationshipCandidates(nextRelationshipCandidates);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "문서 상태를 불러오지 못했습니다.");
     } finally {
@@ -536,6 +611,61 @@ export default function DashboardClient() {
       setError(cause instanceof Error ? cause.message : "보강 작업을 변경하지 못했습니다.");
     } finally {
       setPendingJobAction("");
+    }
+  };
+
+  const loadRelationshipCandidates = async (offset = 0) => {
+    if (relationshipLoading) return;
+    setRelationshipLoading(true);
+    setError("");
+    try {
+      const payload = await jsonRequest<RelationshipCandidateState>(
+        `/api/enrichment-jobs/candidates?limit=12&offset=${offset}`,
+        { cache: "no-store" },
+      );
+      setRelationshipCandidates(payload);
+      setRelationshipSelection((current) => current.filter((jobId) =>
+        payload.candidates.some((candidate) => candidate.jobId === jobId && candidate.tier === "high"),
+      ));
+      setRelationshipPreview(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Codex 관계 후보를 불러오지 못했습니다.");
+    } finally {
+      setRelationshipLoading(false);
+    }
+  };
+
+  const toggleRelationshipCandidate = (candidate: RelationshipCandidate) => {
+    if (candidate.tier !== "high") return;
+    setRelationshipPreview(null);
+    if (
+      !relationshipSelection.includes(candidate.jobId)
+      && relationshipSelection.length >= relationshipCandidates.summary.selectionLimit
+    ) {
+      setError(`관계 후보는 최대 ${relationshipCandidates.summary.selectionLimit}개까지 선택할 수 있습니다.`);
+      return;
+    }
+    setRelationshipSelection((current) => {
+      if (current.includes(candidate.jobId)) return current.filter((jobId) => jobId !== candidate.jobId);
+      return [...current, candidate.jobId];
+    });
+  };
+
+  const previewRelationshipSelection = async () => {
+    if (!relationshipSelection.length || relationshipPreviewing) return;
+    setRelationshipPreviewing(true);
+    setError("");
+    try {
+      const payload = await jsonRequest<RelationshipSelectionPreview>("/api/enrichment-jobs/candidates", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jobIds: relationshipSelection }),
+      });
+      setRelationshipPreview(payload);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "선택한 Codex 관계 후보를 검증하지 못했습니다.");
+    } finally {
+      setRelationshipPreviewing(false);
     }
   };
 
@@ -1138,6 +1268,88 @@ export default function DashboardClient() {
               <footer><span>{githubRuntime.nextStep}</span>{githubRuntime.command && <code>{githubRuntime.command}</code>}</footer>
             </article>
             <button type="button" className="runtime-refresh" onClick={() => void load()}>상태 다시 확인 <span>↻</span></button>
+          </section>
+          <section className="relationship-candidate-panel" aria-labelledby="relationship-candidate-title">
+            <header>
+              <div>
+                <p>CODEX RELATION CANDIDATES · READ ONLY</p>
+                <h3 id="relationship-candidate-title">의미 관계 후보 검토</h3>
+                <small>{relationshipCandidates.summary.message}</small>
+              </div>
+              <button
+                type="button"
+                className="relationship-refresh"
+                disabled={relationshipLoading}
+                onClick={() => void loadRelationshipCandidates(relationshipCandidates.pagination.offset)}
+              >{relationshipLoading ? "확인 중…" : "후보 새로고침"}</button>
+            </header>
+            <dl className="relationship-candidate-summary">
+              <div><dt>HIGH</dt><dd>{relationshipCandidates.summary.highCount}</dd></div>
+              <div><dt>REVIEW</dt><dd>{relationshipCandidates.summary.reviewCount}</dd></div>
+              <div><dt>제외</dt><dd>{relationshipCandidates.summary.excludedCount}</dd></div>
+              <div><dt>PAIR</dt><dd>{relationshipCandidates.summary.candidatesWithAnchorPair}</dd></div>
+              <div><dt>선택</dt><dd>{relationshipSelection.length}/{relationshipCandidates.summary.selectionLimit}</dd></div>
+            </dl>
+            {relationshipCandidates.summary.truncated && <p className="relationship-candidate-warning">대기열이 커서 처음 {relationshipCandidates.summary.scannedJobs}개만 점수화했습니다. 전체 실행은 하지 않습니다.</p>}
+            <div className="relationship-candidate-list" aria-live="polite">
+              {relationshipCandidates.candidates.length === 0 ? <p className="relationship-candidate-empty">현재 provider의 대기 작업이 없거나, 조회 권한이 없습니다.</p> : relationshipCandidates.candidates.map((candidate) => {
+                const selected = relationshipSelection.includes(candidate.jobId);
+                const selectable = candidate.tier === "high";
+                const reasons = candidate.exclusionReasons.length
+                  ? candidate.exclusionReasons
+                  : candidate.positiveReasons;
+                return <article className={`relationship-candidate relationship-${candidate.tier}${selected ? " selected" : ""}`} key={candidate.jobId}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      disabled={!selectable}
+                      onChange={() => toggleRelationshipCandidate(candidate)}
+                      aria-label={`${candidate.documentName} 관계 후보 선택`}
+                    />
+                    <span className="relationship-candidate-mark" aria-hidden="true" />
+                  </label>
+                  <div className="relationship-candidate-copy">
+                    <p><em>{relationshipCandidateTierLabels[candidate.tier]}</em>{candidate.expectedRelationType && <code>{candidate.expectedRelationType}</code>}</p>
+                    <strong>{candidate.documentName}</strong>
+                    <small>근거 #{candidate.evidence.ordinal} · {candidate.evidence.type} · 점수 {candidate.score}</small>
+                    {candidate.sourceAnchor && candidate.targetAnchor ? <small className="relationship-anchor-pair">
+                      {candidate.sourceAnchor.label} → {candidate.expectedRelationType ?? "관계"} → {candidate.targetAnchor.label}
+                    </small> : <small className="relationship-anchor-state">
+                      앵커 해석 {candidate.resolvedAnchorCount}/{candidate.anchorCount}
+                    </small>}
+                    <blockquote>{candidate.evidence.excerpt || "표시할 안전한 근거 요약이 없습니다."}</blockquote>
+                    <span>{reasons.map((entry) => entry.message).join(" · ")}</span>
+                  </div>
+                </article>;
+              })}
+            </div>
+            <footer className="relationship-candidate-controls">
+              <div>
+                <button
+                  type="button"
+                  disabled={relationshipLoading || relationshipCandidates.pagination.offset === 0}
+                  onClick={() => void loadRelationshipCandidates(Math.max(0, relationshipCandidates.pagination.offset - relationshipCandidates.pagination.limit))}
+                >이전</button>
+                <span>{relationshipCandidates.pagination.offset + 1}–{relationshipCandidates.pagination.offset + relationshipCandidates.pagination.returned} / {relationshipCandidates.pagination.totalRanked}</span>
+                <button
+                  type="button"
+                  disabled={relationshipLoading || !relationshipCandidates.pagination.hasMore}
+                  onClick={() => void loadRelationshipCandidates(relationshipCandidates.pagination.offset + relationshipCandidates.pagination.limit)}
+                >다음</button>
+              </div>
+              <button
+                type="button"
+                className="relationship-preview-action"
+                disabled={!relationshipSelection.length || relationshipPreviewing}
+                onClick={() => void previewRelationshipSelection()}
+              >{relationshipPreviewing ? "검증 중…" : "안전 실행 미리보기"}</button>
+            </footer>
+            {relationshipPreview && <div className="relationship-run-preview" aria-live="polite">
+              <strong>실행하지 않았습니다 · {relationshipPreview.preview.maxJobs}개만 준비됨</strong>
+              <span>{relationshipPreview.preview.message}</span>
+              <code>{relationshipPreview.preview.command}</code>
+            </div>}
           </section>
           <section className="pipeline-summary" aria-label="현재 작업 상태">
             <header><p>KNOWLEDGE PIPELINE</p><strong>현재 실행 가능한 작업</strong><em>{snapshot.totals.enrichmentActive ? "ANALYZING" : snapshot.totals.processing ? "PARSING" : "STABLE"}</em></header>

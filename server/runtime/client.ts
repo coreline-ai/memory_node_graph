@@ -58,7 +58,7 @@ export class IntegratedRuntimeClient {
     return payload as T;
   }
 
-  async claim(signal?: AbortSignal) {
+  async claim(options: { signal?: AbortSignal; jobIds?: readonly string[] } = {}) {
     const payload = await this.request<{ job: EnrichmentJobRecord | null }>(
       "/api/enrichment-jobs/claim",
       {
@@ -66,8 +66,9 @@ export class IntegratedRuntimeClient {
         body: JSON.stringify({
           leaseDurationMs: this.config.leaseDurationMs,
           providerVersion: this.config.providerVersion,
+          jobIds: options.jobIds,
         }),
-        signal,
+        signal: options.signal,
       },
     );
     return payload.job;

@@ -1,8 +1,13 @@
 import type { KnowledgeEdge, KnowledgeNode, RelationKind } from "../../graph-data";
 import type { DocumentBlock } from "../markdown/extract-graph";
+import { CODEX_SEMANTIC_RELATION_TYPES } from "./relationship-candidate-score.js";
+import {
+  resolveSemanticAnchors,
+  type SemanticAnchor,
+} from "./semantic-anchor-resolver.js";
 
 export const ENRICHMENT_PROVIDER = "codex" as const;
-export const ENRICHMENT_PROMPT_VERSION = "atlas-relations-v2-chunked";
+export const ENRICHMENT_PROMPT_VERSION = "atlas-relations-v3-anchors";
 export const ENRICHMENT_ONTOLOGY_VERSION = "knowledge-graph-ontology-v1";
 
 export const ENRICHMENT_INPUT_LIMITS = Object.freeze({
@@ -99,6 +104,8 @@ export type EnrichmentJobInput = {
   ontologyVersion: string;
   chunk: EnrichmentChunkDescriptor;
   nodes: KnowledgeNode[];
+  /** Evidence-local anchors are advisory context for relation review. */
+  anchors?: SemanticAnchor[];
   existingRelations: KnowledgeEdge[];
   evidenceBlocks: EnrichmentEvidenceBlock[];
   constraints: {
@@ -276,32 +283,10 @@ export async function createEnrichmentIdempotencyKey(input: {
     .join("");
 }
 
-const relationTypes: RelationKind[] = [
-  "documents",
-  "plans",
-  "contains",
-  "implements",
-  "depends_on",
-  "calls",
-  "reads_from",
-  "writes_to",
-  "produces",
-  "tests",
-  "references",
-  "precedes",
-  "blocks",
-  "supersedes",
-  "same_as",
-  "mentions",
-  "related_to",
-  "supports",
-  "extends",
-  "requires",
-  "uses",
-  "mitigates",
-  "risks",
-  "contradicts",
-];
+// Hierarchy, aliases and mentions are deterministic Markdown-parser output.
+// Codex gets only semantic relation types, which prevents a selected batch
+// from spending its result budget on contains/documents/plans edges.
+const relationTypes: RelationKind[] = [...CODEX_SEMANTIC_RELATION_TYPES];
 
 export type CodexEnrichmentOutput = {
   entityMentions: EnrichmentEntityMentionCandidate[];
@@ -452,18 +437,36 @@ const selectNodesForChunk = (
   nodes: KnowledgeNode[],
   nodeBlockIds: Record<string, string> | undefined,
   chunkBlockIds: Set<string>,
+  anchorNodeIds: ReadonlySet<string>,
 ) => {
-  if (!nodeBlockIds) return nodes.slice(0, ENRICHMENT_INPUT_LIMITS.maxNodes);
-  return nodes.filter((node) =>
-    chunkBlockIds.has(nodeBlockIds[node.id])
-    || node.tags.some((tag) => ["repository", "document", "plan", "shared"].includes(tag)))
-    .sort((left, right) => {
-      const leftLocal = chunkBlockIds.has(nodeBlockIds[left.id]) ? 1 : 0;
-      const rightLocal = chunkBlockIds.has(nodeBlockIds[right.id]) ? 1 : 0;
-      return rightLocal - leftLocal || left.id.localeCompare(right.id);
-    })
-    .slice(0, ENRICHMENT_INPUT_LIMITS.maxNodes);
+  const included = nodeBlockIds
+    ? nodes.filter((node) =>
+      chunkBlockIds.has(nodeBlockIds[node.id])
+      || anchorNodeIds.has(node.id)
+      || node.tags.some((tag) => ["repository", "document", "plan", "shared"].includes(tag)))
+    : nodes;
+  return included.sort((left, right) => {
+    const leftAnchor = anchorNodeIds.has(left.id) ? 1 : 0;
+    const rightAnchor = anchorNodeIds.has(right.id) ? 1 : 0;
+    const leftLocal = nodeBlockIds && chunkBlockIds.has(nodeBlockIds[left.id]) ? 1 : 0;
+    const rightLocal = nodeBlockIds && chunkBlockIds.has(nodeBlockIds[right.id]) ? 1 : 0;
+    const leftContext = left.tags.some((tag) => ["repository", "document", "plan", "shared"].includes(tag)) ? 1 : 0;
+    const rightContext = right.tags.some((tag) => ["repository", "document", "plan", "shared"].includes(tag)) ? 1 : 0;
+    return rightAnchor - leftAnchor
+      || rightLocal - leftLocal
+      || leftContext - rightContext
+      || left.id.localeCompare(right.id);
+  }).slice(0, ENRICHMENT_INPUT_LIMITS.maxNodes);
 };
+
+const serializeSemanticAnchors = (anchors: readonly SemanticAnchor[]) => anchors
+  .slice(0, 96)
+  .map((anchor) => ({
+    ...anchor,
+    label: anchor.label.slice(0, 180),
+    normalized: anchor.normalized.slice(0, 180),
+    matchText: anchor.matchText.slice(0, 120),
+  }));
 
 export async function buildEnrichmentJobInputs(
   input: BuildEnrichmentJobInput,
@@ -489,7 +492,10 @@ export async function buildEnrichmentJobInputs(
       reprocessNonce: input.reprocessNonce,
     });
     const chunkBlockIds = new Set(chunkBlocks.map((block) => block.id));
-    const nodes = selectNodesForChunk(input.nodes, input.nodeBlockIds, chunkBlockIds);
+    const discoveredAnchors = resolveSemanticAnchors({ nodes: input.nodes, blocks: chunkBlocks });
+    const anchorNodeIds = new Set(discoveredAnchors.flatMap((anchor) => anchor.nodeId ? [anchor.nodeId] : []));
+    const nodes = selectNodesForChunk(input.nodes, input.nodeBlockIds, chunkBlockIds, anchorNodeIds);
+    const anchors = serializeSemanticAnchors(resolveSemanticAnchors({ nodes, blocks: chunkBlocks }));
     const nodeIds = new Set(nodes.map((node) => node.id));
     const existingRelations = input.existingRelations
       .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
@@ -518,6 +524,7 @@ export async function buildEnrichmentJobInputs(
         overlapAfter: index === effectiveChunks.length - 1 ? 0 : overlap,
       },
       nodes,
+      anchors,
       existingRelations,
       evidenceBlocks: serializeEvidenceBlocks(chunkBlocks),
       constraints: {

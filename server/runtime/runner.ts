@@ -351,6 +351,7 @@ export class IntegratedRuntimeRunner {
       `[atlas-runtime] run mode=${mode} max_jobs=${options.maxJobs ?? "unlimited"}`
       + ` max_runtime_ms=${options.maxRuntimeMs ?? "unlimited"}`
       + ` enrichment_only=${Boolean(options.enrichmentOnly)}`
+      + ` selected_jobs=${options.jobIds?.length ?? "all"}`
       + ` queued=${initialQueuedJobs ?? "unknown"}`,
     );
     if (options.maxJobs === 0) {
@@ -403,7 +404,10 @@ export class IntegratedRuntimeRunner {
             else counters.failed += 1;
           }
           if (!sourceJob && !answerJob) await this.ensureCodexAuthentication();
-          const job = sourceJob || answerJob ? null : await this.client.claim();
+          const job = sourceJob || answerJob ? null : await this.client.claim({
+            signal: this.runController.signal,
+            jobIds: options.jobIds,
+          });
           failures = 0;
           if (job) {
             counters.claimed += 1;

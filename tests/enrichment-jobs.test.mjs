@@ -19,8 +19,18 @@ async function enrichmentModules() {
       },
     }).outputText;
 
-    const contractsSource = await readFile(
+    const contractsSource = (await readFile(
       new URL("../app/lib/llm/enrichment-contracts.ts", import.meta.url),
+      "utf8",
+    ))
+      .replace('from "./relationship-candidate-score.js"', 'from "./relationship-candidate-score.mjs"')
+      .replace('from "./semantic-anchor-resolver.js"', 'from "./semantic-anchor-resolver.mjs"');
+    const scoreSource = (await readFile(
+      new URL("../app/lib/llm/relationship-candidate-score.ts", import.meta.url),
+      "utf8",
+    )).replace('from "./semantic-anchor-resolver.js"', 'from "./semantic-anchor-resolver.mjs"');
+    const resolverSource = await readFile(
+      new URL("../app/lib/llm/semantic-anchor-resolver.ts", import.meta.url),
       "utf8",
     );
     const repositorySource = (
@@ -38,6 +48,8 @@ async function enrichmentModules() {
 
     await Promise.all([
       writeFile(join(directory, "enrichment-contracts.mjs"), transpile(contractsSource)),
+      writeFile(join(directory, "relationship-candidate-score.mjs"), transpile(scoreSource)),
+      writeFile(join(directory, "semantic-anchor-resolver.mjs"), transpile(resolverSource)),
       writeFile(join(directory, "enrichment-job-repository.mjs"), transpile(repositorySource)),
       writeFile(join(directory, "normalize.mjs"), transpile(normalizeSource)),
     ]);
@@ -201,6 +213,9 @@ test("enrichment input applies deterministic idempotency and evidence caps", asy
   assert.equal(forced.idempotencyKey, forcedDuplicate.idempotencyKey);
   assert.equal(first.jobId, duplicate.jobId);
   assert.equal(first.nodes.length, contracts.ENRICHMENT_INPUT_LIMITS.maxNodes);
+  assert.ok(first.constraints.allowedRelationTypes.includes("calls"));
+  assert.ok(!first.constraints.allowedRelationTypes.includes("contains"));
+  assert.ok(!first.constraints.allowedRelationTypes.includes("documents"));
   assert.ok(first.evidenceBlocks.length <= contracts.ENRICHMENT_INPUT_LIMITS.maxEvidenceBlocks);
   assert.ok(first.evidenceBlocks.every((block) => block.text.length <= 1_200));
   assert.ok(
@@ -263,6 +278,60 @@ test("통합 런타임 claim은 현재 provider 버전만 가져오고 기존 �
       });
       assert.equal(claimed.id, integrated.jobId);
       assert.equal((await candidate.get(legacy.jobId)).status, "queued");
+    }
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("관계 후보 조회는 현재 provider의 queued 작업만 안정적으로 페이지 처리한다", async () => {
+  const { contracts, repository } = await enrichmentModules();
+  const memory = repository.createMemoryEnrichmentJobRepository();
+  const sqlite = new SqliteD1Database();
+  try {
+    const d1 = repository.createD1EnrichmentJobRepository(sqlite);
+    for (const candidate of [memory, d1]) {
+      const suffix = candidate === memory ? "memory" : "d1";
+      const provider = "codex-sdk-0.146.0+atlas-runtime.1";
+      const legacy = await makeInput(contracts, "legacy", `candidate-legacy-${suffix}`, "codex-sdk-0.146.0");
+      const currentFirst = await makeInput(contracts, "current-1", `candidate-first-${suffix}`, provider);
+      const currentSecond = await makeInput(contracts, "current-2", `candidate-second-${suffix}`, provider);
+      await candidate.enqueue(legacy, { now: "2026-08-08T05:00:00.000Z" });
+      await candidate.enqueue(currentFirst, { now: "2026-08-08T05:00:01.000Z" });
+      await candidate.enqueue(currentSecond, { now: "2026-08-08T05:00:02.000Z" });
+      const firstPage = await candidate.listQueuedByProvider({ providerVersion: provider, limit: 1, offset: 0 });
+      const secondPage = await candidate.listQueuedByProvider({ providerVersion: provider, limit: 1, offset: 1 });
+      assert.equal(firstPage.total, 2);
+      assert.equal(firstPage.jobs.length, 1);
+      assert.equal(firstPage.jobs[0].id, currentFirst.jobId);
+      assert.equal(secondPage.jobs[0].id, currentSecond.jobId);
+      assert.ok(!firstPage.jobs.some((item) => item.id === legacy.jobId));
+    }
+  } finally {
+    sqlite.close();
+  }
+});
+
+test("선별 보강 batch는 요청한 job ID만 원자적으로 claim한다", async () => {
+  const { contracts, repository } = await enrichmentModules();
+  const memory = repository.createMemoryEnrichmentJobRepository();
+  const sqlite = new SqliteD1Database();
+  try {
+    const d1 = repository.createD1EnrichmentJobRepository(sqlite);
+    for (const candidate of [memory, d1]) {
+      const suffix = candidate === memory ? "memory" : "d1";
+      const first = await makeInput(contracts, "selection-hash-1", `selection-first-${suffix}`);
+      const selected = await makeInput(contracts, "selection-hash-2", `selection-selected-${suffix}`);
+      await candidate.enqueue(first, { now: "2026-08-08T04:00:00.000Z" });
+      await candidate.enqueue(selected, { now: "2026-08-08T04:00:01.000Z" });
+      const claimed = await candidate.claim({
+        runtimeId: "atlas-runtime-batch-test",
+        jobIds: [selected.jobId],
+        now: "2026-08-08T04:00:02.000Z",
+      });
+      assert.equal(claimed.id, selected.jobId);
+      assert.equal((await candidate.get(first.jobId)).status, "queued");
+      assert.equal((await candidate.get(selected.jobId)).status, "leased");
     }
   } finally {
     sqlite.close();

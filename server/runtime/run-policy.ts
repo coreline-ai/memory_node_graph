@@ -1,5 +1,6 @@
 export const RUNTIME_RUN_MAX_JOBS = 100;
 export const RUNTIME_RUN_MAX_RUNTIME_MS = 24 * 60 * 60 * 1_000;
+export const RUNTIME_RUN_MAX_SELECTED_JOBS = 25;
 
 export type RuntimeRunStopReason =
   | "dry_run"
@@ -15,6 +16,7 @@ export type RuntimeRunOptions = {
   maxJobs?: number;
   maxRuntimeMs?: number;
   enrichmentOnly?: boolean;
+  jobIds?: readonly string[];
   stopWhenIdle?: boolean;
 };
 
@@ -57,6 +59,18 @@ const boundedInteger = (
   return parsed;
 };
 
+const selectedJobIds = (value: string | undefined) => {
+  if (value === undefined) return undefined;
+  const ids = [...new Set(value.split(",").map((entry) => entry.trim()).filter(Boolean))];
+  if (!ids.length || ids.length > RUNTIME_RUN_MAX_SELECTED_JOBS) {
+    throw new Error(`selected job IDs는 1~${RUNTIME_RUN_MAX_SELECTED_JOBS}개여야 합니다.`);
+  }
+  if (ids.some((id) => id.length > 200 || /[\r\n]/.test(id))) {
+    throw new Error("selected job ID 형식이 올바르지 않습니다.");
+  }
+  return ids;
+};
+
 export function parseRuntimeRunOptions(
   arguments_: readonly string[],
   environment: Record<string, string | undefined> = process.env,
@@ -77,12 +91,18 @@ export function parseRuntimeRunOptions(
     1_000,
     RUNTIME_RUN_MAX_RUNTIME_MS,
   );
-  const bounded = once || batch || maxJobs !== undefined || maxRuntimeMs !== undefined;
+  const jobIds = selectedJobIds(
+    optionValue(arguments_, "--job-ids") ?? environment.ATLAS_RUNTIME_JOB_IDS,
+  );
+  const enrichmentOnly = arguments_.includes("--enrichment-only")
+    || environment.ATLAS_RUNTIME_ENRICHMENT_ONLY?.trim().toLowerCase() === "true";
+  const bounded = once || batch || maxJobs !== undefined || maxRuntimeMs !== undefined || jobIds !== undefined;
   return {
     once,
     maxJobs: once && maxJobs === undefined ? 1 : maxJobs,
     maxRuntimeMs,
-    enrichmentOnly: arguments_.includes("--enrichment-only"),
+    enrichmentOnly,
+    jobIds,
     stopWhenIdle: arguments_.includes("--stop-when-idle") || bounded,
   };
 }

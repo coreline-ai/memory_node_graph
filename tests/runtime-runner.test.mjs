@@ -348,6 +348,7 @@ test("제한 실행 CLI는 기본 연속 모드와 0·1개 안전 상한을 구�
     maxJobs: undefined,
     maxRuntimeMs: undefined,
     enrichmentOnly: false,
+    jobIds: undefined,
     stopWhenIdle: false,
   });
   assert.deepEqual(parseRuntimeRunOptions([
@@ -360,6 +361,7 @@ test("제한 실행 CLI는 기본 연속 모드와 0·1개 안전 상한을 구�
     maxJobs: 0,
     maxRuntimeMs: 1_000,
     enrichmentOnly: true,
+    jobIds: undefined,
     stopWhenIdle: true,
   });
   assert.equal(parseRuntimeRunOptions(["--once"], {}).maxJobs, 1);
@@ -367,9 +369,24 @@ test("제한 실행 CLI는 기본 연속 모드와 0·1개 안전 상한을 구�
   assert.equal(batch.maxJobs, 5);
   assert.equal(batch.maxRuntimeMs, 300_000);
   assert.equal(batch.stopWhenIdle, true);
+  assert.deepEqual(parseRuntimeRunOptions([], {
+    ATLAS_RUNTIME_ENRICHMENT_ONLY: "true",
+    ATLAS_RUNTIME_JOB_IDS: "enrichment:one,enrichment:two",
+  }), {
+    once: false,
+    maxJobs: undefined,
+    maxRuntimeMs: undefined,
+    enrichmentOnly: true,
+    jobIds: ["enrichment:one", "enrichment:two"],
+    stopWhenIdle: true,
+  });
   assert.throws(
     () => parseRuntimeRunOptions(["--max-jobs=101"], {}),
     /0~100/,
+  );
+  assert.throws(
+    () => parseRuntimeRunOptions(["--job-ids="], {}),
+    /selected job IDs/,
   );
 });
 

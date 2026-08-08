@@ -694,7 +694,7 @@ test("D1 Graph commit은 20·65문서 저장소를 90문장 이내에서 원자 
     assert.equal(second65Receipt.updatedCount, 1);
     assert.equal(database.database.prepare(
       "SELECT parser_version FROM documents WHERE repository_id = '2065' AND relative_path = 'README.md'",
-    ).get().parser_version, "remark-ast-github-readme-4");
+    ).get().parser_version, "remark-ast-github-readme-5");
   } finally {
     delete globalThis.__AI_ATLAS_TEST_D1__;
     database.close();

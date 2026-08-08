@@ -7,6 +7,7 @@ import { IntegratedRuntimeRunner } from "./runner.js";
 import { CodexEngineError, CodexEnrichmentEngine } from "../codex/codex-engine.js";
 import { codexRuntimeConfig } from "./config.js";
 import { acquireRuntimeSingletonLock, RuntimeAlreadyRunningError } from "./singleton-lock.js";
+import { parseRuntimeRunOptions } from "./run-policy.js";
 
 const lockPath = process.env.ATLAS_RUNTIME_LOCK_PATH?.trim()
   || join(tmpdir(), `${codexRuntimeConfig.runtimeId}.lock`);
@@ -44,17 +45,7 @@ async function runIntegrated(runtimeWasAuthenticated: boolean) {
     enableGitHubSource: true,
     runtimeWasAuthenticated,
   });
-  const configuredMaxJobs = Number(process.env.ATLAS_RUNTIME_MAX_JOBS);
-  const maxJobs = Number.isSafeInteger(configuredMaxJobs) && configuredMaxJobs >= 0
-    ? Math.min(100, configuredMaxJobs)
-    : undefined;
-  return runner.run({
-    maxJobs,
-    maxRuntimeMs: process.env.ATLAS_RUNTIME_MAX_RUNTIME_MS
-      ? Math.max(1_000, Math.min(86_400_000, Number(process.env.ATLAS_RUNTIME_MAX_RUNTIME_MS) || 0))
-      : undefined,
-    stopWhenIdle: process.env.ATLAS_RUNTIME_STOP_WHEN_IDLE?.trim().toLowerCase() === "true",
-  });
+  return runner.run(parseRuntimeRunOptions(process.argv.slice(2)));
 }
 
 async function main() {

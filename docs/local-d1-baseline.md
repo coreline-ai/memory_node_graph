@@ -64,3 +64,34 @@ npm run graph:audit -- --db=/absolute/path/to/backup.sqlite
 - 규칙 관계 94,487 · Codex 관계 1 · 전체 관계 94,488
 - orphan 0 · 중복 관계 0 · stage row 0 · integrity `ok`
 - data fingerprint: `fb0456967b27077f6bb52a30d941c5dd97883d014d0748d4fdb2d3629ed9675d`
+
+## 2026-08-08 Codex 선별 배치 후 정본
+
+- Codex OAuth 소량 배치 전에 `--backup --restore-check`를 실행했다.
+  - backup bytes: `655,790,080`
+  - backup SHA-256: `fdafa0d3a8f8b97b409f634e234c7efa5666fcc7fb7e4e53697206e0b63cedc2`
+  - backup과 임시 복구 DB의 fingerprint 일치
+- 세 문서를 명시 재인덱싱해 현재 provider(`codex-sdk-0.146.0+atlas-runtime.1`) 보강 작업 78개를 만들고, 기존 provider의 대응 작업 78개는 `stale`로 전환했다.
+- 그중 서로 다른 문서 작업 3개를 `enrichment_only`·`max_jobs=3`으로 실행했다.
+  - completed 3 · warning 0 · failed 0 · 종료 사유 `job_limit`
+  - entity mention 12개 · 신규 Codex 관계 0개
+  - 근거 없는 관계는 저장하지 않았으며, 기존 Codex 관계 1개는 보존했다.
+- 그래프 데이터는 문서 853 · 고유 엔티티 89,669 · 전체 관계 94,488로 유지됐다.
+- 작업 상태는 completed 4 · queued 10,900 · stale 78, 무결성은 orphan 0 · 중복 관계 0 · stage row 0 · integrity `ok`다.
+- data fingerprint: `862431b1cda556aece2518d48f28486e69977a795ed9b69b23051e0bd91fb53e`
+
+## 2026-08-08 관계 후보 수동 선별 시험 후 정본
+
+- 실행 전 backup·복구 검증:
+  - backup bytes: `656,687,104`
+  - backup SHA-256: `ed46a5642f998931e9405baf688846bdd4b5605a325e0be61512561ad9090dea`
+  - backup·복구 DB의 fingerprint 일치, integrity `ok`, orphan 0, duplicate relation 0, stage row 0
+- current provider 대기열에서 명시 흐름·API 경로가 있는 7개 job만 선택해 `enrichment_only`·`max_jobs=7`·15분 상한으로 실행했다.
+  - completed 7 · warning 0 · failed 0 · 종료 사유 `job_limit`
+  - entity mention 28개 · Codex 저장 관계 18개 추가
+  - 구형 provider 10,825개와 선택하지 않은 current provider 작업은 처리하지 않았다.
+- 추가 관계 유형: contains 8 · precedes 5 · references 2 · tests 1 · depends_on 1 · supports 1.
+- D1 정본: 문서 853 · 근거 블록 148,655 · 고유 엔티티 89,669 · 규칙 관계 94,487 · Codex 관계 19 · 전체 관계 94,506.
+- 작업 상태: completed 11 · queued 10,893 · stale 78. queued는 current provider 68개와 구형 provider 10,825개로 분리된다.
+- data fingerprint: `fdaa8da576cd961933d7c18c5047a77bab844f6a4064c1f076af3aed8e9af53f`
+- 이 시험은 D1 안전성은 확인했지만 `contains`·문서 순서 `precedes`가 13/18개여서 의미 관계 품질이 부족했다. 후보 점수에서 구조·중복 관계를 제외하기 전에는 다음 25개 또는 전체 배치를 실행하지 않는다.

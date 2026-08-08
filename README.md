@@ -345,6 +345,21 @@ OAuth 구조화 출력 fixture만 독립 검증:
 npm run runtime:smoke
 ```
 
+### Codex 관계 보강 소량 배치
+
+기본 실행은 대기열을 계속 처리합니다. 대량 실행 전에는 현재 OAuth·D1 상태를 확인하고, 선택한 작업만 제한적으로 처리합니다. `ATLAS_RUNTIME_JOB_IDS`에는 쉼표로 구분한 `enrichment:` 작업 ID를 최대 25개까지 넣을 수 있으며, `ATLAS_RUNTIME_ENRICHMENT_ONLY=true`는 GitHub 동기화와 그래프 답변 작업을 건너뜁니다.
+
+```bash
+# 새 터미널에서 현재 앱을 중지한 뒤, 선택한 3개 작업만 처리한다.
+ATLAS_RUNTIME_ENRICHMENT_ONLY=true \
+ATLAS_RUNTIME_JOB_IDS='enrichment:job-a,enrichment:job-b,enrichment:job-c' \
+ATLAS_RUNTIME_MAX_JOBS=3 \
+ATLAS_RUNTIME_MAX_RUNTIME_MS=900000 \
+npm run dev
+```
+
+작업이 끝나면 runtime 상태에 처리 수·성공·경고·실패·종료 사유가 남습니다. 실행 전에는 `npm run db:baseline -- --backup --restore-check`를 수행하고, 실행 후에는 document scope와 `npm run db:baseline`으로 근거 관계·무결성·변경량을 검토합니다.
+
 신규 GitHub 작업은 통합 runtime generation만 claim합니다. 기존 분리 실행 스크립트와 공개 상태 경로는 현재 앱의 실행 경로에 포함하지 않습니다.
 
 ## ♻️ 문서 갱신과 전체 재처리

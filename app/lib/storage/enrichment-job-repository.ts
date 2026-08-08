@@ -25,6 +25,7 @@ type ClaimOptions = {
   runtimeId: string;
   leaseDurationMs?: number;
   providerVersion?: string;
+  jobIds?: readonly string[];
   now?: string;
 };
 
@@ -66,6 +67,19 @@ export type EnqueueEnrichmentJobResult = {
 
 export type EnrichmentJobStatusCounts = Record<EnrichmentJobStatus, number>;
 
+export type ListQueuedEnrichmentJobsOptions = {
+  providerVersion: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type QueuedEnrichmentJobPage = {
+  jobs: EnrichmentJobRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 const emptyStatusCounts = (): EnrichmentJobStatusCounts => ({
   queued: 0,
   leased: 0,
@@ -81,6 +95,7 @@ export interface EnrichmentJobRepository {
   enqueue(input: EnrichmentJobInput, options?: EnqueueOptions): Promise<EnqueueEnrichmentJobResult>;
   get(jobId: string): Promise<EnrichmentJobRecord | null>;
   list(documentId?: string, limit?: number): Promise<EnrichmentJobRecord[]>;
+  listQueuedByProvider(options: ListQueuedEnrichmentJobsOptions): Promise<QueuedEnrichmentJobPage>;
   statusCounts(providerVersion?: string): Promise<EnrichmentJobStatusCounts>;
   claim(options: ClaimOptions): Promise<EnrichmentJobRecord | null>;
   renewLease(input: RenewLeaseInput): Promise<EnrichmentJobRecord>;
@@ -195,6 +210,20 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
     return limit ? rows.slice(-Math.max(1, Math.floor(limit))) : rows;
   }
 
+  async listQueuedByProvider(options: ListQueuedEnrichmentJobsOptions) {
+    const limit = Math.max(1, Math.min(500, Math.floor(options.limit ?? 100)));
+    const offset = Math.max(0, Math.floor(options.offset ?? 0));
+    const rows = [...this.jobs.values()]
+      .filter((job) => job.providerVersion === options.providerVersion && job.status === "queued")
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id));
+    return {
+      jobs: rows.slice(offset, offset + limit).map(clone),
+      total: rows.length,
+      limit,
+      offset,
+    };
+  }
+
   async statusCounts(providerVersion?: string) {
     const counts = emptyStatusCounts();
     for (const job of this.jobs.values()) {
@@ -206,10 +235,15 @@ export class MemoryEnrichmentJobRepository implements EnrichmentJobRepository {
 
   async claim(options: ClaimOptions) {
     const now = timestamp(options.now);
+    const jobIds = [...new Set(options.jobIds ?? [])].slice(0, 25);
     for (const job of [...this.jobs.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) {
       const claimable =
         job.status === "queued" || (isLeaseStatus(job.status) && isExpired(job, now));
-      if (!claimable || (options.providerVersion && job.providerVersion !== options.providerVersion)) continue;
+      if (
+        !claimable
+        || (options.providerVersion && job.providerVersion !== options.providerVersion)
+        || (jobIds.length > 0 && !jobIds.includes(job.id))
+      ) continue;
       if (job.attemptCount >= job.maxAttempts) {
         if (isLeaseStatus(job.status)) {
           job.status = "failed";
@@ -625,6 +659,28 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
     return safeLimit ? jobs.sort((left, right) => left.createdAt.localeCompare(right.createdAt)) : jobs;
   }
 
+  async listQueuedByProvider(options: ListQueuedEnrichmentJobsOptions) {
+    await this.ready();
+    const limit = Math.max(1, Math.min(500, Math.floor(options.limit ?? 100)));
+    const offset = Math.max(0, Math.floor(options.offset ?? 0));
+    const [count, result] = await Promise.all([
+      this.db.prepare("SELECT COUNT(*) AS count FROM enrichment_jobs WHERE provider_version = ? AND status = 'queued'")
+        .bind(options.providerVersion)
+        .first<{ count: number | string }>(),
+      this.db.prepare(`SELECT * FROM enrichment_jobs
+        WHERE provider_version = ? AND status = 'queued'
+        ORDER BY created_at, id LIMIT ? OFFSET ?`)
+        .bind(options.providerVersion, limit, offset)
+        .all<D1Row>(),
+    ]);
+    return {
+      jobs: result.results.map(asD1Job),
+      total: Number(count?.count ?? 0),
+      limit,
+      offset,
+    };
+  }
+
   async statusCounts(providerVersion?: string) {
     await this.ready();
     const counts = emptyStatusCounts();
@@ -642,6 +698,8 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
   async claim(options: ClaimOptions) {
     await this.ready();
     const now = timestamp(options.now);
+    const jobIds = [...new Set(options.jobIds ?? [])].slice(0, 25);
+    const jobIdFilter = jobIds.length ? ` AND id IN (${jobIds.map(() => "?").join(", ")})` : "";
     await this.db.prepare(`UPDATE enrichment_jobs SET status = 'failed', error_code = 'retry_exhausted', error_message = '최대 보강 재시도 횟수를 초과했습니다.', lease_owner = NULL, lease_expires_at = NULL, updated_at = ?, completed_at = ?
       WHERE status IN ('leased', 'running') AND lease_expires_at <= ? AND attempt_count >= max_attempts`)
       .bind(now, now, now).run();
@@ -651,10 +709,12 @@ export class D1EnrichmentJobRepository implements EnrichmentJobRepository {
         ? await this.db.prepare(`SELECT * FROM enrichment_jobs
           WHERE provider_version = ? AND attempt_count < max_attempts
             AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))
-          ORDER BY created_at LIMIT 1`).bind(options.providerVersion, now).first<D1Row>()
+            ${jobIdFilter}
+          ORDER BY created_at LIMIT 1`).bind(options.providerVersion, now, ...jobIds).first<D1Row>()
         : await this.db.prepare(`SELECT * FROM enrichment_jobs
           WHERE attempt_count < max_attempts AND (status = 'queued' OR (status IN ('leased', 'running') AND lease_expires_at <= ?))
-          ORDER BY created_at LIMIT 1`).bind(now).first<D1Row>();
+          ${jobIdFilter}
+          ORDER BY created_at LIMIT 1`).bind(now, ...jobIds).first<D1Row>();
       if (!row) return null;
       const job = asD1Job(row);
       const nextExpiry = expiresAt(now, options.leaseDurationMs);

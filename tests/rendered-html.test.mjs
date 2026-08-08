@@ -1231,7 +1231,7 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
 
     const dashboard = await (await request("/api/documents")).json();
     assert.equal(dashboard.documents.length, 1);
-    assert.equal(dashboard.documents[0].parserVersion, "remark-ast-github-readme-4");
+    assert.equal(dashboard.documents[0].parserVersion, "remark-ast-github-readme-5");
     const graphBeforeFailure = await (await request("/api/graph")).json();
     assert.equal(graphBeforeFailure.meta.source, "documents");
     assert.ok(graphBeforeFailure.nodes.some((node) => node.label === "P4A_UNIQUE_CONTENT"));
