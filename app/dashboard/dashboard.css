@@ -1,8 +1,12 @@
 .control-room {
   position: relative;
-  width: 100vw;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: 100svh;
-  overflow: auto;
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
   color: var(--text);
   background: #07090b;
 }
