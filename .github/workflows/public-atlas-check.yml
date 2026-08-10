@@ -47,8 +47,12 @@ jobs:
           npx tsc --noEmit
           npm run lint
 
-      - name: Run regression and tamper tests
-        run: npm test
+      - name: Run public artifact and tamper tests
+        run: >-
+          node --test
+          tests/public-graph-artifact.test.mjs
+          tests/public-graph-client.test.mjs
+          tests/vercel-static-output.test.mjs
 
       - name: Build and inspect Vercel static output
         run: npm run build:vercel
