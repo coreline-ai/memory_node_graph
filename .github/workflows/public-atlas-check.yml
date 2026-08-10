@@ -32,6 +32,9 @@ jobs:
 
       - name: Verify public source policy
         run: npm run graph:verify-public-sources
+        env:
+          # Ephemeral read-only Actions token; no repository secret or PAT is configured.
+          GH_TOKEN: ${{ github.token }}
 
       - name: Verify tracked public snapshots
         run: |
