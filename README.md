@@ -503,7 +503,8 @@ npm run graph:audit
 - [x] 공개 JSON 정합화·SHA 검증·API 없는 읽기 전용 GUI
 - [x] Vercel 전용 정적 Vite build·산출물 보안 검사
 - [x] 공개 snapshot 변조·누락을 차단하는 GitHub Actions
-- [ ] Vercel Preview·Production 외부 배포 검증
+- [x] Vercel Production 공개 정적 배포·실브라우저 QA
+- [ ] Vercel Preview 공개 전환·GitHub `main` 자동 배포 연결
 
 ## 📚 관련 문서
 
@@ -522,6 +523,14 @@ npm run graph:audit
 ## 📦 배포 원칙
 
 운영 D1·OAuth가 필요한 전체 앱과 로그인 없는 Vercel 공개 앱을 분리합니다. 공개 앱은 GitHub에 커밋된 검증된 JSON만 읽는 정적 배포이며, 원본 D1과 쓰기 기능은 외부로 배포하지 않습니다.
+
+### 공개 배포
+
+- **Production:** [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app)
+- **배포 상태:** 로그인 없이 공개, Vercel Function·API Route·DB 연결 `0`
+- **기준 snapshot:** `500`노드 · `1,495` 실제 관계 · `505` display 선
+- **Preview:** 배포는 `READY`이지만 Vercel 팀의 기본 SSO 보호가 적용되어 공개 전환 대기
+- **자동 재배포:** Vercel GitHub App의 `coreline-ai/memory_node_graph` 접근 승인이 필요해 수동 정적 배포 상태
 
 ### GitHub 전달용 공개 그래프 데이터
 

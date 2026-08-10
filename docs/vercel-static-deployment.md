@@ -93,6 +93,8 @@ npx vercel@latest --prod --yes
 
 CLI가 로그인 또는 scope 선택을 요구하면 브라우저 인증 후 다시 실행한다. 인증이 없다는 이유로 token을 저장소나 `.env`에 추가하지 않는다.
 
+현재 실제 배포는 승인 범위를 좁히기 위해 `dist-vercel/`의 검증된 정적 파일 16개와 정적 라우팅용 `vercel.json` 1개만 별도 스테이징하여 수행했다. Vercel dry-run은 입력을 **17개 파일·2.7MB**로 확인했으며, 저장소의 `.wrangler`, SQLite, OAuth, 환경 변수와 서버 소스는 업로드하지 않았다.
+
 ## 빌드 검증
 
 ```bash
@@ -178,11 +180,24 @@ Vercel Deployments에서 직전 정상 Production을 선택해 **Promote to Prod
 | 항목 | 현재 기록 |
 |---|---|
 | 기능 구현 commit | `1998f9bb65627b7b7df2cea764d60514535205c1` |
-| CI 최종 commit | `734fdc7259174359ba24bca279d0f45e8161ac15` |
+| 배포 기준 commit | `3213aa5c7bb525c2da6f97e065c5f173070de1d4` |
 | GitHub main push | 완료 |
-| GitHub Actions | [Public Atlas static checks · success](https://github.com/coreline-ai/memory_node_graph/actions/runs/31395439664) |
+| GitHub Actions | [Public Atlas static checks · success](https://github.com/coreline-ai/memory_node_graph/actions/runs/31395725350) |
 | Clean clone | `npm ci && npm run graph:verify-public && npm run build:vercel` 성공 |
 | Vercel CLI 인증 | `hwanchoiganda-7455` 계정 확인 |
-| Vercel Preview/Production | 외부 프로젝트 업로드에 대한 실행 승인이 없어 미생성 |
+| Vercel project | `ai-systems-atlas` · `prj_Jwh8gVgPf63GFUUukVEwwgjqp9qe` |
+| Production | [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app) · `dpl_Cod1YTTR3g9igLuXDSbd7YqLZZ3Z` · `READY` |
+| Preview | [preview URL](https://ai-systems-atlas-8tb620h0y-corelines-projects-277c5e1c.vercel.app) · `dpl_DGsb1gDCTJ1A2oaF5xrxebEggmby` · `READY` · SSO 보호 |
+| GitHub 자동 배포 | Vercel GitHub App 저장소 접근 실패로 미연결 |
 
-실제 Preview/Production URL은 아직 없다. URL이 없는 현재 상태를 외부 배포 완료로 보고하지 않으며, 사용자가 Vercel 외부 업로드를 명시적으로 승인한 다음 이 기록을 갱신한다.
+### 2026-08-10 실제 배포 QA
+
+- Production은 로그인 없이 Public Corpus `500/2,000`을 표시했다.
+- Gold `68/101`, Max Density `500/2,000 DEMO`, 별자리·성운·궤도, 검색·노드 선택, 렌즈 필터, pan·zoom, 초신성·커스텀 밝기를 실제 브라우저에서 확인했다.
+- `360px`, `768px`, `1280px`에서 `documentElement`와 `body`의 `scrollWidth`가 viewport와 같았고, 하단 제어와 커스텀 항목이 화면 안에 있었다.
+- `/dashboard`는 `/`로 안전하게 이동했고 `/knowledge/demo` 직접 접근은 SPA fallback으로 정상 로드됐다.
+- 관찰된 네트워크 자산은 정적 JS/CSS/favicon과 `/atlas/atlas-graph-snapshot.json`, `/atlas/atlas-graph-manifest.json`뿐이며 `/api/*`, OAuth, D1, DB 요청은 없었다.
+- 브라우저 warning/error 로그는 `0`건이었다.
+- Vercel inspect에서 Production과 Preview 모두 `READY`, `middleware: []`였고 동일한 정적 rewrite/header 설정을 사용했다.
+
+Preview deployment 자체는 생성됐지만 팀의 기본 `ssoProtection: all_except_custom_domains` 때문에 로그인 없는 직접 검증은 아직 완료되지 않았다. 프로젝트 전체의 Preview SSO 보호를 해제하면 향후 모든 Preview가 공개되므로 별도 명시 승인이 필요하다. GitHub `main` 자동 배포도 Vercel GitHub App이 `coreline-ai/memory_node_graph` 저장소에 접근하도록 조직에서 승인한 다음 연결해야 한다.
