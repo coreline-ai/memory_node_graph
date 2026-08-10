@@ -18,6 +18,7 @@
 [![Knowledge Relations](https://img.shields.io/badge/relations-94%2C506-1F6FEB?style=flat-square&logo=graphql&logoColor=white)](#-데이터-기준선)
 [![OpenAI API Key](https://img.shields.io/badge/OpenAI%20API%20Key-not%20required-2EA043?style=flat-square&logo=openai&logoColor=white)](#-oauth와-api-경계)
 [![Tests](https://img.shields.io/badge/tests-206%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
+[![Public Atlas checks](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml/badge.svg?branch=main)](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml)
 [![Last Commit](https://img.shields.io/github/last-commit/coreline-ai/memory_node_graph?style=flat-square&logo=github&label=last%20commit)](https://github.com/coreline-ai/memory_node_graph/commits/main)
 
 [빠른 시작](#-빠른-시작) · [화면 갤러리](#-화면-갤러리) · [처리 구조](#-처리-구조) · [대시보드](#-atlas-control-room) · [문서](#-관련-문서)

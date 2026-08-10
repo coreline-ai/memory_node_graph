@@ -175,4 +175,14 @@ Vercel Deployments에서 직전 정상 Production을 선택해 **Promote to Prod
 
 ## 현재 배포 기록
 
-실제 Preview/Production URL, 배포 시각, Git commit은 배포가 성공한 뒤 이 절에 기록한다. URL이 없는 상태를 배포 완료로 보고하지 않는다.
+| 항목 | 현재 기록 |
+|---|---|
+| 기능 구현 commit | `1998f9bb65627b7b7df2cea764d60514535205c1` |
+| CI 최종 commit | `734fdc7259174359ba24bca279d0f45e8161ac15` |
+| GitHub main push | 완료 |
+| GitHub Actions | [Public Atlas static checks · success](https://github.com/coreline-ai/memory_node_graph/actions/runs/31395439664) |
+| Clean clone | `npm ci && npm run graph:verify-public && npm run build:vercel` 성공 |
+| Vercel CLI 인증 | `hwanchoiganda-7455` 계정 확인 |
+| Vercel Preview/Production | 외부 프로젝트 업로드에 대한 실행 승인이 없어 미생성 |
+
+실제 Preview/Production URL은 아직 없다. URL이 없는 현재 상태를 외부 배포 완료로 보고하지 않으며, 사용자가 Vercel 외부 업로드를 명시적으로 승인한 다음 이 기록을 갱신한다.
