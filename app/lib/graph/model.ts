@@ -4,6 +4,7 @@ import type { EnrichmentErrorCode, EnrichmentJobStatus } from "../llm/enrichment
 export type GraphSource = "demo" | "documents";
 
 export type GraphSnapshot = {
+  schemaVersion?: "atlas-public-graph/v1" | "atlas-public-fixture-graph/v1";
   nodes: KnowledgeNode[];
   edges: KnowledgeEdge[];
   meta: {
@@ -31,6 +32,8 @@ export type GraphSnapshot = {
     corpusNodeCount?: number;
     corpusEdgeCount?: number;
     graphRevision?: string;
+    publicSnapshot?: boolean;
+    publicFixture?: boolean;
     projectionMode?: "full-corpus-knowledge-map" | "single-repository-knowledge-map" | "multi-repository-shared-knowledge" | "repository-evidence-graph" | "document-evidence-graph";
     analytics?: {
       algorithm: string;

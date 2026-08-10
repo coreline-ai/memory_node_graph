@@ -21,6 +21,7 @@
     "../app/lib/graph/snapshot-cache.ts",
     "../app/lib/graph/graph-retrieval.ts",
     "../app/lib/graph/graph-revision.ts",
+    "../app/lib/graph/public-graph-client.ts",
     "../app/lib/graph/source-metadata.ts",
     "../app/lib/dashboard/document-source-filter.ts",
     "../app/lib/dashboard/runtime-presentation.ts",

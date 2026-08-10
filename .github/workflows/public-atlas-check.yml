@@ -1,0 +1,54 @@
+name: Public Atlas static checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-atlas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-public-static-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout tracked sources and snapshots
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify public source policy
+        run: npm run graph:verify-public-sources
+
+      - name: Verify tracked public snapshots
+        run: |
+          npm run graph:verify-public
+          npm run graph:verify-public-fixtures
+
+      - name: Type-check and lint
+        run: |
+          npm run runtime:build
+          npx tsc --noEmit
+          npm run lint
+
+      - name: Run regression and tamper tests
+        run: npm test
+
+      - name: Build and inspect Vercel static output
+        run: npm run build:vercel
+
+      - name: Confirm build did not mutate tracked snapshots
+        run: git diff --exit-code -- public/atlas config/public-graph-sources.json

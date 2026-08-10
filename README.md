@@ -15,9 +15,9 @@
 
 [![Markdown Documents](https://img.shields.io/badge/Markdown-853%20documents-6f42c1?style=flat-square&logo=markdown&logoColor=white)](#-데이터-기준선)
 [![Knowledge Nodes](https://img.shields.io/badge/nodes-89%2C669-8250DF?style=flat-square&logo=databricks&logoColor=white)](#-데이터-기준선)
-[![Knowledge Relations](https://img.shields.io/badge/relations-94%2C488-1F6FEB?style=flat-square&logo=graphql&logoColor=white)](#-데이터-기준선)
+[![Knowledge Relations](https://img.shields.io/badge/relations-94%2C506-1F6FEB?style=flat-square&logo=graphql&logoColor=white)](#-데이터-기준선)
 [![OpenAI API Key](https://img.shields.io/badge/OpenAI%20API%20Key-not%20required-2EA043?style=flat-square&logo=openai&logoColor=white)](#-oauth와-api-경계)
-[![Tests](https://img.shields.io/badge/tests-176%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
+[![Tests](https://img.shields.io/badge/tests-206%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
 [![Last Commit](https://img.shields.io/github/last-commit/coreline-ai/memory_node_graph?style=flat-square&logo=github&label=last%20commit)](https://github.com/coreline-ai/memory_node_graph/commits/main)
 
 [빠른 시작](#-빠른-시작) · [화면 갤러리](#-화면-갤러리) · [처리 구조](#-처리-구조) · [대시보드](#-atlas-control-room) · [문서](#-관련-문서)
@@ -178,7 +178,7 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 | 고유 엔티티 | 89,669 | canonical entity 집계 |
 | 규칙 관계 | 94,487 | 구조·명시 관계 |
 | Codex 근거 관계 | 1 | 실제 OAuth smoke 결과 |
-| 전체 저장 관계 | 94,488 | 규칙 + 검증된 Codex 관계 |
+| 전체 저장 관계 | 94,506 | 규칙 + 검증된 Codex 관계 |
 | Codex 청크 | 10,904 | 1개 완료 · 10,903개 대기 |
 
 > [!TIP]
@@ -482,7 +482,7 @@ npm run graph:audit
 - GitHub preview·stage·apply·증분 변경 판정
 - 대시보드·필터·URL 상태·Three.js 관계선
 
-현재 전체 **178개 테스트를 통과**합니다.
+현재 전체 **206개 테스트를 통과**합니다.
 
 ## 🗺️ Roadmap
 
@@ -499,7 +499,10 @@ npm run graph:audit
 - [x] 대시보드 분리 실행기 신호·heartbeat 표현 제거
 - [x] GitHub `gh auth`를 통합 서버 작업 런타임으로 이전
 - [x] 전체 D1 노드 검색·문서 중심 1/2-hop graph scope
-- [ ] 공유 웹 공개 읽기·인증 쓰기 배포 검증
+- [x] 공개 JSON 정합화·SHA 검증·API 없는 읽기 전용 GUI
+- [x] Vercel 전용 정적 Vite build·산출물 보안 검사
+- [x] 공개 snapshot 변조·누락을 차단하는 GitHub Actions
+- [ ] Vercel Preview·Production 외부 배포 검증
 
 ## 📚 관련 문서
 
@@ -511,18 +514,53 @@ npm run graph:audit
 | [로컬 D1 기준선·백업·복구](./docs/local-d1-baseline.md) | 정본 탐색·감사·검증 backup·복구 점검 |
 | [Gold Graph 시각 QA](./docs/gold-graph-visual-qa-20260806.md) | GUI 시각 회귀 기준 |
 | [스크린샷 카탈로그](./docs/screenshots/README.md) | 현재 앱 화면과 재촬영 기준 |
+| [공개 그래프 스냅샷](./docs/public-graph-snapshot.md) | 공개 JSON 계약·수량·갱신 |
+| [Vercel 공개 정적 배포](./docs/vercel-static-deployment.md) | DB 없는 build·배포·검증·rollback |
+| [Vercel 정적 배포 구현 계획](./dev-plan/implement_20260810_213534.md) | Phase 1~6 진행 정본 |
 
 ## 📦 배포 원칙
 
-현재 저장소는 구현과 로컬 검증을 우선하며 별도 승인 없이 외부 배포하지 않습니다.
+운영 D1·OAuth가 필요한 전체 앱과 로그인 없는 Vercel 공개 앱을 분리합니다. 공개 앱은 GitHub에 커밋된 검증된 JSON만 읽는 정적 배포이며, 원본 D1과 쓰기 기능은 외부로 배포하지 않습니다.
 
-공유 웹은 다음 조건을 충족해야 합니다.
+### GitHub 전달용 공개 그래프 데이터
 
-- 그래프 읽기와 인증된 문서·GitHub 쓰기 분리
-- Codex SDK 프로세스와 OAuth 세션을 지원하는 상시 Node 런타임
-- 운영 D1 migration·backup·rollback
+원본 `.wrangler` D1은 Git에서 제외하지만, 다른 PC와 Vercel이 사용할 수 있는 실제 D1 기반 공개 projection은 아래 파일로 관리합니다.
+
+```text
+config/public-graph-sources.json
+public/atlas/atlas-graph-snapshot.json
+public/atlas/atlas-graph-manifest.json
+public/atlas/atlas-graph-snapshot.sha256
+public/atlas/atlas-gold-snapshot.json
+public/atlas/atlas-gold-snapshot.sha256
+```
+
+```bash
+# 다른 PC: 원본 D1 없이 committed artifact 정합성 검증
+npm run graph:verify-public
+
+# 원본 PC: GitHub 공개 상태·D1 기준선·export·검증을 순서대로 수행
+npm run graph:prepare-public
+```
+
+현재 공개 artifact는 GitHub 공개 저장소 80개 중 D1에 문서가 있는 78개 저장소·519문서를 기반으로, 53,377개 공개 전용 node와 56,341개 저장 관계에서 **500노드·1,495 실제 관계·505 display 선**을 투영합니다. 원본 D1, relation evidence, 내부 node ID, OAuth/runtime/job 정보는 포함하지 않습니다.
+
+공개 JSON만 사용하는 Vercel 정적 GUI는 다음과 같이 빌드·확인합니다. 이 모드에서는 D1/API polling·문서 관리·저장소/문서 drill-down을 실행하지 않습니다.
+
+```bash
+npm run build:vercel
+npm run preview:vercel
+```
+
+깨끗한 clone에서도 원본 D1·OAuth·환경 변수 없이 위 명령이 동작해야 합니다. 자세한 데이터 계약은 [공개 그래프 스냅샷](./docs/public-graph-snapshot.md), GitHub/Vercel 연동과 갱신·rollback은 [Vercel 공개 정적 배포](./docs/vercel-static-deployment.md)를 따릅니다.
+
+Vercel 공개 웹은 다음 조건을 충족합니다.
+
+- 공개 그래프 읽기와 인증된 로컬 문서·GitHub 쓰기 분리
+- Vercel Function, API Route, 운영 DB, 상시 Node 런타임 없음
+- 공개 snapshot SHA-256·schema·민감정보 자동 검증
 - 비공개 저장소 메타데이터 보호
-- OAuth 토큰·원문·Codex 출력 로그 redaction
+- OAuth 토큰·원문·Codex 출력 로그 미포함
 - OpenAI API Key와 LightRAG 미사용
 
 ---

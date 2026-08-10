@@ -1,0 +1,33 @@
+{
+  "counts": {
+    "displayEdges": 505,
+    "excludedMixedProvenanceNodes": 94,
+    "policyRepositories": 80,
+    "projectedFactualEdges": 1495,
+    "projectedLines": 2000,
+    "projectedNodes": 500,
+    "publicCorpusEdges": 56341,
+    "publicCorpusNodes": 53377,
+    "publicDocuments": 519,
+    "publicRepositories": 78
+  },
+  "generatedAt": "2026-08-08T11:45:16.747Z",
+  "privacy": {
+    "d1Database": "not-included",
+    "internalNodeIds": "sha256-pseudonymized",
+    "localPaths": "redacted-and-rejected",
+    "oauth": "not-included",
+    "policy": "explicit-public-repository-allowlist-and-exclusive-provenance",
+    "relationEvidence": "omitted",
+    "secrets": "pattern-rejected"
+  },
+  "schemaVersion": "atlas-public-graph-manifest/v1",
+  "snapshotPath": "/atlas/atlas-graph-snapshot.json",
+  "snapshotSha256": "dbbafdc40f25bc02fd39a8ae6ee3b300c8473ef5498f669fba9c6f76aba065c7",
+  "source": {
+    "dataFingerprint": "fdaa8da576cd961933d7c18c5047a77bab844f6a4064c1f076af3aed8e9af53f",
+    "kind": "local-d1-public-projection",
+    "policySha256": "6ab6bfed74063c364b612ffccab0db1af70e3589b919b659e1d7eb6750baceed",
+    "sourcePolicySchema": "atlas-public-graph-sources/v1"
+  }
+}

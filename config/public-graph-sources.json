@@ -1,0 +1,408 @@
+{
+  "schemaVersion": "atlas-public-graph-sources/v1",
+  "owner": "coreline-ai",
+  "verification": "GitHub gh OAuth · visibility=PUBLIC · isPrivate=false",
+  "verifiedAt": "2026-08-10T12:48:20.377Z",
+  "repositories": [
+    {
+      "githubId": "R_kgDORIg8Fg",
+      "nameWithOwner": "coreline-ai/agent_skills_marketplace",
+      "url": "https://github.com/coreline-ai/agent_skills_marketplace"
+    },
+    {
+      "githubId": "R_kgDORxdJiA",
+      "nameWithOwner": "coreline-ai/android-subagent-skill",
+      "url": "https://github.com/coreline-ai/android-subagent-skill"
+    },
+    {
+      "githubId": "R_kgDOQ8h1Bw",
+      "nameWithOwner": "coreline-ai/antigravity_gemini_skills",
+      "url": "https://github.com/coreline-ai/antigravity_gemini_skills"
+    },
+    {
+      "githubId": "R_kgDORGCuHg",
+      "nameWithOwner": "coreline-ai/antigravity_glm_mcp",
+      "url": "https://github.com/coreline-ai/antigravity_glm_mcp"
+    },
+    {
+      "githubId": "R_kgDORwd6sg",
+      "nameWithOwner": "coreline-ai/autoresearch-mcp-codex",
+      "url": "https://github.com/coreline-ai/autoresearch-mcp-codex"
+    },
+    {
+      "githubId": "R_kgDOTXHmmA",
+      "nameWithOwner": "coreline-ai/brush-remotion-video",
+      "url": "https://github.com/coreline-ai/brush-remotion-video"
+    },
+    {
+      "githubId": "R_kgDORG3Dnw",
+      "nameWithOwner": "coreline-ai/cibug_aibot_gitea_mvp",
+      "url": "https://github.com/coreline-ai/cibug_aibot_gitea_mvp"
+    },
+    {
+      "githubId": "R_kgDOSGxolw",
+      "nameWithOwner": "coreline-ai/claude-devflow-plugin",
+      "url": "https://github.com/coreline-ai/claude-devflow-plugin"
+    },
+    {
+      "githubId": "R_kgDOSTFufQ",
+      "nameWithOwner": "coreline-ai/claude-skill-factory",
+      "url": "https://github.com/coreline-ai/claude-skill-factory"
+    },
+    {
+      "githubId": "R_kgDORNpSlQ",
+      "nameWithOwner": "coreline-ai/codex_cbot_telegram",
+      "url": "https://github.com/coreline-ai/codex_cbot_telegram"
+    },
+    {
+      "githubId": "R_kgDORR9jmg",
+      "nameWithOwner": "coreline-ai/codex_freeboard_mvp",
+      "url": "https://github.com/coreline-ai/codex_freeboard_mvp"
+    },
+    {
+      "githubId": "R_kgDOSGnv9w",
+      "nameWithOwner": "coreline-ai/codex-devflow-plugin",
+      "url": "https://github.com/coreline-ai/codex-devflow-plugin"
+    },
+    {
+      "githubId": "R_kgDOSFty-Q",
+      "nameWithOwner": "coreline-ai/codex-resstyle-skill",
+      "url": "https://github.com/coreline-ai/codex-resstyle-skill"
+    },
+    {
+      "githubId": "R_kgDOSS1ANQ",
+      "nameWithOwner": "coreline-ai/codex-skill-factory",
+      "url": "https://github.com/coreline-ai/codex-skill-factory"
+    },
+    {
+      "githubId": "R_kgDORRIiGg",
+      "nameWithOwner": "coreline-ai/collection_useful_github",
+      "url": "https://github.com/coreline-ai/collection_useful_github"
+    },
+    {
+      "githubId": "R_kgDORa3xvQ",
+      "nameWithOwner": "coreline-ai/coreline_bots_dashboard",
+      "url": "https://github.com/coreline-ai/coreline_bots_dashboard"
+    },
+    {
+      "githubId": "R_kgDOR_gz6g",
+      "nameWithOwner": "coreline-ai/coreline-agent",
+      "url": "https://github.com/coreline-ai/coreline-agent"
+    },
+    {
+      "githubId": "R_kgDOR6ANUA",
+      "nameWithOwner": "coreline-ai/coreline-agent-team",
+      "url": "https://github.com/coreline-ai/coreline-agent-team"
+    },
+    {
+      "githubId": "R_kgDOQ2l4aw",
+      "nameWithOwner": "coreline-ai/coreline-ai",
+      "url": "https://github.com/coreline-ai/coreline-ai"
+    },
+    {
+      "githubId": "R_kgDORG2ARQ",
+      "nameWithOwner": "coreline-ai/coreline-ai-terminal",
+      "url": "https://github.com/coreline-ai/coreline-ai-terminal"
+    },
+    {
+      "githubId": "R_kgDOSmgw8A",
+      "nameWithOwner": "coreline-ai/coreline-auth-module",
+      "url": "https://github.com/coreline-ai/coreline-auth-module"
+    },
+    {
+      "githubId": "R_kgDOR5sdfg",
+      "nameWithOwner": "coreline-ai/coreline-codexcode-cli",
+      "url": "https://github.com/coreline-ai/coreline-codexcode-cli"
+    },
+    {
+      "githubId": "R_kgDOSdVM1A",
+      "nameWithOwner": "coreline-ai/coreline-kakaobot-v3",
+      "url": "https://github.com/coreline-ai/coreline-kakaobot-v3"
+    },
+    {
+      "githubId": "R_kgDOR-ApOQ",
+      "nameWithOwner": "coreline-ai/coreline-meta-harness",
+      "url": "https://github.com/coreline-ai/coreline-meta-harness"
+    },
+    {
+      "githubId": "R_kgDOR5sR4Q",
+      "nameWithOwner": "coreline-ai/coreline-orchestrator",
+      "url": "https://github.com/coreline-ai/coreline-orchestrator"
+    },
+    {
+      "githubId": "R_kgDOSaTJAg",
+      "nameWithOwner": "coreline-ai/CoreMCP-personal-gateway",
+      "url": "https://github.com/coreline-ai/CoreMCP-personal-gateway"
+    },
+    {
+      "githubId": "R_kgDOSaTD8w",
+      "nameWithOwner": "coreline-ai/cron-agent-dashboard",
+      "url": "https://github.com/coreline-ai/cron-agent-dashboard"
+    },
+    {
+      "githubId": "R_kgDORVLAXA",
+      "nameWithOwner": "coreline-ai/daily_stock_info",
+      "url": "https://github.com/coreline-ai/daily_stock_info"
+    },
+    {
+      "githubId": "R_kgDOR4dSbA",
+      "nameWithOwner": "coreline-ai/dev-plan-skill",
+      "url": "https://github.com/coreline-ai/dev-plan-skill"
+    },
+    {
+      "githubId": "R_kgDOTj99hA",
+      "nameWithOwner": "coreline-ai/dev-plan-v2",
+      "url": "https://github.com/coreline-ai/dev-plan-v2"
+    },
+    {
+      "githubId": "R_kgDOTpw25g",
+      "nameWithOwner": "coreline-ai/editorial-docs-studio",
+      "url": "https://github.com/coreline-ai/editorial-docs-studio"
+    },
+    {
+      "githubId": "R_kgDORYIDrA",
+      "nameWithOwner": "coreline-ai/essentia_android_maker",
+      "url": "https://github.com/coreline-ai/essentia_android_maker"
+    },
+    {
+      "githubId": "R_kgDORXea3g",
+      "nameWithOwner": "coreline-ai/ffmpeg-android-maker",
+      "url": "https://github.com/coreline-ai/ffmpeg-android-maker"
+    },
+    {
+      "githubId": "R_kgDOQ1uSfg",
+      "nameWithOwner": "coreline-ai/flutter_benchmark_tool",
+      "url": "https://github.com/coreline-ai/flutter_benchmark_tool"
+    },
+    {
+      "githubId": "R_kgDOTtk1YA",
+      "nameWithOwner": "coreline-ai/flutter_mobile_agent",
+      "url": "https://github.com/coreline-ai/flutter_mobile_agent"
+    },
+    {
+      "githubId": "R_kgDOQ9lZ-w",
+      "nameWithOwner": "coreline-ai/flutter_ondevice_ainews",
+      "url": "https://github.com/coreline-ai/flutter_ondevice_ainews"
+    },
+    {
+      "githubId": "R_kgDOQ2DKOA",
+      "nameWithOwner": "coreline-ai/flutter_simple_mirroring",
+      "url": "https://github.com/coreline-ai/flutter_simple_mirroring"
+    },
+    {
+      "githubId": "R_kgDOQ1xxVg",
+      "nameWithOwner": "coreline-ai/flutter_simple_saas_app",
+      "url": "https://github.com/coreline-ai/flutter_simple_saas_app"
+    },
+    {
+      "githubId": "R_kgDOQ2Dk8A",
+      "nameWithOwner": "coreline-ai/fullstack_profile_public",
+      "url": "https://github.com/coreline-ai/fullstack_profile_public"
+    },
+    {
+      "githubId": "R_kgDORF7wKQ",
+      "nameWithOwner": "coreline-ai/gemini_usage_cli",
+      "url": "https://github.com/coreline-ai/gemini_usage_cli"
+    },
+    {
+      "githubId": "R_kgDOQ9kVAA",
+      "nameWithOwner": "coreline-ai/google_ai_edge",
+      "url": "https://github.com/coreline-ai/google_ai_edge"
+    },
+    {
+      "githubId": "R_kgDORpZlTg",
+      "nameWithOwner": "coreline-ai/gpt_image_gen",
+      "url": "https://github.com/coreline-ai/gpt_image_gen"
+    },
+    {
+      "githubId": "R_kgDORvgJIg",
+      "nameWithOwner": "coreline-ai/graph-RAG-MVP",
+      "url": "https://github.com/coreline-ai/graph-RAG-MVP"
+    },
+    {
+      "githubId": "R_kgDOSN0LXg",
+      "nameWithOwner": "coreline-ai/graphify-legal-wiki",
+      "url": "https://github.com/coreline-ai/graphify-legal-wiki"
+    },
+    {
+      "githubId": "R_kgDOR6RlvA",
+      "nameWithOwner": "coreline-ai/harness-protect-aegis",
+      "url": "https://github.com/coreline-ai/harness-protect-aegis"
+    },
+    {
+      "githubId": "R_kgDOSoUzew",
+      "nameWithOwner": "coreline-ai/hermes-agent-gui",
+      "url": "https://github.com/coreline-ai/hermes-agent-gui"
+    },
+    {
+      "githubId": "R_kgDOSP6oJQ",
+      "nameWithOwner": "coreline-ai/html-news-creator",
+      "url": "https://github.com/coreline-ai/html-news-creator"
+    },
+    {
+      "githubId": "R_kgDOS2gg3Q",
+      "nameWithOwner": "coreline-ai/improvement_loop_harness",
+      "url": "https://github.com/coreline-ai/improvement_loop_harness"
+    },
+    {
+      "githubId": "R_kgDORJP-xg",
+      "nameWithOwner": "coreline-ai/kakao_coreline_bot",
+      "url": "https://github.com/coreline-ai/kakao_coreline_bot"
+    },
+    {
+      "githubId": "R_kgDOTj942g",
+      "nameWithOwner": "coreline-ai/kakao-heybot-auto",
+      "url": "https://github.com/coreline-ai/kakao-heybot-auto"
+    },
+    {
+      "githubId": "R_kgDORjDQCw",
+      "nameWithOwner": "coreline-ai/kotlin_audio_heartune",
+      "url": "https://github.com/coreline-ai/kotlin_audio_heartune"
+    },
+    {
+      "githubId": "R_kgDOQ1tDyA",
+      "nameWithOwner": "coreline-ai/kotlin_fullstack_appstore",
+      "url": "https://github.com/coreline-ai/kotlin_fullstack_appstore"
+    },
+    {
+      "githubId": "R_kgDOQ1ycrQ",
+      "nameWithOwner": "coreline-ai/kotlin_llm_playlists",
+      "url": "https://github.com/coreline-ai/kotlin_llm_playlists"
+    },
+    {
+      "githubId": "R_kgDOQ1sJ6g",
+      "nameWithOwner": "coreline-ai/kotlin_pcmdecoding_mvp",
+      "url": "https://github.com/coreline-ai/kotlin_pcmdecoding_mvp"
+    },
+    {
+      "githubId": "R_kgDORB3rwQ",
+      "nameWithOwner": "coreline-ai/kotlin_smart_adaptive_sound",
+      "url": "https://github.com/coreline-ai/kotlin_smart_adaptive_sound"
+    },
+    {
+      "githubId": "R_kgDOTw0KtA",
+      "nameWithOwner": "coreline-ai/long-stt-android",
+      "url": "https://github.com/coreline-ai/long-stt-android"
+    },
+    {
+      "githubId": "R_kgDOTSeuCg",
+      "nameWithOwner": "coreline-ai/lucky-real-app",
+      "url": "https://github.com/coreline-ai/lucky-real-app"
+    },
+    {
+      "githubId": "R_kgDOTMPFIw",
+      "nameWithOwner": "coreline-ai/mcp-policy-gateway",
+      "url": "https://github.com/coreline-ai/mcp-policy-gateway"
+    },
+    {
+      "githubId": "R_kgDOTs_4bg",
+      "nameWithOwner": "coreline-ai/memory_node_graph",
+      "url": "https://github.com/coreline-ai/memory_node_graph"
+    },
+    {
+      "githubId": "R_kgDOTL_TTw",
+      "nameWithOwner": "coreline-ai/mini-web-game",
+      "url": "https://github.com/coreline-ai/mini-web-game"
+    },
+    {
+      "githubId": "R_kgDOQ5VULA",
+      "nameWithOwner": "coreline-ai/monorepo_code_indexer",
+      "url": "https://github.com/coreline-ai/monorepo_code_indexer"
+    },
+    {
+      "githubId": "R_kgDORQi2XQ",
+      "nameWithOwner": "coreline-ai/multi_llm_mcp",
+      "url": "https://github.com/coreline-ai/multi_llm_mcp"
+    },
+    {
+      "githubId": "R_kgDORgzKCA",
+      "nameWithOwner": "coreline-ai/multi_model_tui",
+      "url": "https://github.com/coreline-ai/multi_model_tui"
+    },
+    {
+      "githubId": "R_kgDOQ2B2tw",
+      "nameWithOwner": "coreline-ai/node_aiweb_news",
+      "url": "https://github.com/coreline-ai/node_aiweb_news"
+    },
+    {
+      "githubId": "R_kgDOSW32UQ",
+      "nameWithOwner": "coreline-ai/ParametricEQ-module-20band",
+      "url": "https://github.com/coreline-ai/ParametricEQ-module-20band"
+    },
+    {
+      "githubId": "R_kgDORQuRZg",
+      "nameWithOwner": "coreline-ai/personal_task_desktop",
+      "url": "https://github.com/coreline-ai/personal_task_desktop"
+    },
+    {
+      "githubId": "R_kgDOR70rfA",
+      "nameWithOwner": "coreline-ai/pipeline-notebooklm",
+      "url": "https://github.com/coreline-ai/pipeline-notebooklm"
+    },
+    {
+      "githubId": "R_kgDOQ1zJgA",
+      "nameWithOwner": "coreline-ai/python_simple_saas_fullstack",
+      "url": "https://github.com/coreline-ai/python_simple_saas_fullstack"
+    },
+    {
+      "githubId": "R_kgDORHQv9A",
+      "nameWithOwner": "coreline-ai/remote_pc_insight",
+      "url": "https://github.com/coreline-ai/remote_pc_insight"
+    },
+    {
+      "githubId": "R_kgDORvSwDA",
+      "nameWithOwner": "coreline-ai/simple-RAG-chat",
+      "url": "https://github.com/coreline-ai/simple-RAG-chat"
+    },
+    {
+      "githubId": "R_kgDORQsrzQ",
+      "nameWithOwner": "coreline-ai/simulate_building_sunshade",
+      "url": "https://github.com/coreline-ai/simulate_building_sunshade"
+    },
+    {
+      "githubId": "R_kgDOSsHSKA",
+      "nameWithOwner": "coreline-ai/skills-html-showcase",
+      "url": "https://github.com/coreline-ai/skills-html-showcase"
+    },
+    {
+      "githubId": "R_kgDORMsuSw",
+      "nameWithOwner": "coreline-ai/stock_analysis_event",
+      "url": "https://github.com/coreline-ai/stock_analysis_event"
+    },
+    {
+      "githubId": "R_kgDOSXa3Ug",
+      "nameWithOwner": "coreline-ai/system-builder-AX",
+      "url": "https://github.com/coreline-ai/system-builder-AX"
+    },
+    {
+      "githubId": "R_kgDORQzCNg",
+      "nameWithOwner": "coreline-ai/talk_codex_gemini",
+      "url": "https://github.com/coreline-ai/talk_codex_gemini"
+    },
+    {
+      "githubId": "R_kgDORVQT6Q",
+      "nameWithOwner": "coreline-ai/team_work_dashboard",
+      "url": "https://github.com/coreline-ai/team_work_dashboard"
+    },
+    {
+      "githubId": "R_kgDORZ0bFw",
+      "nameWithOwner": "coreline-ai/trading_stock_skills",
+      "url": "https://github.com/coreline-ai/trading_stock_skills"
+    },
+    {
+      "githubId": "R_kgDORyx71A",
+      "nameWithOwner": "coreline-ai/validation-skill-base",
+      "url": "https://github.com/coreline-ai/validation-skill-base"
+    },
+    {
+      "githubId": "R_kgDOQ2CuFA",
+      "nameWithOwner": "coreline-ai/web_coreline_public",
+      "url": "https://github.com/coreline-ai/web_coreline_public"
+    },
+    {
+      "githubId": "R_kgDOQ3KV_w",
+      "nameWithOwner": "coreline-ai/web_richeditor_tool",
+      "url": "https://github.com/coreline-ai/web_richeditor_tool"
+    }
+  ]
+}

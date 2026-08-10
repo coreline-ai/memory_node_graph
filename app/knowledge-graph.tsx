@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
@@ -30,6 +29,12 @@ import type {
   GraphNodeSearchResult,
   GraphSnapshot,
 } from "./lib/graph/model";
+import { analyzeGraphSnapshot } from "./lib/graph/analytics";
+import { createPerformanceGraphSnapshot } from "./lib/graph/performance-fixture";
+import {
+  loadPublicGoldGraphSnapshot,
+  loadPublicGraphSnapshot,
+} from "./lib/graph/public-graph-client";
 import {
   GRAPH_REVISION_STORAGE_KEY,
   shouldRefreshGraphRevision,
@@ -145,6 +150,17 @@ type ShowcaseState = {
   luminosityCustom: boolean;
 };
 
+export type GraphDataMode = "api" | "public-static";
+
+type KnowledgeGraphProps = {
+  dataMode?: GraphDataMode;
+};
+
+declare const __ATLAS_PUBLIC_STATIC_BUILD__: boolean | undefined;
+
+const PUBLIC_STATIC_BUILD = typeof __ATLAS_PUBLIC_STATIC_BUILD__ !== "undefined"
+  && __ATLAS_PUBLIC_STATIC_BUILD__;
+
 const VIEW_LABELS: Record<GraphViewMode, string> = {
   constellation: "별자리",
   nebula: "성운",
@@ -156,6 +172,12 @@ const LUMINOSITY_LABELS: Record<LuminosityPreset, string> = {
   bright: "브라이트",
   supernova: "초신성",
 };
+
+// Keep the floating source chooser away from both viewport edges.  The same
+// values are mirrored in `.data-source-panel` so its measured placement and
+// rendered width never disagree on narrow screens.
+const DATA_SOURCE_PANEL_MAX_WIDTH = 310;
+const DATA_SOURCE_PANEL_GUTTER = 20;
 
 const NODE_COLORS: Record<NodeKind, number> = {
   thesis: 0xff473d,
@@ -293,7 +315,8 @@ function useSetToggle<T>(
   return [set, toggle, clear, replace];
 }
 
-export default function KnowledgeGraph() {
+export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps) {
+  const publicStaticMode = PUBLIC_STATIC_BUILD || dataMode === "public-static";
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const graphApiRef = useRef<GraphApi | null>(null);
@@ -429,15 +452,16 @@ export default function KnowledgeGraph() {
     setGraphError("");
     try {
       const pageUrl = new URL(window.location.href);
-      const graphRequest = graphApiRequestFromPageUrl(pageUrl);
       const presentationFixture = pageUrl.searchParams.has("showcase")
         || pageUrl.searchParams.has("fixture");
       const savedScopeState = presentationFixture
         ? null
         : graphScopeHistoryStateFromHistoryState(window.history.state);
       setGraphRequestedScope(
-        pageUrl.searchParams.has("showcase") || pageUrl.searchParams.has("fixture")
+        presentationFixture
           ? null
+          : publicStaticMode
+            ? "corpus"
           : pageUrl.searchParams.get("scope") === "repository"
             ? "repository"
             : pageUrl.searchParams.get("scope") === "document"
@@ -446,13 +470,36 @@ export default function KnowledgeGraph() {
               ? "overview"
               : "corpus",
       );
-      const response = await fetch(graphRequest.path, { cache: "no-store" });
-      const payload = (await response.json()) as GraphSnapshot & { error?: string };
-      if (!response.ok) throw new Error(payload.error || `그래프 요청 실패 (${response.status})`);
+      let payload: GraphSnapshot;
+      let implicitScope = false;
+      if (publicStaticMode) {
+        const showcase = pageUrl.searchParams.get("showcase");
+        const fixture = pageUrl.searchParams.get("fixture");
+        if (showcase === "max" || fixture === "500x2000") {
+          payload = analyzeGraphSnapshot(createPerformanceGraphSnapshot());
+        } else if (showcase === "gold" || fixture === "gold-v1") {
+          payload = await loadPublicGoldGraphSnapshot();
+        } else {
+          payload = (await loadPublicGraphSnapshot()).snapshot;
+          implicitScope = pageUrl.searchParams.get("scope") !== "corpus";
+          pageUrl.searchParams.set("scope", "corpus");
+          pageUrl.searchParams.delete("repositoryId");
+          pageUrl.searchParams.delete("documentId");
+        }
+      } else {
+        const graphRequest = graphApiRequestFromPageUrl(pageUrl);
+        implicitScope = graphRequest.implicitScope;
+        const response = await fetch(graphRequest.path, { cache: "no-store" });
+        const responsePayload = (await response.json()) as GraphSnapshot & { error?: string };
+        if (!response.ok) {
+          throw new Error(responsePayload.error || `그래프 요청 실패 (${response.status})`);
+        }
+        payload = responsePayload;
+      }
       if (!Array.isArray(payload.nodes) || !Array.isArray(payload.edges)) {
         throw new Error("그래프 응답 형식이 올바르지 않습니다.");
       }
-      if (graphRequest.implicitScope && payload.meta.scope) {
+      if (implicitScope && payload.meta.scope) {
         pageUrl.searchParams.set("scope", payload.meta.scope);
         window.history.replaceState({}, "", pageUrl);
       }
@@ -472,7 +519,7 @@ export default function KnowledgeGraph() {
       graphLoadingRef.current = false;
       setGraphLoading(false);
     }
-  }, [restoreGraphScopeState]);
+  }, [publicStaticMode, restoreGraphScopeState]);
 
   const navigateGraphScope = useCallback(
     async (scope: GraphNavigationScope, resourceId?: string, focusNodeId?: string) => {
@@ -513,9 +560,16 @@ export default function KnowledgeGraph() {
   const positionDataMenu = useCallback(() => {
     const bounds = dataMenuButtonRef.current?.getBoundingClientRect();
     if (!bounds) return;
-    const panelWidth = Math.min(310, window.innerWidth - 24);
+    const panelWidth = Math.min(
+      DATA_SOURCE_PANEL_MAX_WIDTH,
+      window.innerWidth - DATA_SOURCE_PANEL_GUTTER * 2,
+    );
     setDataMenuPosition({
-      left: clamp(bounds.left, 12, window.innerWidth - panelWidth - 12),
+      left: clamp(
+        bounds.left,
+        DATA_SOURCE_PANEL_GUTTER,
+        window.innerWidth - panelWidth - DATA_SOURCE_PANEL_GUTTER,
+      ),
       bottom: window.innerHeight - bounds.top + 8,
     });
   }, []);
@@ -680,6 +734,7 @@ export default function KnowledgeGraph() {
   }, [loadGraph]);
 
   useEffect(() => {
+    if (publicStaticMode) return;
     let disposed = false;
     const presentationActive = () => {
       const url = new URL(window.location.href);
@@ -723,7 +778,7 @@ export default function KnowledgeGraph() {
       window.removeEventListener("storage", onStorage);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [loadGraph]);
+  }, [loadGraph, publicStaticMode]);
 
   useEffect(() => {
     if (!graphData.meta.generatedAt) return;
@@ -735,6 +790,7 @@ export default function KnowledgeGraph() {
   }, [graphData.meta.generatedAt, graphScopeState]);
 
   useEffect(() => {
+    if (publicStaticMode) return;
     const controller = new AbortController();
     void fetch("/api/graph/documents?limit=6", {
       cache: "no-store",
@@ -747,10 +803,11 @@ export default function KnowledgeGraph() {
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [graphData.meta.graphRevision]);
+  }, [graphData.meta.graphRevision, publicStaticMode]);
 
   useEffect(() => {
     const normalized = query.trim();
+    if (publicStaticMode) return;
     if (normalized.length < 2) {
       return;
     }
@@ -776,7 +833,7 @@ export default function KnowledgeGraph() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query]);
+  }, [publicStaticMode, query]);
 
   const nodeMap = useMemo(
     () => new Map(knowledgeNodes.map((nodeItem) => [nodeItem.id, nodeItem])),
@@ -880,7 +937,7 @@ export default function KnowledgeGraph() {
         : documentScopeActive
           ? `DOC ${knowledgeNodes.length}N/${knowledgeEdges.length}E`
         : corpusScopeActive
-          ? `D1 ${knowledgeNodes.length}N/${knowledgeEdges.length}E`
+          ? `${publicStaticMode ? "PUBLIC" : "D1"} ${knowledgeNodes.length}N/${knowledgeEdges.length}E`
         : overviewScopeActive
           ? `MAP ${graphData.meta.repositoryCount ?? 0}R`
           : graphData.meta.source === "documents"
@@ -3015,7 +3072,7 @@ export default function KnowledgeGraph() {
                   : repositoryScopeContext
                   ? "REPOSITORY DETAIL"
                   : corpusScopeActive
-                    ? "FULL D1 CORPUS"
+                    ? publicStaticMode ? "PUBLIC STATIC CORPUS" : "FULL D1 CORPUS"
                   : overviewScopeActive
                     ? "REPOSITORY MAP"
                     : goldGraphActive
@@ -3052,7 +3109,7 @@ export default function KnowledgeGraph() {
                   : documentScopeActive
                     ? "DOC"
                   : corpusScopeActive
-                    ? "D1 MAP"
+                    ? publicStaticMode ? "PUBLIC MAP" : "D1 MAP"
                   : overviewScopeActive
                     ? "MAP"
                     : goldGraphActive
@@ -3061,8 +3118,8 @@ export default function KnowledgeGraph() {
             </span>
           </div>
           {graphData.meta.corpusNodeCount !== undefined && graphData.meta.corpusEdgeCount !== undefined && (
-            <div className="corpus-stats" aria-label="D1 전체 데이터 통계">
-              <span>D1 전체</span>
+            <div className="corpus-stats" aria-label={publicStaticMode ? "공개 snapshot 전체 데이터 통계" : "D1 전체 데이터 통계"}>
+              <span>{publicStaticMode ? "공개 원본" : "D1 전체"}</span>
               <strong>{graphData.meta.corpusNodeCount.toLocaleString()} 노드</strong>
               <i aria-hidden="true" />
               <strong>{graphData.meta.corpusEdgeCount.toLocaleString()} 관계</strong>
@@ -3259,7 +3316,7 @@ export default function KnowledgeGraph() {
               </>
             ) : (
               <span>{corpusScopeActive
-                ? "전체 D1 코퍼스"
+                ? publicStaticMode ? "공개 지식 코퍼스" : "전체 D1 코퍼스"
                 : overviewScopeActive
                   ? "전체 저장소"
                   : selectedNode?.shortLabel ?? "전체 지식 우주"}</span>
@@ -3360,7 +3417,7 @@ export default function KnowledgeGraph() {
               : repositoryScopeContext
               ? `${graphData.meta.documentCount ?? 0}개 Markdown · ${knowledgeNodes.length}개 노드 · ${knowledgeEdges.length}개 관계`
               : corpusScopeActive
-                ? `D1 전체 ${(graphData.meta.corpusNodeCount ?? 0).toLocaleString()}노드 · ${(graphData.meta.corpusEdgeCount ?? 0).toLocaleString()}관계 중 화면 ${knowledgeNodes.length}노드 · 실제 ${(graphData.meta.projectedFactualEdgeCount ?? knowledgeEdges.length).toLocaleString()}관계${(graphData.meta.displayEdgeCount ?? 0) > 0 ? ` + 시각 연결 ${graphData.meta.displayEdgeCount?.toLocaleString()}` : ""}`
+                ? `${publicStaticMode ? "공개 원본" : "D1 전체"} ${(graphData.meta.corpusNodeCount ?? 0).toLocaleString()}노드 · ${(graphData.meta.corpusEdgeCount ?? 0).toLocaleString()}관계 중 화면 ${knowledgeNodes.length}노드 · 실제 ${(graphData.meta.projectedFactualEdgeCount ?? knowledgeEdges.length).toLocaleString()}관계${(graphData.meta.displayEdgeCount ?? 0) > 0 ? ` + 시각 연결 ${graphData.meta.displayEdgeCount?.toLocaleString()}` : ""}`
               : overviewScopeActive
                 ? `${graphData.meta.repositoryCount ?? 0}개 저장소 · 공유 기술 중심 overview`
                 : graphData.meta.source === "documents"
@@ -3369,7 +3426,9 @@ export default function KnowledgeGraph() {
           </span>
           {corpusScopeActive && (
             <small className="projection-guide">
-              화면은 전체 {(graphData.meta.corpusNodeCount ?? 0).toLocaleString()}개 노드 중 핵심 500개 투영입니다. 상단 검색으로 화면 밖 노드를 찾으면 해당 Markdown 중심의 1·2단계 관계를 궤도로 엽니다.
+              {publicStaticMode
+                ? `GitHub에 공개 검증된 ${(graphData.meta.corpusNodeCount ?? 0).toLocaleString()}개 노드 중 핵심 ${knowledgeNodes.length.toLocaleString()}개를 정적 JSON으로 표시합니다.`
+                : `화면은 전체 ${(graphData.meta.corpusNodeCount ?? 0).toLocaleString()}개 노드 중 핵심 500개 투영입니다. 상단 검색으로 화면 밖 노드를 찾으면 해당 Markdown 중심의 1·2단계 관계를 궤도로 엽니다.`}
             </small>
           )}
           {goldGraphActive && (
@@ -3380,7 +3439,7 @@ export default function KnowledgeGraph() {
               onClick={() => void selectDataSource("corpus")}
             >
               <span>Gold 표본 닫기</span>
-              <strong>실제 D1 연결망 보기</strong>
+              <strong>{publicStaticMode ? "공개 연결망 보기" : "실제 D1 연결망 보기"}</strong>
               <i aria-hidden="true">→</i>
             </button>
           )}
@@ -3436,7 +3495,7 @@ export default function KnowledgeGraph() {
           <div className="control-cluster data-cluster" role="group" aria-label="데이터">
             <span className="control-cluster-label" aria-hidden="true">데이터</span>
             <div className="control-group data-switch">
-              {(repositoryScopeContext || documentScopeContext) && (
+              {!publicStaticMode && (repositoryScopeContext || documentScopeContext) && (
                 <button
                   type="button"
                   className="scope-back-control"
@@ -3448,10 +3507,12 @@ export default function KnowledgeGraph() {
                   <em>{documentScopeContext ? "전체 D1" : "전체 저장소"}</em>
                 </button>
               )}
-              <Link className="dashboard-control" href="/dashboard" title="Markdown 문서 관리">
-                <span className="data-icon">＋</span>
-                <em>문서 관리</em>
-              </Link>
+              {!publicStaticMode && (
+                <a className="dashboard-control" href="/dashboard" title="Markdown 문서 관리">
+                  <span className="data-icon">＋</span>
+                  <em>문서 관리</em>
+                </a>
+              )}
               <button
                 ref={dataMenuButtonRef}
                 type="button"
@@ -3480,7 +3541,7 @@ export default function KnowledgeGraph() {
                   : showcaseActive
                     ? "최대 밀도"
                     : corpusScopeActive
-                      ? "전체 D1"
+                      ? publicStaticMode ? "공개 지식" : "전체 D1"
                       : overviewScopeActive
                         ? "저장소 맵"
                         : repositoryScopeActive
@@ -3583,7 +3644,7 @@ export default function KnowledgeGraph() {
                 : showcaseActive
                   ? "DEMO · 500 NODES / 2,000 EDGES"
                   : corpusScopeActive
-                    ? "LIVE D1 · RELATIONSHIP FIRST"
+                    ? publicStaticMode ? "STATIC JSON · VERIFIED PUBLIC DATA" : "LIVE D1 · RELATIONSHIP FIRST"
                     : documentScopeActive
                       ? "DOCUMENT · STORED EVIDENCE"
                     : "DATA SOURCE"}</span>
@@ -3626,29 +3687,33 @@ export default function KnowledgeGraph() {
               >
                 <i className="data-option-current" aria-hidden="true" />
                 <span>
-                  <strong>전체 D1 지식 맵</strong>
+                  <strong>{publicStaticMode ? "공개 정적 지식 맵" : "전체 D1 지식 맵"}</strong>
                   <small>
                     {corpusScopeActive
                       ? `${(graphData.meta.projectedFactualEdgeCount ?? knowledgeEdges.length).toLocaleString()}개 실제 관계 + ${(graphData.meta.displayEdgeCount ?? 0).toLocaleString()}개 시각 연결`
-                      : "실제 문서 코퍼스 · 500노드 관계 확장 투영"}
+                      : publicStaticMode
+                        ? "GitHub 공개 snapshot · 500노드 관계 투영"
+                        : "실제 문서 코퍼스 · 500노드 관계 확장 투영"}
                   </small>
                 </span>
                 <b>{corpusScopeActive ? "ACTIVE" : "OPEN"}</b>
               </button>
-              <button
-                type="button"
-                className={overviewScopeActive ? "is-active" : ""}
-                aria-pressed={overviewScopeActive}
-                disabled={graphLoading}
-                onClick={() => void selectDataSource("overview")}
-              >
-                <i className="data-option-overview" aria-hidden="true" />
-                <span>
-                  <strong>저장소 Overview</strong>
-                  <small>{graphData.meta.repositoryCount ?? 0}개 저장소와 공유 기술 중심 맵</small>
-                </span>
-                <b>{overviewScopeActive ? "ACTIVE" : "OPEN"}</b>
-              </button>
+              {!publicStaticMode && (
+                <button
+                  type="button"
+                  className={overviewScopeActive ? "is-active" : ""}
+                  aria-pressed={overviewScopeActive}
+                  disabled={graphLoading}
+                  onClick={() => void selectDataSource("overview")}
+                >
+                  <i className="data-option-overview" aria-hidden="true" />
+                  <span>
+                    <strong>저장소 Overview</strong>
+                    <small>{graphData.meta.repositoryCount ?? 0}개 저장소와 공유 기술 중심 맵</small>
+                  </span>
+                  <b>{overviewScopeActive ? "ACTIVE" : "OPEN"}</b>
+                </button>
+              )}
               <button
                 type="button"
                 className={goldGraphActive ? "is-active is-gold" : "is-gold"}
@@ -3705,12 +3770,12 @@ export default function KnowledgeGraph() {
             <footer role="status" aria-live="polite">
               <i aria-hidden="true" />
               {goldGraphActive
-                ? "검토 표본 · 전체 코퍼스 아님 · D1과 분리 · 저장되지 않음"
+                ? `검토 표본 · 전체 코퍼스 아님 · ${publicStaticMode ? "공개 snapshot" : "D1"}과 분리 · 저장되지 않음`
                   : showcaseActive
                   ? "읽기 전용 · 저장되지 않음 · 실제 지식 데이터 아님"
                   : documentScopeActive
                     ? "문서 직접 노드 중심 · 저장된 관계만 표시 · 1·2단계 확장 · 화면용 연결선 0개"
-                  : `실제 D1 읽기 전용 투영 · 화면 상한 500노드 / 2,000선${(graphData.meta.displayEdgeCount ?? 0) > 0 ? ` · 화면용 ${graphData.meta.displayEdgeCount?.toLocaleString()}선은 비저장` : ""}`}
+                  : `${publicStaticMode ? "GitHub 공개 JSON" : "실제 D1"} 읽기 전용 투영 · 화면 상한 500노드 / 2,000선${(graphData.meta.displayEdgeCount ?? 0) > 0 ? ` · 화면용 ${graphData.meta.displayEdgeCount?.toLocaleString()}선은 비저장` : ""}`}
             </footer>
           </section>
         )}
@@ -3911,7 +3976,7 @@ export default function KnowledgeGraph() {
               <h2>{selectedNode.label}</h2>
               <p className="detail-summary">{selectedNode.summary}</p>
 
-              {selectedRepositoryId && !repositoryScopeActive && (
+              {!publicStaticMode && selectedRepositoryId && !repositoryScopeActive && (
                 <button
                   type="button"
                   className="detail-scope-action"

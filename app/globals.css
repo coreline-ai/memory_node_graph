@@ -1506,7 +1506,8 @@ textarea:focus-visible {
 .data-source-panel {
   position: fixed;
   z-index: 34;
-  width: min(310px, calc(100vw - 24px));
+  /* Keep a stable 20px breathing room on both sides of a narrow viewport. */
+  width: min(310px, calc(100vw - 40px));
   max-height: min(520px, calc(100vh - 100px));
   padding: 0 12px 12px;
   color: #a8a9a5;
@@ -1564,7 +1565,11 @@ textarea:focus-visible {
   gap: 5px;
   padding: 11px 0;
   min-height: 0;
+  /* This is a vertical document list.  A horizontal native scrollbar is both
+     misleading and obscures the final document row on compact screens. */
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .data-source-options > button {
@@ -1572,6 +1577,8 @@ textarea:focus-visible {
   grid-template-columns: 21px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
+  width: 100%;
+  min-width: 0;
   min-height: 57px;
   padding: 9px 10px;
   color: #777e84;
@@ -1649,9 +1656,10 @@ textarea:focus-visible {
 }
 
 .recent-document-options > div {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
-  justify-content: space-between;
   padding: 0 2px 4px;
   color: #626c73;
   font-family: var(--font-mono);
@@ -1660,9 +1668,14 @@ textarea:focus-visible {
 }
 
 .recent-document-options > div small {
+  min-width: 0;
+  overflow: hidden;
   color: #444c52;
   font-size: 6px;
   letter-spacing: 0;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .recent-document-options > button {

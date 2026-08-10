@@ -8,5 +8,8 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <KnowledgeGraph />;
+  const dataMode = process.env.NEXT_PUBLIC_ATLAS_DATA_MODE === "public-static"
+    ? "public-static"
+    : "api";
+  return <KnowledgeGraph dataMode={dataMode} />;
 }
