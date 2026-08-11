@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  DASHBOARD_DOCUMENT_PAGE_SIZE,
   countDashboardDocumentsBySource,
   filterDashboardDocumentsBySource,
+  sliceDashboardDocuments,
 } from "../.runtime-dist/app/lib/dashboard/document-source-filter.js";
 
 const documents = [
@@ -33,4 +35,17 @@ test("대시보드 문서 출처 filter는 원본 순서를 보존하고 입력 
   );
   assert.notStrictEqual(filterDashboardDocumentsBySource(documents, "all"), documents);
   assert.deepEqual(documents.map((document) => document.id), originalIds);
+});
+
+test("Markdown 문서 목록은 20개씩 누적 표시한다", () => {
+  const manyDocuments = Array.from({ length: 45 }, (_, index) => ({
+    id: `document-${index + 1}`,
+    sourceType: "github",
+  }));
+
+  assert.equal(DASHBOARD_DOCUMENT_PAGE_SIZE, 20);
+  assert.equal(sliceDashboardDocuments(manyDocuments, DASHBOARD_DOCUMENT_PAGE_SIZE).length, 20);
+  assert.equal(sliceDashboardDocuments(manyDocuments, DASHBOARD_DOCUMENT_PAGE_SIZE * 2).length, 40);
+  assert.equal(sliceDashboardDocuments(manyDocuments, DASHBOARD_DOCUMENT_PAGE_SIZE * 3).length, 45);
+  assert.equal(sliceDashboardDocuments(manyDocuments, Number.NaN).length, 20);
 });

@@ -131,6 +131,21 @@ const corpusNodePriority = (node: KnowledgeNode, degree: number) => {
   return degree * 1_000 + semanticBonus;
 };
 
+const CORPUS_DIVERSITY_RELATION_TYPES = ["uses", "tests", "produces"] as const;
+const CORPUS_DIVERSITY_RELATION_SET = new Set<string>(CORPUS_DIVERSITY_RELATION_TYPES);
+
+const corpusDiversityEdgeTarget = (
+  nodeBudget: number,
+  edgeBudget: number,
+  candidateCount: number,
+) => {
+  if (candidateCount <= 0) return 0;
+  if (nodeBudget >= 250 && edgeBudget >= 1_000) {
+    return Math.min(candidateCount, Math.max(50, Math.min(100, Math.floor(edgeBudget * 0.025))));
+  }
+  return Math.min(candidateCount, Math.max(1, Math.floor(Math.min(nodeBudget, edgeBudget) * 0.1)));
+};
+
 const displayPairKey = (source: string, target: string) =>
   source < target ? `${source}|${target}` : `${target}|${source}`;
 
@@ -170,7 +185,11 @@ const createCorpusDisplayWeave = (
   edgeBudget: number,
 ) => {
   if (nodes.length < 250 || factualEdges.length >= edgeBudget) return [] as KnowledgeEdge[];
-  const displayBudget = Math.min(edgeBudget - factualEdges.length, nodes.length * 2);
+  const displayBudget = Math.min(
+    edgeBudget - factualEdges.length,
+    nodes.length * 2,
+    Math.max(1, Math.floor(edgeBudget * 0.2)),
+  );
   if (displayBudget <= 0) return [] as KnowledgeEdge[];
 
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -335,6 +354,79 @@ export function projectGraphCorpus(
     .filter((node) => !isRepositoryNode(node))
     .slice(0, anchorTarget);
   const selectedIds = new Set([...repositories, ...anchors].map((node) => node.id));
+  const diversityCandidates = edges.filter((edge) =>
+    CORPUS_DIVERSITY_RELATION_SET.has(edge.type)
+    && relationLayerFor(edge) !== "display");
+  const diversityDegree = new Map<string, number>();
+  for (const edge of diversityCandidates) {
+    diversityDegree.set(edge.source, (diversityDegree.get(edge.source) ?? 0) + 1);
+    diversityDegree.set(edge.target, (diversityDegree.get(edge.target) ?? 0) + 1);
+  }
+  const diversityTarget = corpusDiversityEdgeTarget(
+    nodeBudget,
+    edgeBudget,
+    diversityCandidates.length,
+  );
+  const diversityTypeTargets = new Map<string, number>([
+    ["uses", Math.floor(diversityTarget * 0.5)],
+    ["tests", Math.floor(diversityTarget * 0.4)],
+    ["produces", diversityTarget - Math.floor(diversityTarget * 0.5) - Math.floor(diversityTarget * 0.4)],
+  ]);
+  const diversityEdges: KnowledgeEdge[] = [];
+  const diversityEdgeKeys = new Set<string>();
+  const canReserveDiversityEdge = (edge: KnowledgeEdge) => {
+    const endpoints = [edge.source, edge.target];
+    if (endpoints.some((id) => {
+      const node = nodeById.get(id);
+      return node && isRepositoryNode(node) && !selectedIds.has(id);
+    })) return false;
+    const newEndpointCount = endpoints.filter((id) => !selectedIds.has(id)).length;
+    return selectedIds.size + newEndpointCount <= nodeBudget;
+  };
+  const reserveDiversityEdge = (edge: KnowledgeEdge) => {
+    const key = edgeKey(edge);
+    if (diversityEdgeKeys.has(key) || !canReserveDiversityEdge(edge)) return false;
+    diversityEdges.push(edge);
+    diversityEdgeKeys.add(key);
+    selectedIds.add(edge.source);
+    selectedIds.add(edge.target);
+    return true;
+  };
+  const nextDiversityEdge = (candidates: readonly KnowledgeEdge[]) =>
+    candidates
+      .filter((edge) => !diversityEdgeKeys.has(edgeKey(edge)) && canReserveDiversityEdge(edge))
+      .sort((left, right) => {
+        const selectedEndpointDifference =
+          Number(selectedIds.has(right.source)) + Number(selectedIds.has(right.target))
+          - Number(selectedIds.has(left.source)) - Number(selectedIds.has(left.target));
+        if (selectedEndpointDifference) return selectedEndpointDifference;
+        const diversityDegreeDifference =
+          (diversityDegree.get(right.source) ?? 0) + (diversityDegree.get(right.target) ?? 0)
+          - (diversityDegree.get(left.source) ?? 0) - (diversityDegree.get(left.target) ?? 0);
+        if (diversityDegreeDifference) return diversityDegreeDifference;
+        const totalDegreeDifference =
+          (degree.get(right.source) ?? 0) + (degree.get(right.target) ?? 0)
+          - (degree.get(left.source) ?? 0) - (degree.get(left.target) ?? 0);
+        return totalDegreeDifference
+          || right.confidence - left.confidence
+          || edgeKey(left).localeCompare(edgeKey(right));
+      })[0];
+  for (const relationType of CORPUS_DIVERSITY_RELATION_TYPES) {
+    const typeTarget = diversityTypeTargets.get(relationType) ?? 0;
+    let selectedTypeCount = 0;
+    const candidates = diversityCandidates.filter((candidate) => candidate.type === relationType);
+    while (selectedTypeCount < typeTarget && diversityEdges.length < diversityTarget) {
+      const edge = nextDiversityEdge(candidates);
+      if (!edge || !reserveDiversityEdge(edge)) break;
+      selectedTypeCount += 1;
+    }
+  }
+  if (diversityEdges.length < diversityTarget) {
+    while (diversityEdges.length < diversityTarget) {
+      const edge = nextDiversityEdge(diversityCandidates);
+      if (!edge || !reserveDiversityEdge(edge)) break;
+    }
+  }
   const adjacency = new Map<string, KnowledgeEdge[]>();
   for (const edge of edges) {
     const sourceEdges = adjacency.get(edge.source) ?? [];
@@ -408,7 +500,15 @@ export function projectGraphCorpus(
     layerPriority[relationLayerFor(left)] - layerPriority[relationLayerFor(right)]
     || right.confidence - left.confidence
     || edgeKey(left).localeCompare(edgeKey(right)));
-  const factualEdges = connectedEdges.slice(0, edgeBudget);
+  const connectedEdgeByKey = new Map(connectedEdges.map((edge) => [edgeKey(edge), edge]));
+  const reservedDiversityEdges = diversityEdges
+    .map((edge) => connectedEdgeByKey.get(edgeKey(edge)))
+    .filter((edge): edge is KnowledgeEdge => Boolean(edge));
+  const reservedDiversityKeys = new Set(reservedDiversityEdges.map(edgeKey));
+  const factualEdges = [
+    ...reservedDiversityEdges,
+    ...connectedEdges.filter((edge) => !reservedDiversityKeys.has(edgeKey(edge))),
+  ].slice(0, edgeBudget);
   const displayEdges = createCorpusDisplayWeave(nodes, factualEdges, edgeBudget);
   const selectedEdges = [...factualEdges, ...displayEdges];
   const corpusNodeCount = snapshot.meta.corpusNodeCount ?? snapshot.meta.totalNodeCount ?? snapshot.nodes.length;

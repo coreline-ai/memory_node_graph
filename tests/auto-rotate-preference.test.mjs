@@ -14,22 +14,22 @@ async function importTypeScript(relativePath) {
   return import(`data:text/javascript;base64,${Buffer.from(output).toString("base64")}`);
 }
 
-test("모션 감소 환경은 자동 시작을 막되 사용자의 명시적 회전 선택은 저속으로 유지한다", async () => {
+test("모션 감소 환경에서도 자동 회전은 저속으로 기본 활성화된다", async () => {
   const rotation = await importTypeScript("../app/graph/auto-rotate.ts");
 
   const reducedInitial = rotation.initialAutoRotateIntent(true);
-  assert.deepEqual(reducedInitial, { enabled: false, userControlled: false });
-  assert.equal(rotation.autoRotateStatusText(reducedInitial, true), "감소 모션 · 자동 회전 정지");
+  assert.deepEqual(reducedInitial, { enabled: true, userControlled: false });
+  assert.equal(rotation.autoRotateStatusText(reducedInitial, true), "감소 모션 · 저속 회전");
 
-  const userEnabled = rotation.toggleAutoRotateIntent(reducedInitial);
-  assert.deepEqual(userEnabled, { enabled: true, userControlled: true });
+  const userDisabled = rotation.toggleAutoRotateIntent(reducedInitial);
+  assert.deepEqual(userDisabled, { enabled: false, userControlled: true });
   assert.deepEqual(
-    rotation.reconcileAutoRotateMotionPreference(userEnabled, true),
-    userEnabled,
+    rotation.reconcileAutoRotateMotionPreference(userDisabled, true),
+    userDisabled,
   );
   assert.equal(rotation.autoRotateSpeed(true), rotation.AUTO_ROTATE_SPEED.reducedMotion);
   assert.ok(rotation.autoRotateSpeed(true) < rotation.autoRotateSpeed(false));
-  assert.equal(rotation.autoRotateStatusText(userEnabled, true), "감소 모션 · 저속 회전");
+  assert.equal(rotation.autoRotateStatusText(userDisabled, true), "감소 모션 · 자동 회전 정지");
 });
 
 test("사용자 선택 전의 자동 회전은 시스템 모션 환경 변화에 맞춰 동기화한다", async () => {
@@ -39,7 +39,7 @@ test("사용자 선택 전의 자동 회전은 시스템 모션 환경 변화에
   assert.deepEqual(standardInitial, { enabled: true, userControlled: false });
   assert.deepEqual(
     rotation.reconcileAutoRotateMotionPreference(standardInitial, true),
-    { enabled: false, userControlled: false },
+    { enabled: true, userControlled: false },
   );
   assert.deepEqual(
     rotation.reconcileAutoRotateMotionPreference(rotation.initialAutoRotateIntent(true), false),

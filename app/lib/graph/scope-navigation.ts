@@ -1,4 +1,5 @@
 export type GraphNavigationScope = "corpus" | "overview" | "repository" | "document";
+export type GraphDataSource = "local-d1" | "public-snapshot";
 
 export type GraphPresentationReturnState = {
   viewMode: "constellation" | "nebula" | "orbit";
@@ -89,6 +90,22 @@ export function graphApiRequestFromPageUrl(pageUrl: URL): GraphApiRequest {
   return { path: `${apiUrl.pathname}${apiUrl.search}`, implicitScope };
 }
 
+export function graphDataSourceFromPageUrl(pageUrl: URL): GraphDataSource {
+  return pageUrl.searchParams.get("source") === "public"
+    ? "public-snapshot"
+    : "local-d1";
+}
+
+export function pageUrlForGraphDataSource(
+  pageUrl: URL,
+  source: GraphDataSource,
+) {
+  const next = pageUrlForGraphScope(pageUrl, "corpus");
+  if (source === "public-snapshot") next.searchParams.set("source", "public");
+  else next.searchParams.delete("source");
+  return next;
+}
+
 export function pageUrlForGraphScope(
   pageUrl: URL,
   scope: GraphNavigationScope,
@@ -99,6 +116,7 @@ export function pageUrlForGraphScope(
   next.searchParams.delete("fixture");
   next.searchParams.delete("node");
   next.searchParams.set("scope", scope);
+  if (scope !== "corpus") next.searchParams.delete("source");
   if (scope === "repository" && resourceId) {
     next.searchParams.set("repositoryId", resourceId);
     next.searchParams.delete("documentId");

@@ -1,6 +1,7 @@
 import type { NodeKind } from "../graph-data";
 
 export type LabelLod = "overview" | "explore" | "detail";
+export type LabelDensity = "low" | "medium" | "high";
 export type LabelFocusTier =
   | "selected"
   | "direct"
@@ -30,16 +31,16 @@ const FOCUS_IMPORTANCE: Record<LabelFocusTier, number> = {
   ambient: 0,
 };
 
-const DESKTOP_LIMITS: Record<LabelLod, number> = {
-  overview: 5,
-  explore: 10,
-  detail: 16,
+const DESKTOP_LIMITS: Record<LabelDensity, Record<LabelLod, number>> = {
+  low: { overview: 3, explore: 6, detail: 10 },
+  medium: { overview: 5, explore: 10, detail: 16 },
+  high: { overview: 15, explore: 30, detail: 48 },
 };
 
-const COMPACT_LIMITS: Record<LabelLod, number> = {
-  overview: 4,
-  explore: 7,
-  detail: 10,
+const COMPACT_LIMITS: Record<LabelDensity, Record<LabelLod, number>> = {
+  low: { overview: 2, explore: 4, detail: 6 },
+  medium: { overview: 4, explore: 7, detail: 10 },
+  high: { overview: 8, explore: 14, detail: 20 },
 };
 
 const SELECTION_BONUS: Record<LabelLod, number> = {
@@ -63,8 +64,9 @@ export function labelLimit(
   lod: LabelLod,
   compact: boolean,
   hasSelection: boolean,
+  density: LabelDensity = "medium",
 ) {
-  const baseLimit = (compact ? COMPACT_LIMITS : DESKTOP_LIMITS)[lod];
+  const baseLimit = (compact ? COMPACT_LIMITS : DESKTOP_LIMITS)[density][lod];
   if (!hasSelection) return baseLimit;
   const compactBonus = compact ? Math.min(2, SELECTION_BONUS[lod]) : SELECTION_BONUS[lod];
   return baseLimit + compactBonus;
@@ -86,8 +88,9 @@ export function selectLabelIds(
   lod: LabelLod,
   compact: boolean,
   hasSelection: boolean,
+  density: LabelDensity = "medium",
 ) {
-  const limit = labelLimit(lod, compact, hasSelection);
+  const limit = labelLimit(lod, compact, hasSelection, density);
   return new Set(
     [...candidates]
       .sort((left, right) => {

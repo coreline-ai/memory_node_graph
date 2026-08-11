@@ -1,0 +1,29 @@
+# Local build/runtime output
+.wrangler/
+.runtime-dist/
+.vinext/
+dist/
+dist-vercel/
+node_modules/
+coverage/
+outputs/
+work/
+
+# Repository/development-only material
+.git/
+.github/
+.agents/
+.codex/
+dev-plan/
+docs/
+examples/
+
+# Local secrets and caches
+.env*
+!.env.example
+.DS_Store
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*

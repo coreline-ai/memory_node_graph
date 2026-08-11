@@ -224,7 +224,7 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 .github-preview-controls .preview-action { color: #a9d5c9; background: rgba(121,213,192,.055); border-color: rgba(121,213,192,.2); }
 .github-preview-controls > p { margin: 8px 0 0; color: #b69a6c; font-size: 7px; line-height: 1.5; }
 .github-discovery-note { margin: 15px 0 0; color: #4c565d; font-size: 7.5px; line-height: 1.65; }
-.github-repository-browser { min-width: 0; }
+.github-repository-browser { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; }
 .github-repository-toolbar { display: flex; gap: 10px; align-items: center; min-height: 55px; padding: 0 14px; border-bottom: 1px solid var(--border); }
 .github-repository-toolbar > label { display: flex; flex: 0 1 240px; align-items: center; min-height: 30px; padding: 0 9px; color: #58636a; background: rgba(255,255,255,.018); border: 1px solid var(--border); }
 .github-repository-toolbar input { width: 100%; margin-left: 8px; color: #aab0b2; font-size: 8px; outline: 0; background: transparent; border: 0; }
@@ -233,7 +233,7 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 .github-repository-toolbar button { min-height: 28px; padding: 0 9px; color: #5e666c; font-size: 7.5px; white-space: nowrap; background: transparent; border: 1px solid var(--border); cursor: pointer; }
 .github-repository-toolbar button.active { color: #c2d9e8; background: rgba(101,181,255,.07); border-color: rgba(101,181,255,.28); }
 .github-repository-toolbar > span { margin-left: auto; color: #515b62; font-family: var(--font-mono); font-size: 7px; white-space: nowrap; }
-.github-repository-list { max-height: 304px; overflow: auto; }
+.github-repository-list { min-height: 0; max-height: none; overflow: auto; scrollbar-gutter: stable; }
 .github-repository-row { display: grid; grid-template-columns: 18px 7px minmax(150px, 1fr) auto 25px; gap: 9px; align-items: center; min-height: 50px; padding: 0 13px; border-bottom: 1px solid rgba(255,255,255,.045); cursor: pointer; }
 .github-repository-row:hover { background: rgba(255,255,255,.018); }
 .github-repository-row.selected { background: linear-gradient(90deg, rgba(101,181,255,.035), transparent 52%); }
@@ -405,6 +405,7 @@ button:disabled { opacity: .42; cursor: not-allowed; }
   z-index: 1;
   display: grid;
   grid-template-columns: minmax(660px, 1fr) minmax(310px, 390px);
+  gap: 14px;
   min-height: calc(100svh - 154px);
   padding: 20px 28px 28px;
 }
@@ -412,7 +413,7 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 .document-library,
 .ingestion-activity { min-width: 0; background: rgba(11,14,17,.66); border: 1px solid var(--border); }
 .ingestion-activity { display: flex; flex-direction: column; }
-.document-library { border-right: 0; }
+.document-library { border-right: 1px solid var(--border); }
 .panel-heading { justify-content: space-between; min-height: 66px; padding: 0 18px; border-bottom: 1px solid var(--border); }
 .panel-heading h2 { margin: 0; font-size: 13px; font-weight: 520; }
 .panel-heading > span { color: #555d64; font-family: var(--font-mono); font-size: 8px; letter-spacing: .11em; }
@@ -428,6 +429,12 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 .document-table { width: 100%; }
 .document-row { display: grid; grid-template-columns: minmax(190px, 1.3fr) 112px 210px 86px 112px 136px; align-items: center; min-height: 82px; padding: 0 16px; color: #777d82; font-size: 9px; border-bottom: 1px solid rgba(255,255,255,.055); }
 .document-row:not(.document-head):hover { background: rgba(255,255,255,.018); }
+.document-load-more { display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 8px 16px; background: rgba(7,10,13,.62); border-top: 1px solid rgba(255,255,255,.045); }
+.document-load-more > span,
+.document-load-more > em { color: #555f66; font-family: var(--font-mono); font-size: 7px; font-style: normal; letter-spacing: .06em; }
+.document-load-more > button { min-height: 30px; padding: 0 12px; color: #9ec9df; font-family: var(--font-mono); font-size: 7.5px; background: rgba(101,181,255,.055); border: 1px solid rgba(101,181,255,.2); border-radius: 3px; cursor: pointer; }
+.document-load-more > button:hover { color: #e4f5ff; background: rgba(101,181,255,.11); border-color: rgba(101,181,255,.36); }
+.document-load-more > button strong { margin-left: 5px; color: var(--blue); font-weight: 600; }
 .document-head { min-height: 35px; color: #4d5359; font-family: var(--font-mono); font-size: 7px; letter-spacing: .1em; }
 .document-name { gap: 10px; min-width: 0; }
 .document-name > i { flex: 0 0 auto; width: 5px; height: 5px; background: var(--blue); border-radius: 50%; box-shadow: 0 0 8px rgba(101,181,255,.64); }
@@ -618,6 +625,8 @@ label:focus-within { outline: 1px solid rgba(101,181,255,.8); outline-offset: 2p
   .github-capability-guide-step { grid-column: 2 / -1; padding: 9px 0 0; border-top: 1px solid rgba(255,181,94,.14); border-left: 0; }
   .tone-critical .github-capability-guide-step { border-top-color: rgba(255,102,120,.14); }
   .github-discovery-summary { border-right: 0; border-bottom: 1px solid var(--border); }
+  .github-repository-browser { display: block; }
+  .github-repository-list { max-height: 420px; }
   .github-metrics { grid-template-columns: repeat(6, 1fr); }
   .github-preview-repositories { grid-template-columns: 1fr; }
   .github-repository-sync > header { align-items: flex-start; flex-direction: column; gap: 12px; padding: 14px 18px; }
@@ -700,7 +709,7 @@ label:focus-within { outline: 1px solid rgba(101,181,255,.8); outline-offset: 2p
   display: flex;
   gap: 32px;
   justify-content: space-between;
-  margin: 18px 0 0;
+  margin: 18px 28px 0;
   padding: 20px 22px;
 }
 
@@ -744,7 +753,9 @@ label:focus-within { outline: 1px solid rgba(101,181,255,.8); outline-offset: 2p
   border: 1px solid rgba(255, 255, 255, .11);
   border-radius: 10px;
   color: #8799a3;
-  padding: 10px 14px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 9.5px;
 }
 
 /* Phase 5 — integrated OAuth and storage/projection observability. */
@@ -897,6 +908,11 @@ label:focus-within { outline: 1px solid rgba(101,181,255,.8); outline-offset: 2p
 @media (max-width: 900px) {
   .graph-inventory-orbit { grid-template-columns: 1fr 64px 1.2fr; }
   .graph-inventory-orbit > p { grid-column: 1 / -1; }
+}
+
+@media (max-width: 560px) {
+  .reprocess-preview { margin: 12px 10px 0; }
+  .document-load-more { align-items: flex-start; flex-direction: column; gap: 8px; }
 }
 
 @media (max-width: 560px) {

@@ -20,6 +20,51 @@ const percentile = (values, ratio) => {
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * ratio))] ?? 0;
 };
 
+test("orbit selection recenters the camera only when its center changes", async () => {
+  const cameraFocus = await importTypeScript("../app/graph/camera-focus.ts");
+
+  assert.equal(
+    cameraFocus.shouldRecenterLayoutCamera({
+      previousView: "constellation",
+      nextView: "orbit",
+      previousCenterId: null,
+      nextCenterId: "node-a",
+      animateTransition: true,
+    }),
+    true,
+  );
+  assert.equal(
+    cameraFocus.shouldRecenterLayoutCamera({
+      previousView: "orbit",
+      nextView: "orbit",
+      previousCenterId: "node-a",
+      nextCenterId: "node-b",
+      animateTransition: true,
+    }),
+    true,
+  );
+  assert.equal(
+    cameraFocus.shouldRecenterLayoutCamera({
+      previousView: "orbit",
+      nextView: "orbit",
+      previousCenterId: "node-b",
+      nextCenterId: "node-b",
+      animateTransition: true,
+    }),
+    false,
+  );
+  assert.equal(
+    cameraFocus.shouldRecenterLayoutCamera({
+      previousView: "nebula",
+      nextView: "nebula",
+      previousCenterId: null,
+      nextCenterId: null,
+      animateTransition: false,
+    }),
+    true,
+  );
+});
+
 test("500-node and 2,000-edge fixture is deterministic and layouts stay within CPU budget", async (t) => {
   const [{ createPerformanceGraphSnapshot }, layouts] = await Promise.all([
     importTypeScript("../app/lib/graph/performance-fixture.ts"),
@@ -132,6 +177,14 @@ test("label LOD increases with zoom and prioritizes selected relationship distan
     labelLod.labelLimit("explore", false, false) <
       labelLod.labelLimit("detail", false, false),
   );
+  assert.ok(
+    labelLod.labelLimit("overview", false, false, "low") <
+      labelLod.labelLimit("overview", false, false, "medium"),
+  );
+  assert.ok(
+    labelLod.labelLimit("overview", false, false, "medium") <
+      labelLod.labelLimit("overview", false, false, "high"),
+  );
 
   const candidates = [
     { id: "selected", kind: "concept", degree: 1, focusTier: "selected" },
@@ -156,6 +209,10 @@ test("label LOD increases with zoom and prioritizes selected relationship distan
   assert.equal(selectedIds.has("selected"), true);
   assert.equal(selectedIds.has("direct"), true);
   assert.equal(selectedIds.has("expanded"), true);
+  assert.ok(
+    labelLod.selectLabelIds(candidates, "overview", false, true, "high").size >
+      labelLod.selectLabelIds(candidates, "overview", false, true, "low").size,
+  );
   assert.ok(
     labelLod.scoreLabelCandidate(candidates[0]) >
       labelLod.scoreLabelCandidate(candidates[1]),
@@ -221,7 +278,7 @@ test("orbit depth descriptors map the selected center to direct and expanded rin
   );
 });
 
-test("luminosity v2 keeps supernova maximal on compact screens and clamps unsafe inputs", async () => {
+test("luminosity v2 keeps the reduced preset hierarchy on compact screens and clamps unsafe inputs", async () => {
   const luminosity = await importTypeScript("../app/graph/luminosity.ts");
   const normal = luminosity.resolveLuminositySettings("normal", {
     compact: false,
@@ -257,6 +314,29 @@ test("luminosity v2 keeps supernova maximal on compact screens and clamps unsafe
   }
   assert.deepEqual(compactSupernova, supernova);
   assert.equal(classicCompactSupernova.light, 1.28);
+  assert.deepEqual(luminosity.luminosityPresetControls, {
+    normal: {
+      overall: 55,
+      edges: 20,
+      bloom: 12,
+      particles: 15,
+      focusContrast: "medium",
+    },
+    bright: {
+      overall: 70,
+      edges: 32,
+      bloom: 28,
+      particles: 30,
+      focusContrast: "medium",
+    },
+    supernova: {
+      overall: 90,
+      edges: 50,
+      bloom: 45,
+      particles: 50,
+      focusContrast: "medium",
+    },
+  });
 
   const clamped = luminosity.normalizeLuminositySettings({
     light: Number.NaN,
@@ -276,7 +356,7 @@ test("luminosity v2 keeps supernova maximal on compact screens and clamps unsafe
   assert.equal(clamped.edgeIntensity, 1);
   assert.equal(clamped.particleIntensity, 0);
   assert.equal(clamped.ambientNodeBoost, 1.32);
-  assert.equal(clamped.ambientEdgeBrightness, 0.2);
+  assert.equal(clamped.ambientEdgeBrightness, 0);
   assert.equal(clamped.outputCeiling, 2.5);
 
   const customControls = luminosity.normalizeLuminosityControls({
@@ -288,7 +368,7 @@ test("luminosity v2 keeps supernova maximal on compact screens and clamps unsafe
   });
   assert.deepEqual(customControls, {
     overall: 150,
-    edges: 20,
+    edges: 0,
     bloom: 0,
     particles: 0,
     focusContrast: "medium",
@@ -297,9 +377,16 @@ test("luminosity v2 keeps supernova maximal on compact screens and clamps unsafe
     luminosity.resolveLuminosityControls(luminosity.luminosityPresetControls.supernova),
     supernova,
   );
+  assert.deepEqual(luminosity.defaultCustomLuminosityControls, {
+    overall: 150,
+    edges: 50,
+    bloom: 20,
+    particles: 100,
+    focusContrast: "medium",
+  });
   const minimumEdges = luminosity.resolveLuminosityControls({
     ...luminosity.luminosityPresetControls.bright,
-    edges: 20,
+    edges: 0,
   });
   const maximumEdges = luminosity.resolveLuminosityControls({
     ...luminosity.luminosityPresetControls.bright,
@@ -307,6 +394,14 @@ test("luminosity v2 keeps supernova maximal on compact screens and clamps unsafe
   });
   assert.ok(minimumEdges.edgeIntensity < maximumEdges.edgeIntensity);
   assert.ok(minimumEdges.ambientEdgeBrightness < maximumEdges.ambientEdgeBrightness);
+  assert.equal(minimumEdges.edgeIntensity, 0);
+  assert.equal(minimumEdges.ambientEdgeBrightness, 0);
+
+  const noBloom = luminosity.resolveLuminosityControls({
+    ...luminosity.defaultCustomLuminosityControls,
+    bloom: 0,
+  });
+  assert.equal(noBloom.bloom, 0);
 
   const noParticles = luminosity.resolveLuminosityControls({
     ...luminosity.luminosityPresetControls.bright,
@@ -315,7 +410,7 @@ test("luminosity v2 keeps supernova maximal on compact screens and clamps unsafe
   assert.equal(noParticles.dust, 0);
   assert.equal(noParticles.photon, 0);
   assert.equal(noParticles.particleIntensity, 0);
-  assert.equal(supernova.particleIntensity, 1);
+  assert.equal(supernova.particleIntensity, 0.5);
   assert.ok(
     luminosity.resolveFocusContrast("low").dimmedNodeBoost >
       luminosity.resolveFocusContrast("high").dimmedNodeBoost,
@@ -347,6 +442,22 @@ test("compact graph controls keep grouped horizontal access without dropping con
   assert.match(responsiveRules, /\.control-cluster\s*\{[\s\S]*?flex:\s*0 0 auto/);
   assert.match(compactRules, /min-width:\s*36px/);
   assert.match(compactRules, /\.graph-controls button em,[\s\S]*?display:\s*none/);
+});
+
+test("the public deployment data option uses a self-contained SVG icon", async () => {
+  const source = await readFile(
+    new URL("../app/knowledge-graph.tsx", import.meta.url),
+    "utf8",
+  );
+  const iconStart = source.indexOf('<svg\n                  className="data-option-public"');
+  const iconEnd = source.indexOf("</svg>", iconStart);
+
+  assert.ok(iconStart >= 0 && iconEnd > iconStart);
+  const iconSource = source.slice(iconStart, iconEnd);
+  assert.match(iconSource, /width="18"/);
+  assert.match(iconSource, /height="18"/);
+  assert.match(iconSource, /stroke="#79d5c0"/);
+  assert.match(iconSource, /fill="#79d5c0"/);
 });
 
 test("dust, nebula, and photons share one circular soft-glow texture", async () => {

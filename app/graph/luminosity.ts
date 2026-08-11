@@ -34,13 +34,13 @@ type ResolveLuminosityOptions = {
 
 const LIMITS: Record<keyof LuminositySettings, readonly [number, number]> = {
   light: [0.5, 1.75],
-  bloom: [0.65, 1.45],
+  bloom: [0, 1.45],
   dust: [0, 0.38],
   photon: [0, 1],
-  edgeIntensity: [0.2, 1],
+  edgeIntensity: [0, 1],
   particleIntensity: [0, 1],
   ambientNodeBoost: [1, 1.32],
-  ambientEdgeBrightness: [0.2, 0.7],
+  ambientEdgeBrightness: [0, 0.7],
   outputCeiling: [1, 2.5],
 };
 
@@ -79,26 +79,34 @@ export const luminosityPresetControls: Record<
   LuminosityControls
 > = {
   normal: {
-    overall: 75,
-    edges: 35,
-    bloom: 45,
-    particles: 35,
+    overall: 55,
+    edges: 20,
+    bloom: 12,
+    particles: 15,
     focusContrast: "medium",
   },
   bright: {
-    overall: 100,
-    edges: 55,
-    bloom: 70,
-    particles: 65,
+    overall: 70,
+    edges: 32,
+    bloom: 28,
+    particles: 30,
     focusContrast: "medium",
   },
   supernova: {
-    overall: 150,
-    edges: 100,
-    bloom: 100,
-    particles: 100,
+    overall: 90,
+    edges: 50,
+    bloom: 45,
+    particles: 50,
     focusContrast: "medium",
   },
+};
+
+export const defaultCustomLuminosityControls: LuminosityControls = {
+  overall: 150,
+  edges: 50,
+  bloom: 20,
+  particles: 100,
+  focusContrast: "medium",
 };
 
 export function normalizeLuminosityControls(
@@ -106,7 +114,7 @@ export function normalizeLuminosityControls(
 ): LuminosityControls {
   return {
     overall: clampFinite(controls.overall, 50, 150),
-    edges: clampFinite(controls.edges, 20, 100),
+    edges: clampFinite(controls.edges, 0, 100),
     bloom: clampFinite(controls.bloom, 0, 100),
     particles: clampFinite(controls.particles, 0, 100),
     focusContrast:
@@ -128,7 +136,7 @@ export function resolveLuminosityControls(
       [150, 1.68],
     ]),
     bloom: interpolateStops(controls.bloom, [
-      [0, 0.65],
+      [0, 0],
       [45, 0.96],
       [70, 1.14],
       [100, 1.38],
@@ -146,6 +154,7 @@ export function resolveLuminosityControls(
       [100, 1],
     ]),
     edgeIntensity: interpolateStops(controls.edges, [
+      [0, 0],
       [20, 0.32],
       [35, 0.5],
       [55, 0.72],
@@ -159,6 +168,7 @@ export function resolveLuminosityControls(
       [150, 1.26],
     ]),
     ambientEdgeBrightness: interpolateStops(controls.edges, [
+      [0, 0],
       [20, 0.3],
       [35, 0.4],
       [55, 0.49],

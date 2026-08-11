@@ -26,8 +26,10 @@ import type {
 } from "../lib/github/dashboard-projection";
 import type { GitHubDashboardDryRun } from "../lib/github/dashboard-dry-run";
 import {
+  DASHBOARD_DOCUMENT_PAGE_SIZE,
   countDashboardDocumentsBySource,
   filterDashboardDocumentsBySource,
+  sliceDashboardDocuments,
   type DashboardDocumentSourceFilter,
 } from "../lib/dashboard/document-source-filter";
 import {
@@ -266,6 +268,7 @@ export default function DashboardClient() {
   const [pendingDelete, setPendingDelete] = useState<DocumentRecord | null>(null);
   const [pendingJobAction, setPendingJobAction] = useState<string>("");
   const [documentSourceFilter, setDocumentSourceFilter] = useState<DashboardDocumentSourceFilter>("all");
+  const [documentVisibleLimit, setDocumentVisibleLimit] = useState(DASHBOARD_DOCUMENT_PAGE_SIZE);
   const [repositoryFilter, setRepositoryFilter] = useState<RepositoryFilter>("all");
   const [repositoryQuery, setRepositoryQuery] = useState("");
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<string[]>([]);
@@ -365,6 +368,16 @@ export default function DashboardClient() {
     () => filterDashboardDocumentsBySource(snapshot.documents, documentSourceFilter),
     [documentSourceFilter, snapshot.documents],
   );
+  const displayedDocuments = useMemo(
+    () => sliceDashboardDocuments(visibleDocuments, documentVisibleLimit),
+    [documentVisibleLimit, visibleDocuments],
+  );
+  const remainingDocumentCount = Math.max(0, visibleDocuments.length - displayedDocuments.length);
+
+  const selectDocumentSourceFilter = (filter: DashboardDocumentSourceFilter) => {
+    setDocumentSourceFilter(filter);
+    setDocumentVisibleLimit(DASHBOARD_DOCUMENT_PAGE_SIZE);
+  };
 
   const latestGitHubCapability = useMemo(() => githubState.capabilities
     .filter((capability) => capability.runtimeId.startsWith("atlas-runtime-"))
@@ -1158,7 +1171,7 @@ export default function DashboardClient() {
         <section className="document-library" aria-labelledby="document-library-title">
           <header className="panel-heading">
             <div><p>DOCUMENT LIBRARY</p><h2 id="document-library-title">Markdown 문서</h2></div>
-            <span>{visibleDocuments.length.toString().padStart(2, "0")} / {snapshot.documents.length.toString().padStart(2, "0")} FILES</span>
+            <span>{displayedDocuments.length.toString().padStart(2, "0")} / {visibleDocuments.length.toString().padStart(2, "0")} SHOWN</span>
           </header>
 
           {loading ? (
@@ -1178,7 +1191,7 @@ export default function DashboardClient() {
                 type="button"
                 className={documentSourceFilter === filter ? "active" : ""}
                 aria-pressed={documentSourceFilter === filter}
-                onClick={() => setDocumentSourceFilter(filter)}
+                onClick={() => selectDocumentSourceFilter(filter)}
               >{documentSourceFilterLabels[filter]} <strong>{documentSourceCounts[filter]}</strong></button>)}
               <small>{visibleDocuments.length} / {snapshot.documents.length}</small>
             </div>
@@ -1188,13 +1201,13 @@ export default function DashboardClient() {
               <p>{documentSourceFilter === "github"
                 ? "저장소 Preview와 Apply를 완료하면 README와 dev-plan 문서가 이 목록에 표시됩니다."
                 : "상단 Markdown 추가 버튼으로 로컬 문서를 직접 등록할 수 있습니다."}</p>
-              <button type="button" onClick={() => setDocumentSourceFilter("all")}>전체 문서 보기</button>
-            </div> : (
+              <button type="button" onClick={() => selectDocumentSourceFilter("all")}>전체 문서 보기</button>
+            </div> : (<>
             <div className="document-table" role="table" aria-label="문서 목록">
               <div className="document-row document-head" role="row">
                 <span>문서</span><span>기본 그래프</span><span>AI 보강</span><span>그래프</span><span>갱신</span><span>문서 작업</span>
               </div>
-              {visibleDocuments.map((document) => {
+              {displayedDocuments.map((document) => {
                 const enrichment = enrichmentByDocument.get(document.id);
                 const canRetry = Boolean(
                   enrichment
@@ -1243,7 +1256,15 @@ export default function DashboardClient() {
                 </div>;
               })}
             </div>
-            )}
+              <footer className="document-load-more" aria-live="polite">
+                <span>{number.format(displayedDocuments.length)} / {number.format(visibleDocuments.length)}개 문서 표시</span>
+                {remainingDocumentCount > 0 ? <button
+                  type="button"
+                  onClick={() => setDocumentVisibleLimit((current) => current + DASHBOARD_DOCUMENT_PAGE_SIZE)}
+                  aria-label={`Markdown 문서 ${Math.min(DASHBOARD_DOCUMENT_PAGE_SIZE, remainingDocumentCount)}개 더 보기`}
+                >더보기 <strong>+{Math.min(DASHBOARD_DOCUMENT_PAGE_SIZE, remainingDocumentCount)}</strong></button> : <em>전체 표시</em>}
+              </footer>
+            </>)}
           </>}
         </section>
 

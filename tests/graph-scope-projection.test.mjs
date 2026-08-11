@@ -112,6 +112,62 @@ test("corpus 소형 그래프는 임의 관계를 만들지 않는다", () => {
   assert.deepEqual(projected.edges, edges);
 });
 
+test("corpus 대형 그래프는 녹색 관계 유형을 50~100개 결정적으로 보존한다", () => {
+  const nodes = Array.from({ length: 600 }, (_, index) => ({
+    ...technology(index),
+    id: `concept:diversity:${String(index).padStart(3, "0")}`,
+    label: `Diversity concept ${String(index).padStart(3, "0")}`,
+    tags: [index < 400 ? "reference-hub" : "delivery-path"],
+  }));
+  const neutralEdges = nodes.slice(0, 400).flatMap((node, index) =>
+    [1, 3, 7, 13, 29, 47]
+      .map((offset) => nodes[index + offset])
+      .filter((target) => target && Number(target.id.slice(-3)) < 400)
+      .map((target) => ({
+        source: node.id,
+        target: target.id,
+        type: "references",
+        confidence: 0.99,
+        note: "high-degree neutral relation",
+        layer: "explicit",
+      })));
+  const diversityEdges = Array.from({ length: 120 }, (_, index) => ({
+    source: nodes[400 + index].id,
+    target: nodes[400 + ((index + 41) % 200)].id,
+    type: ["uses", "tests", "produces"][index % 3],
+    confidence: 0.9,
+    note: "green diversity relation",
+    layer: "explicit",
+  }));
+  const snapshot = {
+    nodes: [...nodes].reverse(),
+    edges: [...neutralEdges, ...diversityEdges].reverse(),
+    meta: {
+      source: "documents",
+      provider: "markdown-ast",
+      generatedAt: "2026-08-11T00:00:00Z",
+      corpusNodeCount: nodes.length,
+      corpusEdgeCount: neutralEdges.length + diversityEdges.length,
+    },
+  };
+  const projected = projectGraphCorpus(snapshot);
+  const repeated = projectGraphCorpus({
+    ...snapshot,
+    nodes: [...snapshot.nodes].reverse(),
+    edges: [...snapshot.edges].reverse(),
+  });
+  const greenEdges = projected.edges.filter((edge) =>
+    ["uses", "tests", "produces"].includes(edge.type));
+
+  assert.equal(projected.nodes.length, GRAPH_CORPUS_NODE_BUDGET);
+  assert.ok(greenEdges.length >= 50 && greenEdges.length <= 100);
+  assert.ok(greenEdges.some((edge) => edge.type === "uses"));
+  assert.ok(greenEdges.some((edge) => edge.type === "tests"));
+  assert.ok(greenEdges.some((edge) => edge.type === "produces"));
+  assert.deepEqual(repeated.nodes, projected.nodes);
+  assert.deepEqual(repeated.edges, projected.edges);
+});
+
 test("corpus 대형 희소 그래프는 사실 관계를 보존하고 비저장 display weave로 화면 연결을 확장한다", () => {
   const nodes = Array.from({ length: 300 }, (_, index) => ({
     ...technology(index),
@@ -156,6 +212,7 @@ test("corpus 대형 희소 그래프는 사실 관계를 보존하고 비저장 
     edge.origin === "display"
     && edge.provider === "corpus-visual-weave-v1"
     && /사실 관계로 저장되지 않습니다/.test(edge.note)));
+  assert.ok(displayEdges.length <= Math.floor(GRAPH_CORPUS_EDGE_BUDGET * 0.2));
   assert.equal(projected.meta.projectedFactualEdgeCount, factualEdges.length);
   assert.equal(projected.meta.displayEdgeCount, displayEdges.length);
   assert.equal(projected.meta.omittedEdgeCount, 94_488 - factualEdges.length);

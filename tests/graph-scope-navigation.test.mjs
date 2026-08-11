@@ -3,12 +3,32 @@ import test from "node:test";
 
 import {
   graphApiRequestFromPageUrl,
+  graphDataSourceFromPageUrl,
   graphScopeHistoryStateFromHistoryState,
   historyStateWithGraphScopeState,
   pageUrlForCurrentGraph,
+  pageUrlForGraphDataSource,
   pageUrlForGraphScope,
   repositoryIdFromNodeId,
 } from "../.runtime-dist/app/lib/graph/scope-navigation.js";
+
+test("로컬 D1과 공개 snapshot 데이터 소스를 URL에서 결정적으로 전환한다", () => {
+  const local = new URL("http://localhost:3000/?scope=corpus&view=nebula");
+  assert.equal(graphDataSourceFromPageUrl(local), "local-d1");
+
+  const publicSnapshot = pageUrlForGraphDataSource(local, "public-snapshot");
+  assert.equal(publicSnapshot.searchParams.get("scope"), "corpus");
+  assert.equal(publicSnapshot.searchParams.get("source"), "public");
+  assert.equal(publicSnapshot.searchParams.get("view"), "nebula");
+  assert.equal(graphDataSourceFromPageUrl(publicSnapshot), "public-snapshot");
+
+  const restoredLocal = pageUrlForGraphDataSource(publicSnapshot, "local-d1");
+  assert.equal(restoredLocal.searchParams.has("source"), false);
+  assert.equal(graphDataSourceFromPageUrl(restoredLocal), "local-d1");
+
+  const repository = pageUrlForGraphScope(publicSnapshot, "repository", "1322252398");
+  assert.equal(repository.searchParams.has("source"), false);
+});
 
 test("scope가 없는 일반 그래프 URL은 전체 corpus API를 기본 요청한다", () => {
   const request = graphApiRequestFromPageUrl(

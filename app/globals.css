@@ -1427,6 +1427,14 @@ textarea:focus-visible {
   min-width: 64px;
 }
 
+.utility-switch .label-density-control {
+  min-width: 58px;
+}
+
+.utility-switch .label-density-control:disabled {
+  cursor: not-allowed;
+}
+
 .motion-preference-status {
   display: inline-flex;
   align-items: center;
@@ -1733,6 +1741,7 @@ textarea:focus-visible {
 }
 
 .data-option-current,
+.data-option-public,
 .data-option-overview,
 .data-option-gold,
 .data-option-max {
@@ -1752,6 +1761,16 @@ textarea:focus-visible {
   position: absolute;
   content: "";
   border-radius: 50%;
+}
+
+.data-option-public {
+  flex: 0 0 18px;
+  overflow: visible;
+  filter: drop-shadow(0 0 4px rgba(121, 213, 192, 0.7));
+}
+
+.data-source-options > button.is-public.is-active b {
+  color: #79d5c0;
 }
 
 .data-option-overview {
@@ -2243,6 +2262,16 @@ textarea:focus-visible {
 .label-icon {
   font-size: 9px;
   font-weight: 700;
+}
+
+.label-density-icon {
+  min-width: 15px;
+  color: currentColor;
+  font-family: var(--font-mono);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  text-align: center;
 }
 
 .orbit-icon {

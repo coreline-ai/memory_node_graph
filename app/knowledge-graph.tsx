@@ -41,9 +41,11 @@ import {
 } from "./lib/graph/graph-revision";
 import {
   graphApiRequestFromPageUrl,
+  graphDataSourceFromPageUrl,
   graphScopeHistoryStateFromHistoryState,
   historyStateWithGraphScopeState,
   pageUrlForCurrentGraph,
+  pageUrlForGraphDataSource,
   pageUrlForGraphScope,
   repositoryIdFromNodeId,
   type GraphNavigationScope,
@@ -57,6 +59,7 @@ import {
   type PositionTuple,
 } from "./graph/layouts";
 import {
+  defaultCustomLuminosityControls,
   luminosityPresetControls,
   resolveFocusContrast,
   resolveLuminosityControls,
@@ -79,6 +82,7 @@ import {
   resolveLabelLod,
   scoreLabelCandidate,
   selectLabelIds,
+  type LabelDensity,
   type LabelFocusTier,
   type LabelLod,
 } from "./graph/label-lod";
@@ -99,6 +103,7 @@ import {
   toggleAutoRotateIntent,
   type AutoRotateIntent,
 } from "./graph/auto-rotate";
+import { shouldRecenterLayoutCamera } from "./graph/camera-focus";
 
 type SimNode = KnowledgeNode & {
   x?: number;
@@ -130,6 +135,7 @@ type GraphApi = {
   flyTo: (id: string) => void;
   setAutoRotate: (value: boolean, speed: number) => void;
   setLabelsVisible: (value: boolean) => void;
+  setLabelDensity: (density: LabelDensity) => void;
   setViewMode: (mode: GraphViewMode, selectedId?: string | null) => void;
   setLuminosity: (preset: LuminosityPreset) => void;
   setLuminosityControls?: (controls: LuminosityControls) => void;
@@ -144,6 +150,7 @@ type ShowcaseState = {
   selectedId: string | null;
   autoRotateIntent: AutoRotateIntent;
   labelsVisible: boolean;
+  labelDensity: LabelDensity;
   luminosity: LuminosityPreset;
   luminosityControls: LuminosityControls;
   savedCustomControls: LuminosityControls | null;
@@ -172,6 +179,14 @@ const LUMINOSITY_LABELS: Record<LuminosityPreset, string> = {
   bright: "브라이트",
   supernova: "초신성",
 };
+
+const LABEL_DENSITY_LABELS: Record<LabelDensity, string> = {
+  low: "적게",
+  medium: "보통",
+  high: "많이",
+};
+
+const LABEL_DENSITIES: LabelDensity[] = ["low", "medium", "high"];
 
 // Keep the floating source chooser away from both viewport edges.  The same
 // values are mirrored in `.data-source-panel` so its measured placement and
@@ -316,7 +331,9 @@ function useSetToggle<T>(
 }
 
 export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps) {
-  const publicStaticMode = PUBLIC_STATIC_BUILD || dataMode === "public-static";
+  const deploymentPublicStaticMode = PUBLIC_STATIC_BUILD || dataMode === "public-static";
+  const [localPublicSnapshotMode, setLocalPublicSnapshotMode] = useState(false);
+  const publicStaticMode = deploymentPublicStaticMode || localPublicSnapshotMode;
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const graphApiRef = useRef<GraphApi | null>(null);
@@ -328,11 +345,13 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   const urlInitializedRef = useRef(false);
   const showcaseStateRef = useRef<ShowcaseState | null>(null);
   const shouldFitShowcaseRef = useRef(false);
-  const viewModeRef = useRef<GraphViewMode>("constellation");
-  const luminosityRef = useRef<LuminosityPreset>("bright");
+  const viewModeRef = useRef<GraphViewMode>("nebula");
+  const labelsVisibleRef = useRef(false);
+  const labelDensityRef = useRef<LabelDensity>("medium");
+  const luminosityRef = useRef<LuminosityPreset>("normal");
   const luminosityPreviewRef = useRef(true);
   const luminosityControlsRef = useRef<LuminosityControls>({
-    ...luminosityPresetControls.bright,
+    ...defaultCustomLuminosityControls,
   });
   const selectedIdRef = useRef<string | null>(null);
   const autoRotateIntentRef = useRef<AutoRotateIntent>(initialAutoRotateIntent(false));
@@ -353,16 +372,17 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     initialAutoRotateIntent(false),
   );
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const [labelsVisible, setLabelsVisible] = useState(true);
+  const [labelsVisible, setLabelsVisible] = useState(false);
+  const [labelDensity, setLabelDensity] = useState<LabelDensity>("medium");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<GraphViewMode>("constellation");
-  const [luminosity, setLuminosity] = useState<LuminosityPreset>("bright");
+  const [viewMode, setViewMode] = useState<GraphViewMode>("nebula");
+  const [luminosity, setLuminosity] = useState<LuminosityPreset>("normal");
   const [luminosityControls, setLuminosityControls] = useState<LuminosityControls>(
-    () => ({ ...luminosityPresetControls.bright }),
+    () => ({ ...defaultCustomLuminosityControls }),
   );
   const [savedCustomControls, setSavedCustomControls] =
-    useState<LuminosityControls | null>(null);
-  const [luminosityCustom, setLuminosityCustom] = useState(false);
+    useState<LuminosityControls | null>(() => ({ ...defaultCustomLuminosityControls }));
+  const [luminosityCustom, setLuminosityCustom] = useState(true);
   const [luminosityPanelOpen, setLuminosityPanelOpen] = useState(false);
   const [dataMenuOpen, setDataMenuOpen] = useState(false);
   const [dataMenuPosition, setDataMenuPosition] = useState({ left: 12, bottom: 82 });
@@ -452,6 +472,12 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     setGraphError("");
     try {
       const pageUrl = new URL(window.location.href);
+      const requestedDataSource = graphDataSourceFromPageUrl(pageUrl);
+      const requestPublicSnapshot = deploymentPublicStaticMode
+        || requestedDataSource === "public-snapshot";
+      if (!deploymentPublicStaticMode) {
+        setLocalPublicSnapshotMode(requestedDataSource === "public-snapshot");
+      }
       const presentationFixture = pageUrl.searchParams.has("showcase")
         || pageUrl.searchParams.has("fixture");
       const savedScopeState = presentationFixture
@@ -460,7 +486,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       setGraphRequestedScope(
         presentationFixture
           ? null
-          : publicStaticMode
+          : requestPublicSnapshot
             ? "corpus"
           : pageUrl.searchParams.get("scope") === "repository"
             ? "repository"
@@ -472,7 +498,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       );
       let payload: GraphSnapshot;
       let implicitScope = false;
-      if (publicStaticMode) {
+      if (requestPublicSnapshot) {
         const showcase = pageUrl.searchParams.get("showcase");
         const fixture = pageUrl.searchParams.get("fixture");
         if (showcase === "max" || fixture === "500x2000") {
@@ -519,7 +545,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       graphLoadingRef.current = false;
       setGraphLoading(false);
     }
-  }, [publicStaticMode, restoreGraphScopeState]);
+  }, [deploymentPublicStaticMode, restoreGraphScopeState]);
 
   const navigateGraphScope = useCallback(
     async (scope: GraphNavigationScope, resourceId?: string, focusNodeId?: string) => {
@@ -593,6 +619,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       selectedId,
       autoRotateIntent: { ...autoRotateIntent },
       labelsVisible,
+      labelDensity,
       luminosity,
       luminosityControls: { ...luminosityControls },
       savedCustomControls: savedCustomControls ? { ...savedCustomControls } : null,
@@ -605,6 +632,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     activeRelations,
     autoRotateIntent,
     labelsVisible,
+    labelDensity,
     luminosity,
     luminosityControls,
     luminosityCustom,
@@ -655,6 +683,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     setViewMode(state.viewMode);
     updateAutoRotateIntent({ ...state.autoRotateIntent });
     setLabelsVisible(state.labelsVisible);
+    setLabelDensity(state.labelDensity);
     setLuminosity(state.luminosity);
     setLuminosityControls({ ...state.luminosityControls });
     setSavedCustomControls(
@@ -666,7 +695,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   }, [replaceDomains, replaceKinds, replaceRelations, updateAutoRotateIntent]);
 
   const selectDataSource = useCallback(
-    async (source: "current" | "corpus" | "overview" | "gold" | "max") => {
+    async (source: "current" | "corpus" | "public" | "overview" | "gold" | "max") => {
       let url = new URL(window.location.href);
       const currentShowcase = url.searchParams.get("showcase");
       const wasPresentation = currentShowcase === "max"
@@ -685,8 +714,18 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         applyGoldPresentation();
         url.searchParams.set("showcase", "gold");
         url.searchParams.set("view", "constellation");
+      } else if (source === "public") {
+        url = pageUrlForGraphDataSource(url, "public-snapshot");
+        setLocalPublicSnapshotMode(true);
+        setSelectedId(null);
+        setHovered(null);
+        setQuery("");
+        setSearchOpen(false);
       } else if (source === "corpus" || source === "overview") {
-        url = pageUrlForGraphScope(url, source);
+        url = source === "corpus"
+          ? pageUrlForGraphDataSource(url, "local-d1")
+          : pageUrlForGraphScope(url, source);
+        setLocalPublicSnapshotMode(false);
         setSelectedId(null);
         setHovered(null);
         setQuery("");
@@ -700,8 +739,15 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         );
         if (!restoreState && wasPresentation) {
           setSelectedId(null);
-          setViewMode("constellation");
-          graphApiRef.current?.setViewMode("constellation", null);
+          setViewMode("nebula");
+          setLabelsVisible(false);
+          setLabelDensity("medium");
+          setLuminosity("normal");
+          setLuminosityControls({ ...defaultCustomLuminosityControls });
+          setSavedCustomControls({ ...defaultCustomLuminosityControls });
+          setLuminosityCustom(true);
+          setLuminosityPanelOpen(false);
+          graphApiRef.current?.setViewMode("nebula", null);
         }
       }
       url.searchParams.delete("fixture");
@@ -1098,8 +1144,14 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   }, [autoRotate, currentAutoRotateSpeed]);
 
   useEffect(() => {
+    labelsVisibleRef.current = labelsVisible;
     graphApiRef.current?.setLabelsVisible(labelsVisible);
   }, [labelsVisible]);
+
+  useEffect(() => {
+    labelDensityRef.current = labelDensity;
+    graphApiRef.current?.setLabelDensity(labelDensity);
+  }, [labelDensity]);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
@@ -1899,6 +1951,8 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
 
     const labelLayer = document.createElement("div");
     labelLayer.className = "graph-label-layer";
+    labelLayer.style.display = labelsVisibleRef.current ? "" : "none";
+    labelLayer.dataset.density = labelDensityRef.current;
     host.appendChild(labelLayer);
     const labels = simNodes
       .map((item, index) => {
@@ -1984,6 +2038,9 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     let pointerDown: { x: number; y: number } | null = null;
     let hoveredId: string | null = null;
     let frame = 0;
+    let cameraTransitionFrame = 0;
+    let cameraTransitionSerial = 0;
+    let cameraTransitionActive = false;
     let lastTime = performance.now();
     let lastPulse = lastTime;
     let frameSerial = 0;
@@ -2016,6 +2073,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     };
 
     const handlePointerDown = (event: PointerEvent) => {
+      cancelCameraTransition();
       pointerDown = { x: event.clientX, y: event.clientY };
     };
 
@@ -2045,6 +2103,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     renderer.domElement.style.cursor = "grab";
 
     let currentView: GraphViewMode = "constellation";
+    let currentLayoutCenterId: string | null = null;
     let layoutTransitionStartedAt = 0;
     let layoutTransitionDuration = 0;
     let currentOrbitRadii: [number, number] = [
@@ -2110,20 +2169,58 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         graphRadius * (mode === "constellation" ? 1.85 : mode === "nebula" ? 2.65 : 2.72),
       );
 
-    const moveCameraHome = (mode: GraphViewMode, animated: boolean) => {
-      const endCamera = cameraPositionFor(mode);
+    const restoreAutoRotate = () => {
+      controls.autoRotate = autoRotateIntentRef.current.enabled;
+      controls.autoRotateSpeed = autoRotateSpeed(reducedMotion);
+    };
+
+    const cancelCameraTransition = (restoreRotation = true) => {
+      cameraTransitionSerial += 1;
+      if (cameraTransitionFrame) cancelAnimationFrame(cameraTransitionFrame);
+      cameraTransitionFrame = 0;
+      cameraTransitionActive = false;
+      if (restoreRotation) restoreAutoRotate();
+    };
+
+    const transitionCameraTo = (
+      endCamera: THREE.Vector3,
+      endTarget: THREE.Vector3,
+      durationMs: number,
+    ) => {
+      cancelCameraTransition(false);
+      const transitionSerial = cameraTransitionSerial;
       const startCamera = camera.position.clone();
       const startTarget = controls.target.clone();
       const startedAt = performance.now();
-      const duration = reducedMotion || !animated ? 0 : 780;
+      const duration = reducedMotion ? 0 : durationMs;
+      cameraTransitionActive = true;
+      controls.autoRotate = false;
+
       const tick = () => {
-        const progress = duration === 0 ? 1 : clamp((performance.now() - startedAt) / duration, 0, 1);
+        if (transitionSerial !== cameraTransitionSerial) return;
+        const progress = duration === 0
+          ? 1
+          : clamp((performance.now() - startedAt) / duration, 0, 1);
         const eased = 1 - Math.pow(1 - progress, 3);
         camera.position.lerpVectors(startCamera, endCamera, eased);
-        controls.target.lerpVectors(startTarget, new THREE.Vector3(0, 0, 0), eased);
-        if (progress < 1) requestAnimationFrame(tick);
+        controls.target.lerpVectors(startTarget, endTarget, eased);
+        if (progress < 1) {
+          cameraTransitionFrame = requestAnimationFrame(tick);
+          return;
+        }
+        cameraTransitionFrame = 0;
+        cameraTransitionActive = false;
+        restoreAutoRotate();
       };
       tick();
+    };
+
+    const moveCameraHome = (mode: GraphViewMode, animated: boolean) => {
+      transitionCameraTo(
+        cameraPositionFor(mode),
+        new THREE.Vector3(0, 0, 0),
+        animated ? 780 : 0,
+      );
     };
 
     const applyLayout = (
@@ -2132,6 +2229,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       animateTransition = true,
     ) => {
       const previousView = currentView;
+      const previousCenterId = currentLayoutCenterId;
       const result = calculateLayout(
         mode,
         simNodes,
@@ -2145,12 +2243,23 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         layoutTargetPositions.set(position, index * 3);
       });
       currentView = mode;
+      currentLayoutCenterId = result.centerId ?? null;
       nodeMaterial.uniforms.uViewScale.value = mode === "nebula" ? 1.32 : mode === "orbit" ? 1.14 : 1;
       layoutTransitionStartedAt = performance.now();
       layoutTransitionDuration = reducedMotion || !animateTransition ? 0 : 780;
       if (layoutTransitionDuration === 0) baseNodePositions.set(layoutTargetPositions);
       setLayoutDecorations(mode, result);
-      if (previousView !== mode || !animateTransition) moveCameraHome(mode, animateTransition);
+      if (
+        shouldRecenterLayoutCamera({
+          previousView,
+          nextView: mode,
+          previousCenterId,
+          nextCenterId: currentLayoutCenterId,
+          animateTransition,
+        })
+      ) {
+        moveCameraHome(mode, animateTransition);
+      }
     };
 
     const applyLuminosity = (preset: LuminosityPreset) => {
@@ -2180,55 +2289,32 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         .clone()
         .sub(controls.target)
         .normalize();
-      const startCamera = camera.position.clone();
-      const startTarget = controls.target.clone();
       const endCamera = target
         .clone()
         .add(direction.multiplyScalar(graphRadius * 0.78));
-      const startedAt = performance.now();
-      const duration = 860;
-
-      const animateFlight = () => {
-        const progress = clamp((performance.now() - startedAt) / duration, 0, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        camera.position.lerpVectors(startCamera, endCamera, eased);
-        controls.target.lerpVectors(startTarget, target, eased);
-        if (progress < 1) requestAnimationFrame(animateFlight);
-      };
-      animateFlight();
+      transitionCameraTo(endCamera, target, 860);
     };
 
     graphApiRef.current = {
       reset: () => {
-        const startCamera = camera.position.clone();
-        const startTarget = controls.target.clone();
-        const resetCameraPosition = cameraPositionFor(currentView);
-        const startedAt = performance.now();
-        const duration = 780;
-        const animateReset = () => {
-          const progress = clamp(
-            (performance.now() - startedAt) / duration,
-            0,
-            1,
-          );
-          const eased = 1 - Math.pow(1 - progress, 3);
-          camera.position.lerpVectors(startCamera, resetCameraPosition, eased);
-          controls.target.lerpVectors(
-            startTarget,
-            new THREE.Vector3(0, 0, 0),
-            eased,
-          );
-          if (progress < 1) requestAnimationFrame(animateReset);
-        };
-        animateReset();
+        transitionCameraTo(
+          cameraPositionFor(currentView),
+          new THREE.Vector3(0, 0, 0),
+          780,
+        );
       },
       flyTo,
       setAutoRotate: (value, speed) => {
-        controls.autoRotate = value;
+        controls.autoRotate = cameraTransitionActive ? false : value;
         controls.autoRotateSpeed = speed;
       },
       setLabelsVisible: (value) => {
         labelLayer.style.display = value ? "" : "none";
+      },
+      setLabelDensity: (density) => {
+        labelDensityRef.current = density;
+        labelLayer.dataset.density = density;
+        labelSelectionKey = "";
       },
       setViewMode: (mode, centerId) => applyLayout(mode, centerId),
       setLuminosity: applyLuminosity,
@@ -2725,6 +2811,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         );
         const nextLabelSelectionKey = [
           nextLabelLod,
+          labelDensityRef.current,
           selectedNodeId ?? "",
           focus.directNodeIds ? [...focus.directNodeIds].sort().join(",") : "",
           focus.expandedNodeIds ? [...focus.expandedNodeIds].sort().join(",") : "",
@@ -2748,6 +2835,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
             activeLabelLod,
             compact,
             Boolean(selectedNodeId),
+            labelDensityRef.current,
           );
           const candidatesById = new Map(
             labelCandidates.map((candidate) => [candidate.id, candidate]),
@@ -2957,6 +3045,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
 
     return () => {
       cancelAnimationFrame(frame);
+      cancelCameraTransition(false);
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
       renderer.domElement.removeEventListener("pointerleave", handlePointerLeave);
@@ -3010,6 +3099,14 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   };
 
   const openOrRestoreCustomLuminosity = () => {
+    if (!savedCustomControls) {
+      const defaults = { ...defaultCustomLuminosityControls };
+      setLuminosityControls(defaults);
+      setSavedCustomControls(defaults);
+      setLuminosityCustom(true);
+      setLuminosityPanelOpen(true);
+      return;
+    }
     if (savedCustomControls && !luminosityCustom) {
       setLuminosityControls({ ...savedCustomControls });
       setLuminosityCustom(true);
@@ -3037,9 +3134,17 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   };
 
   const resetLuminosityControls = () => {
-    setLuminosityControls({ ...luminosityPresetControls[luminosity] });
-    setSavedCustomControls(null);
-    setLuminosityCustom(false);
+    const defaults = { ...defaultCustomLuminosityControls };
+    setLuminosityControls(defaults);
+    setSavedCustomControls(defaults);
+    setLuminosityCustom(true);
+  };
+
+  const cycleLabelDensity = () => {
+    setLabelDensity((current) => {
+      const currentIndex = LABEL_DENSITIES.indexOf(current);
+      return LABEL_DENSITIES[(currentIndex + 1) % LABEL_DENSITIES.length];
+    });
   };
 
   const hoveredNode = hovered ? nodeMap.get(hovered.id) : null;
@@ -3591,6 +3696,19 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
                 <span className="label-icon">Aa</span>
                 <em>라벨</em>
               </button>
+              <button
+                type="button"
+                className={`label-density-control ${labelsVisible ? "is-active" : ""}`}
+                disabled={!labelsVisible}
+                onClick={cycleLabelDensity}
+                aria-label={`텍스트 라벨 표시 개수: ${LABEL_DENSITY_LABELS[labelDensity]}`}
+                title={`라벨 표시 개수: ${LABEL_DENSITY_LABELS[labelDensity]} · 클릭하여 변경`}
+              >
+                <span className="label-density-icon" aria-hidden="true">
+                  {labelDensity === "low" ? "1×" : labelDensity === "medium" ? "2×" : "3×"}
+                </span>
+                <em>{LABEL_DENSITY_LABELS[labelDensity]}</em>
+              </button>
             </div>
             <span className="control-subseparator" aria-hidden="true" />
             <div className="control-group luminosity-switch" aria-label="발광 강도">
@@ -3663,7 +3781,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
                         : "CURRENT GRAPH"}</strong>
             </header>
             <div className="data-source-options">
-              {presentationFixtureActive && (
+              {presentationFixtureActive && !publicStaticMode && (
                 <button
                   type="button"
                   aria-pressed={false}
@@ -3678,25 +3796,53 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
                   <b>RETURN</b>
                 </button>
               )}
+              {!deploymentPublicStaticMode && (
+                <button
+                  type="button"
+                  className={corpusScopeActive && !publicStaticMode ? "is-active" : ""}
+                  aria-pressed={corpusScopeActive && !publicStaticMode}
+                  disabled={graphLoading}
+                  onClick={() => void selectDataSource("corpus")}
+                >
+                  <i className="data-option-current" aria-hidden="true" />
+                  <span>
+                    <strong>로컬 전체 D1</strong>
+                    <small>{corpusScopeActive && !publicStaticMode
+                      ? `${(graphData.meta.projectedFactualEdgeCount ?? knowledgeEdges.length).toLocaleString()}개 실제 관계 + ${(graphData.meta.displayEdgeCount ?? 0).toLocaleString()}개 시각 연결`
+                      : "로컬 원본 문서 · 500노드 관계 확장 투영"}</small>
+                  </span>
+                  <b>{corpusScopeActive && !publicStaticMode ? "ACTIVE" : "OPEN"}</b>
+                </button>
+              )}
               <button
                 type="button"
-                className={corpusScopeActive ? "is-active" : ""}
-                aria-pressed={corpusScopeActive}
+                className={corpusScopeActive && publicStaticMode ? "is-active is-public" : "is-public"}
+                aria-pressed={corpusScopeActive && publicStaticMode}
                 disabled={graphLoading}
-                onClick={() => void selectDataSource("corpus")}
+                onClick={() => void selectDataSource(
+                  publicStaticMode && presentationFixtureActive ? "current" : "public",
+                )}
               >
-                <i className="data-option-current" aria-hidden="true" />
+                <svg
+                  className="data-option-public"
+                  aria-hidden="true"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 18 18"
+                  fill="none"
+                  focusable="false"
+                >
+                  <circle cx="9" cy="9" r="8" stroke="#79d5c0" strokeOpacity="0.55" />
+                  <circle cx="9" cy="9" r="5" stroke="#65b5ff" strokeOpacity="0.8" />
+                  <circle cx="9" cy="9" r="1.7" fill="#79d5c0" />
+                </svg>
                 <span>
-                  <strong>{publicStaticMode ? "공개 정적 지식 맵" : "전체 D1 지식 맵"}</strong>
-                  <small>
-                    {corpusScopeActive
-                      ? `${(graphData.meta.projectedFactualEdgeCount ?? knowledgeEdges.length).toLocaleString()}개 실제 관계 + ${(graphData.meta.displayEdgeCount ?? 0).toLocaleString()}개 시각 연결`
-                      : publicStaticMode
-                        ? "GitHub 공개 snapshot · 500노드 관계 투영"
-                        : "실제 문서 코퍼스 · 500노드 관계 확장 투영"}
-                  </small>
+                  <strong>{deploymentPublicStaticMode ? "공개 정적 지식 맵" : "공개 배포본"}</strong>
+                  <small>{corpusScopeActive && publicStaticMode
+                    ? `${(graphData.meta.projectedFactualEdgeCount ?? knowledgeEdges.length).toLocaleString()}개 실제 관계 + ${(graphData.meta.displayEdgeCount ?? 0).toLocaleString()}개 시각 연결`
+                    : "Vercel과 동일한 검증 JSON · 500노드 관계 투영"}</small>
                 </span>
-                <b>{corpusScopeActive ? "ACTIVE" : "OPEN"}</b>
+                <b>{corpusScopeActive && publicStaticMode ? "ACTIVE" : "OPEN"}</b>
               </button>
               {!publicStaticMode && (
                 <button
@@ -3742,7 +3888,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
                 </span>
                 <b>{showcaseActive ? "ACTIVE" : "VIEW"}</b>
               </button>
-              {recentDocuments.length > 0 && (
+              {!publicStaticMode && recentDocuments.length > 0 && (
                 <div className="recent-document-options" aria-label="최근 Markdown 문서">
                   <div>
                     <span>RECENT DOCUMENTS</span>
@@ -3809,7 +3955,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
             <div className="luminosity-slider-list">
               {([
                 ["overall", "전체 밝기", 50, 150],
-                ["edges", "관계선", 20, 100],
+                ["edges", "관계선", 0, 100],
                 ["bloom", "후광", 0, 100],
                 ["particles", "배경 입자", 0, 100],
               ] as const).map(([controlKey, label, min, max]) => {
@@ -3881,7 +4027,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
                   : `${LUMINOSITY_LABELS[luminosity]} 프리셋${savedCustomControls ? " · 커스텀 저장됨" : ""}`}
               </span>
               <button type="button" onClick={resetLuminosityControls}>
-                {savedCustomControls ? "커스텀 초기화" : "프리셋으로 초기화"}
+                커스텀 기본값
               </button>
             </footer>
           </section>

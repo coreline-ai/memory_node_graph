@@ -93,6 +93,9 @@ test("server-renders the graph with grouped controls and the three graph views",
   assert.match(html, /작은 화면에서는 가로로 스크롤/);
   assert.match(html, /그래프 데이터 선택/);
   assert.match(html, />커스텀</);
+  assert.match(html, /텍스트 라벨 표시 개수: 보통/);
+  assert.match(html, /button[^>]*class="is-active"[^>]*aria-pressed="true"[^>]*>[^]*?<em>성운<\/em>/);
+  assert.match(html, /class="luminosity-adjust-button has-custom is-custom"/);
   assert.match(html, /관계 계층/);
   assert.match(html, /구조/);
   assert.match(html, /명시/);
@@ -120,6 +123,18 @@ test("server-renders Atlas Control Room", async () => {
   assert.match(html, /보기별 최대/);
   assert.doesNotMatch(html, /통합 런타임 오프라인/);
   assert.match(html, /AI 보강 작업/);
+});
+
+test("dashboard repository list fills the desktop discovery column", async () => {
+  const css = await readFile(new URL("../app/dashboard/dashboard.css", import.meta.url), "utf8");
+  const responsiveStart = css.indexOf("@media (max-width: 800px)");
+  const desktopCss = css.slice(0, responsiveStart);
+  const responsiveCss = css.slice(responsiveStart);
+
+  assert.match(desktopCss, /\.github-repository-browser\s*\{[^}]*display:\s*grid[^}]*grid-template-rows:\s*auto minmax\(0, 1fr\)/);
+  assert.match(desktopCss, /\.github-repository-list\s*\{[^}]*min-height:\s*0[^}]*max-height:\s*none[^}]*overflow:\s*auto/);
+  assert.match(responsiveCss, /\.github-repository-browser\s*\{[^}]*display:\s*block/);
+  assert.match(responsiveCss, /\.github-repository-list\s*\{[^}]*max-height:\s*420px/);
 });
 
 test("graph API uses the built-in snapshot before documents are added", async () => {

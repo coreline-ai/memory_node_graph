@@ -9,8 +9,11 @@ export const AUTO_ROTATE_SPEED = {
 } as const;
 
 export function initialAutoRotateIntent(prefersReducedMotion: boolean): AutoRotateIntent {
+  // The requested default is always on; reduced-motion users receive the
+  // dedicated low-speed profile through autoRotateSpeed().
+  void prefersReducedMotion;
   return {
-    enabled: !prefersReducedMotion,
+    enabled: true,
     userControlled: false,
   };
 }
