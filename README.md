@@ -82,7 +82,7 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 |---|---|
 | Production | [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app) |
 | 접근 방식 | 로그인 불필요 · 읽기 전용 · 브라우저에서 즉시 실행 |
-| 공개 데이터 | 500노드 · 1,370개 근거 관계 · 400개 비저장 시각 연결 |
+| 공개 데이터 | 500노드 · 1,372개 근거 관계 · 400개 비저장 시각 연결 |
 | 보안 경계 | Vercel Function 0 · API Route 0 · DB 연결 0 · OAuth/원문 미포함 |
 
 > [!NOTE]
@@ -564,7 +564,7 @@ npm run graph:audit
 
 - **Production:** [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app)
 - **배포 상태:** 로그인 없이 공개, Vercel Function·API Route·DB 연결 `0`
-- **기준 snapshot:** `500`노드 · `1,495` 실제 관계 · `505` display 선
+- **기준 snapshot:** `500`노드 · `1,372` 실제 관계 · `400` display 선
 - **Preview:** 배포는 `READY`이지만 Vercel 팀의 기본 SSO 보호가 적용되어 공개 전환 대기
 - **자동 재배포:** Vercel Git Integration을 `coreline-ai/memory_node_graph`에 연결 완료. 다음 `main` push에서 Production 자동 배포를 최종 검증
 
@@ -589,7 +589,7 @@ npm run graph:verify-public
 npm run graph:prepare-public
 ```
 
-현재 공개 artifact는 GitHub 공개 저장소 80개 중 D1에 문서가 있는 78개 저장소·519문서를 기반으로, 53,377개 공개 전용 node와 56,341개 저장 관계에서 **500노드·1,495 실제 관계·505 display 선**을 투영합니다. 원본 D1, relation evidence, 내부 node ID, OAuth/runtime/job 정보는 포함하지 않습니다.
+현재 공개 artifact는 GitHub 공개 저장소 81개 중 D1에 문서가 있는 78개 저장소·519문서를 기반으로, 53,377개 공개 전용 node와 56,406개 저장 관계에서 **500노드·1,372 실제 관계·400 display 선**을 투영합니다. 원본 D1, relation evidence, 내부 node ID, OAuth/runtime/job 정보는 포함하지 않습니다.
 
 공개 JSON만 사용하는 Vercel 정적 GUI는 다음과 같이 빌드·확인합니다. 이 모드에서는 D1/API polling·문서 관리·저장소/문서 drill-down을 실행하지 않습니다.
 

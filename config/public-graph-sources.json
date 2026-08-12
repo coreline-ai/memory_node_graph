@@ -1,13 +1,15 @@
 {
-  "schemaVersion": "atlas-public-graph-sources/v1",
   "owner": "coreline-ai",
-  "verification": "GitHub gh OAuth · visibility=PUBLIC · isPrivate=false",
-  "verifiedAt": "2026-08-10T12:48:20.377Z",
   "repositories": [
     {
       "githubId": "R_kgDORIg8Fg",
       "nameWithOwner": "coreline-ai/agent_skills_marketplace",
       "url": "https://github.com/coreline-ai/agent_skills_marketplace"
+    },
+    {
+      "githubId": "R_kgDOT15nkA",
+      "nameWithOwner": "coreline-ai/alpine-codex-cli-client",
+      "url": "https://github.com/coreline-ai/alpine-codex-cli-client"
     },
     {
       "githubId": "R_kgDORxdJiA",
@@ -404,5 +406,8 @@
       "nameWithOwner": "coreline-ai/web_richeditor_tool",
       "url": "https://github.com/coreline-ai/web_richeditor_tool"
     }
-  ]
+  ],
+  "schemaVersion": "atlas-public-graph-sources/v1",
+  "verification": "GitHub gh OAuth · visibility=PUBLIC · isPrivate=false",
+  "verifiedAt": "2026-08-12T20:53:14.507Z"
 }

@@ -209,20 +209,20 @@
     },
     {
       "confidence": 0.92,
-      "layer": "explicit",
-      "note": "storage 명시 표현: sources table",
-      "origin": "rule",
-      "source": "pub_e9b5a0dca9f61a7fb410b31a",
-      "target": "pub_61a1a9e7d4761148145259bc",
+      "layer": "inferred",
+      "note": "macOS launchd와 watchdog은 Cloudflare Quick Tunnel을 관리하는 image_quick_tunnel을 상시 실행 대상으로 사용합니다.",
+      "origin": "codex",
+      "source": "pub_b9003bad80cd099188c774a1",
+      "target": "pub_cfe5aaa9522d0529345471fe",
       "type": "uses"
     },
     {
       "confidence": 0.92,
-      "layer": "explicit",
-      "note": "storage 명시 표현: sources table",
-      "origin": "rule",
-      "source": "pub_afd20d2bc2f52a82e2e9f1a1",
-      "target": "pub_61a1a9e7d4761148145259bc",
+      "layer": "inferred",
+      "note": "macOS launchd와 watchdog은 열거된 프록시들을 상시 실행 대상으로 사용합니다.",
+      "origin": "codex",
+      "source": "pub_b9003bad80cd099188c774a1",
+      "target": "pub_22ed22141e3f5ff8421ee2b6",
       "type": "uses"
     },
     {
@@ -10090,6 +10090,15 @@
       "type": "references"
     },
     {
+      "confidence": 0.91,
+      "layer": "inferred",
+      "note": "저장소 요약 기능은 README 내용을 우선 읽고, 사용할 수 없을 때 메타데이터로 대체합니다.",
+      "origin": "codex",
+      "source": "pub_f3fa7d6e344dc08492825c56",
+      "target": "pub_49b33c06c75f07169df19987",
+      "type": "reads_from"
+    },
+    {
       "confidence": 0.99,
       "layer": "structural",
       "note": "section 구조 항목",
@@ -10150,6 +10159,15 @@
       "origin": "rule",
       "source": "pub_887a51d923df6767da2cb7e6",
       "target": "pub_9de75fbda6b3b7ea2150e7c4",
+      "type": "contains"
+    },
+    {
+      "confidence": 0.98,
+      "layer": "structural",
+      "note": "Markdown 제목 계층",
+      "origin": "rule",
+      "source": "pub_49b33c06c75f07169df19987",
+      "target": "pub_4da3cb71ccb183502eba7345",
       "type": "contains"
     },
     {
@@ -10483,24 +10501,6 @@
       "origin": "rule",
       "source": "pub_d80c71dca48cc61083416982",
       "target": "pub_4bbef8e039388461f888529a",
-      "type": "contains"
-    },
-    {
-      "confidence": 0.98,
-      "layer": "structural",
-      "note": "Markdown 제목 계층",
-      "origin": "rule",
-      "source": "pub_1c75c0faf3c6955a395cc7d7",
-      "target": "pub_afd20d2bc2f52a82e2e9f1a1",
-      "type": "contains"
-    },
-    {
-      "confidence": 0.98,
-      "layer": "structural",
-      "note": "Markdown 제목 계층",
-      "origin": "rule",
-      "source": "pub_1c75c0faf3c6955a395cc7d7",
-      "target": "pub_e9b5a0dca9f61a7fb410b31a",
       "type": "contains"
     },
     {
@@ -11534,15 +11534,6 @@
       "layer": "structural",
       "note": "저장소 개발 계획",
       "origin": "rule",
-      "source": "pub_74398bf0e23ebcd0fc192e2e",
-      "target": "pub_1c75c0faf3c6955a395cc7d7",
-      "type": "plans"
-    },
-    {
-      "confidence": 0.98,
-      "layer": "structural",
-      "note": "저장소 개발 계획",
-      "origin": "rule",
       "source": "pub_6255ee62c7270dc438c0fc9d",
       "target": "pub_067f30254a188573480f7155",
       "type": "plans"
@@ -11636,6 +11627,15 @@
       "source": "pub_4d061b9b690b5d5afba4af3d",
       "target": "pub_94ee4211c6acac2a5cd5f954",
       "type": "plans"
+    },
+    {
+      "confidence": 0.98,
+      "layer": "structural",
+      "note": "저장소의 GitHub Markdown 문서",
+      "origin": "rule",
+      "source": "pub_f3fa7d6e344dc08492825c56",
+      "target": "pub_49b33c06c75f07169df19987",
+      "type": "documents"
     },
     {
       "confidence": 0.98,
@@ -12331,6 +12331,24 @@
       "type": "contains"
     },
     {
+      "confidence": 0.94,
+      "layer": "structural",
+      "note": "중첩 작업 구조",
+      "origin": "rule",
+      "source": "pub_b9003bad80cd099188c774a1",
+      "target": "pub_cfe5aaa9522d0529345471fe",
+      "type": "contains"
+    },
+    {
+      "confidence": 0.94,
+      "layer": "structural",
+      "note": "중첩 작업 구조",
+      "origin": "rule",
+      "source": "pub_b9003bad80cd099188c774a1",
+      "target": "pub_22ed22141e3f5ff8421ee2b6",
+      "type": "contains"
+    },
+    {
       "confidence": 0.38,
       "layer": "display",
       "note": "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
@@ -12453,6 +12471,15 @@
       "note": "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
       "origin": "display",
       "source": "pub_e77ba4e7144b4f547137fc32",
+      "target": "pub_b9003bad80cd099188c774a1",
+      "type": "related_to"
+    },
+    {
+      "confidence": 0.38,
+      "layer": "display",
+      "note": "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
+      "origin": "display",
+      "source": "pub_b9003bad80cd099188c774a1",
       "target": "pub_cb701d15e1925942535cbc79",
       "type": "related_to"
     },
@@ -12462,6 +12489,15 @@
       "note": "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
       "origin": "display",
       "source": "pub_cb701d15e1925942535cbc79",
+      "target": "pub_49b33c06c75f07169df19987",
+      "type": "related_to"
+    },
+    {
+      "confidence": 0.38,
+      "layer": "display",
+      "note": "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
+      "origin": "display",
+      "source": "pub_49b33c06c75f07169df19987",
       "target": "pub_9c3be579b6114f7ae43e7fe7",
       "type": "related_to"
     },
@@ -12480,15 +12516,6 @@
       "note": "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
       "origin": "display",
       "source": "pub_a939b5aa2e4d137582975850",
-      "target": "pub_4da3cb71ccb183502eba7345",
-      "type": "related_to"
-    },
-    {
-      "confidence": 0.38,
-      "layer": "display",
-      "note": "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
-      "origin": "display",
-      "source": "pub_4da3cb71ccb183502eba7345",
       "target": "pub_16e6956f4c8e84e04eb4e769",
       "type": "related_to"
     },
@@ -12633,15 +12660,6 @@
       "note": "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
       "origin": "display",
       "source": "pub_6b390d1a01a85f7233c2bd4b",
-      "target": "pub_25f1f8de09a39f4434b5fa7d",
-      "type": "related_to"
-    },
-    {
-      "confidence": 0.38,
-      "layer": "display",
-      "note": "화면용 클러스터 브리지이며 사실 관계로 저장되지 않습니다.",
-      "origin": "display",
-      "source": "pub_25f1f8de09a39f4434b5fa7d",
       "target": "pub_fe051e6759f61ac8504d76cf",
       "type": "related_to"
     },
@@ -14333,24 +14351,6 @@
       "layer": "display",
       "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
       "origin": "display",
-      "source": "pub_61a1a9e7d4761148145259bc",
-      "target": "pub_250b78cb818f90df31e33ba0",
-      "type": "related_to"
-    },
-    {
-      "confidence": 0.38,
-      "layer": "display",
-      "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
-      "origin": "display",
-      "source": "pub_6afbb37539be29cdd03309f0",
-      "target": "pub_61a1a9e7d4761148145259bc",
-      "type": "related_to"
-    },
-    {
-      "confidence": 0.38,
-      "layer": "display",
-      "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
-      "origin": "display",
       "source": "pub_6afbb37539be29cdd03309f0",
       "target": "pub_250b78cb818f90df31e33ba0",
       "type": "related_to"
@@ -14747,15 +14747,6 @@
       "layer": "display",
       "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
       "origin": "display",
-      "source": "pub_61a1a9e7d4761148145259bc",
-      "target": "pub_77b60b5203602d8908e66d3a",
-      "type": "related_to"
-    },
-    {
-      "confidence": 0.38,
-      "layer": "display",
-      "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
-      "origin": "display",
       "source": "pub_250b78cb818f90df31e33ba0",
       "target": "pub_77b60b5203602d8908e66d3a",
       "type": "related_to"
@@ -14774,7 +14765,7 @@
       "layer": "display",
       "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
       "origin": "display",
-      "source": "pub_61a1a9e7d4761148145259bc",
+      "source": "pub_250b78cb818f90df31e33ba0",
       "target": "pub_e77ba4e7144b4f547137fc32",
       "type": "related_to"
     },
@@ -14783,7 +14774,7 @@
       "layer": "display",
       "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
       "origin": "display",
-      "source": "pub_250b78cb818f90df31e33ba0",
+      "source": "pub_6afbb37539be29cdd03309f0",
       "target": "pub_e77ba4e7144b4f547137fc32",
       "type": "related_to"
     },
@@ -15929,6 +15920,33 @@
       "source": "pub_bb193d8fb799a2da6cc1a994",
       "target": "pub_2e3ce49319c485bbeb37c53f",
       "type": "related_to"
+    },
+    {
+      "confidence": 0.38,
+      "layer": "display",
+      "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
+      "origin": "display",
+      "source": "pub_e33b34b475b264c0223ff3ee",
+      "target": "pub_47917e0b8672622055afc739",
+      "type": "related_to"
+    },
+    {
+      "confidence": 0.38,
+      "layer": "display",
+      "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
+      "origin": "display",
+      "source": "pub_b05703ce8953013022302fd4",
+      "target": "pub_67ef832553aa7eaab1409aa7",
+      "type": "related_to"
+    },
+    {
+      "confidence": 0.38,
+      "layer": "display",
+      "note": "공유 태그·분야 기반 화면용 의미 근접선이며 사실 관계로 저장되지 않습니다.",
+      "origin": "display",
+      "source": "pub_83ed124fa675c5b0063eeaad",
+      "target": "pub_67ef832553aa7eaab1409aa7",
+      "type": "related_to"
     }
   ],
   "meta": {
@@ -16057,38 +16075,38 @@
         },
         {
           "id": "community-21",
-          "label": "sources table",
-          "representativeNodeId": "pub_61a1a9e7d4761148145259bc",
-          "size": 4
-        },
-        {
-          "id": "community-22",
           "label": "Verification",
           "representativeNodeId": "pub_6e250c1decd7aaf5d352e7c1",
           "size": 4
         },
         {
-          "id": "community-23",
+          "id": "community-22",
           "label": "workspace table",
           "representativeNodeId": "pub_250b78cb818f90df31e33ba0",
           "size": 4
         },
         {
-          "id": "community-24",
+          "id": "community-23",
           "label": "@hermes-agent-gui/desktop",
           "representativeNodeId": "pub_03889c75ced77415d25b7cab",
           "size": 3
         },
         {
-          "id": "community-25",
+          "id": "community-24",
           "label": "@vibeloop/sdk",
           "representativeNodeId": "pub_9e17bdbf18ba972413a186a3",
           "size": 3
         },
         {
-          "id": "community-26",
+          "id": "community-25",
           "label": "@vitejs/plugin-react",
           "representativeNodeId": "pub_9d5a2af060fb6f2300807767",
+          "size": 3
+        },
+        {
+          "id": "community-26",
+          "label": "🧰 운영 보조 기능",
+          "representativeNodeId": "pub_4da3cb71ccb183502eba7345",
           "size": 3
         },
         {
@@ -16105,27 +16123,27 @@
         },
         {
           "id": "community-29",
+          "label": "image_quick_tunnel (Cloudflare Quick Tunnel 관리)",
+          "representativeNodeId": "pub_cfe5aaa9522d0529345471fe",
+          "size": 3
+        },
+        {
+          "id": "community-30",
           "label": "pnpm --filter @hermes-agent-gui/web test",
           "representativeNodeId": "pub_8fb2fb513048a98f81f3b065",
           "size": 3
         },
         {
-          "id": "community-30",
+          "id": "community-31",
           "label": "Three.js",
           "representativeNodeId": "pub_a939b5aa2e4d137582975850",
           "size": 2
         },
         {
-          "id": "community-31",
+          "id": "community-32",
           "label": "최종 통합 검증",
           "representativeNodeId": "pub_067f30254a188573480f7155",
           "size": 2
-        },
-        {
-          "id": "community-32",
-          "label": "🧰 운영 보조 기능",
-          "representativeNodeId": "pub_4da3cb71ccb183502eba7345",
-          "size": 1
         },
         {
           "id": "community-33",
@@ -16225,46 +16243,60 @@
         },
         {
           "id": "community-49",
-          "label": "pipeline-notebooklm",
-          "representativeNodeId": "pub_25f1f8de09a39f4434b5fa7d",
-          "size": 1
-        },
-        {
-          "id": "community-50",
           "label": "README.md",
           "representativeNodeId": "pub_fe051e6759f61ac8504d76cf",
           "size": 1
         }
       ],
-      "communityCount": 50,
+      "communityCount": 49,
       "componentCount": 36,
-      "density": 0.005491,
+      "density": 0.005499,
       "inferredEvidenceCoverage": 0,
-      "leafRatio": 0.122,
-      "nonStructuralRatio": 0.859322
+      "leafRatio": 0.126,
+      "nonStructuralRatio": 0.858916
     },
-    "corpusEdgeCount": 56341,
+    "corpusEdgeCount": 56406,
     "corpusNodeCount": 53377,
     "displayEdgeCount": 400,
     "documentCount": 519,
     "edgeBudget": 2000,
     "generatedAt": "2026-08-08T11:45:16.747Z",
-    "graphRevision": "public-fdaa8da576cd961933d7c18c5047a77b-6ab6bfed74063c36",
-    "message": "공개 검증된 78개 저장소에서 핵심 노드 500개, 실제 관계 1370개, 화면용 연결선 400개를 투영했습니다.",
+    "graphRevision": "public-736d816a546c01f1c154be9ade3b76b3-72237f5cc87f6822",
+    "message": "공개 검증된 78개 저장소에서 핵심 노드 500개, 실제 관계 1372개, 화면용 연결선 400개를 투영했습니다.",
     "nodeBudget": 500,
-    "omittedEdgeCount": 54971,
+    "omittedEdgeCount": 55034,
     "omittedNodeCount": 52877,
-    "projectedFactualEdgeCount": 1370,
+    "projectedFactualEdgeCount": 1372,
     "projectionMode": "full-corpus-knowledge-map",
     "provider": "markdown-ast",
     "publicSnapshot": true,
     "repositoryCount": 78,
     "scope": "corpus",
     "source": "documents",
-    "totalEdgeCount": 56341,
+    "totalEdgeCount": 56406,
     "totalNodeCount": 53377
   },
   "nodes": [
+    {
+      "domain": "reasoning",
+      "id": "pub_49b33c06c75f07169df19987",
+      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
+      "kind": "system",
+      "label": "README.md",
+      "metrics": {
+        "bridge": false,
+        "centrality": 0.028052,
+        "communityId": "community-26",
+        "degree": 2
+      },
+      "shortLabel": "README.md",
+      "summary": "coreline-kakaobot-v3 저장소의 README.md 문서입니다.",
+      "tags": [
+        "document",
+        "github-readme",
+        "README.md"
+      ]
+    },
     {
       "domain": "reasoning",
       "id": "pub_3168ff608c4a0ef433d79cd0",
@@ -16826,7 +16858,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-50",
+        "communityId": "community-49",
         "degree": 0
       },
       "shortLabel": "README.md",
@@ -16846,7 +16878,7 @@
       "label": "dev-plan/implement-20260427-221152.md",
       "metrics": {
         "bridge": false,
-        "centrality": 0.025118,
+        "centrality": 0.025402,
         "communityId": "community-16",
         "degree": 3
       },
@@ -16867,7 +16899,7 @@
       "label": "docs/prd-trd-research-notes.md",
       "metrics": {
         "bridge": false,
-        "centrality": 0.025118,
+        "centrality": 0.025402,
         "communityId": "community-16",
         "degree": 3
       },
@@ -16888,7 +16920,7 @@
       "label": "dev-plan/implement-20260427-215727.md",
       "metrics": {
         "bridge": false,
-        "centrality": 0.025118,
+        "centrality": 0.025402,
         "communityId": "community-16",
         "degree": 3
       },
@@ -17318,7 +17350,7 @@
       "label": "docs/API_SPEC.md",
       "metrics": {
         "bridge": true,
-        "centrality": 0.020603,
+        "centrality": 0.020604,
         "communityId": "community-05",
         "degree": 3
       },
@@ -17371,6 +17403,63 @@
         "file",
         "github-dev-plan",
         "ontology:file"
+      ]
+    },
+    {
+      "domain": "reasoning",
+      "id": "pub_b9003bad80cd099188c774a1",
+      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
+      "kind": "practice",
+      "label": "macOS launchd + watchdog 상시 실행 대상:",
+      "metrics": {
+        "bridge": false,
+        "centrality": 0.015162,
+        "communityId": "community-29",
+        "degree": 2
+      },
+      "shortLabel": "macOS launchd + watchdog 상시 실행 대상:",
+      "summary": "operation 항목입니다.",
+      "tags": [
+        "github-readme",
+        "operation"
+      ]
+    },
+    {
+      "domain": "reasoning",
+      "id": "pub_cfe5aaa9522d0529345471fe",
+      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
+      "kind": "practice",
+      "label": "image_quick_tunnel (Cloudflare Quick Tunnel 관리)",
+      "metrics": {
+        "bridge": false,
+        "centrality": 0.021607,
+        "communityId": "community-29",
+        "degree": 1
+      },
+      "shortLabel": "image_quick_tunnel (Cloudflare Quick Tunnel 관리)",
+      "summary": "operation 항목입니다.",
+      "tags": [
+        "github-readme",
+        "operation"
+      ]
+    },
+    {
+      "domain": "memory",
+      "id": "pub_22ed22141e3f5ff8421ee2b6",
+      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
+      "kind": "practice",
+      "label": "codex_proxy, local_proxy, stock_proxy, conversation_proxy, image_proxy, summary_proxy, fortune_proxy, weather_proxy, news_proxy, hot_topic_proxy, research_proxy, archive_rag_proxy, archive_rag_web",
+      "metrics": {
+        "bridge": false,
+        "centrality": 0.021607,
+        "communityId": "community-29",
+        "degree": 1
+      },
+      "shortLabel": "codex_proxy, local_proxy, stock_proxy, conversation_p…",
+      "summary": "operation 항목입니다.",
+      "tags": [
+        "github-readme",
+        "operation"
       ]
     },
     {
@@ -17438,7 +17527,7 @@
       "label": "Phase 1과 Phase 2는 병렬 가능 (서로 의존성 없음)",
       "metrics": {
         "bridge": false,
-        "centrality": 0.017034,
+        "centrality": 0.017062,
         "communityId": "community-03",
         "degree": 3
       },
@@ -17457,7 +17546,7 @@
       "label": "Phase 4는 Phase 3 완료 후 (또는 백엔드 mock으로 병렬 가능하나 권장 X)",
       "metrics": {
         "bridge": false,
-        "centrality": 0.017034,
+        "centrality": 0.017062,
         "communityId": "community-03",
         "degree": 3
       },
@@ -17476,7 +17565,7 @@
       "label": "Phase 3은 Phase 1+2 모두 필요",
       "metrics": {
         "bridge": false,
-        "centrality": 0.017034,
+        "centrality": 0.017062,
         "communityId": "community-03",
         "degree": 3
       },
@@ -17496,7 +17585,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-25",
+        "communityId": "community-24",
         "degree": 1
       },
       "shortLabel": "@vibeloop/sdk가 안정화되기 전 외부 API로 공개하면 breaking change 위…",
@@ -18491,7 +18580,7 @@
       "label": "Phase 5: 통합 검증 (Integration + Regression)",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018626,
+        "centrality": 0.018678,
         "communityId": "community-03",
         "degree": 3
       },
@@ -18511,7 +18600,7 @@
       "label": "Phase 2: News Q&A Intent Extractor",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018626,
+        "centrality": 0.018678,
         "communityId": "community-03",
         "degree": 3
       },
@@ -18531,7 +18620,7 @@
       "label": "Phase 4: SPA 메시지 렌더 — 마크다운 링크 + footer",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018626,
+        "centrality": 0.018678,
         "communityId": "community-03",
         "degree": 3
       },
@@ -18551,7 +18640,7 @@
       "label": "Phase 1: Data Fetchers (DB 쿼리 함수 8개)",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018626,
+        "centrality": 0.018678,
         "communityId": "community-03",
         "degree": 4
       },
@@ -18571,7 +18660,7 @@
       "label": "Phase 3: api_chat 통합 — 옵션 D 컨텍스트 자동 주입",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018626,
+        "centrality": 0.018678,
         "communityId": "community-03",
         "degree": 4
       },
@@ -18851,7 +18940,7 @@
       "label": "Phase 8: 이미지 선택 로직 통합 정비",
       "metrics": {
         "bridge": false,
-        "centrality": 0.020345,
+        "centrality": 0.020396,
         "communityId": "community-03",
         "degree": 3
       },
@@ -18871,7 +18960,7 @@
       "label": "Phase 7: Nitter (X/Twitter 미러) — Optional",
       "metrics": {
         "bridge": false,
-        "centrality": 0.020345,
+        "centrality": 0.020396,
         "communityId": "community-03",
         "degree": 3
       },
@@ -18891,7 +18980,7 @@
       "label": "Phase 1: 신규 RSS 소스 추가",
       "metrics": {
         "bridge": false,
-        "centrality": 0.020345,
+        "centrality": 0.020396,
         "communityId": "community-03",
         "degree": 3
       },
@@ -19133,7 +19222,7 @@
       "label": "Phase 11",
       "metrics": {
         "bridge": true,
-        "centrality": 0.332617,
+        "centrality": 0.332616,
         "communityId": "community-07",
         "degree": 5
       },
@@ -19397,7 +19486,7 @@
       "label": "Phase 8",
       "metrics": {
         "bridge": true,
-        "centrality": 0.250607,
+        "centrality": 0.250606,
         "communityId": "community-07",
         "degree": 10
       },
@@ -19441,7 +19530,7 @@
       "label": "Phase 6A",
       "metrics": {
         "bridge": false,
-        "centrality": 0.095845,
+        "centrality": 0.096056,
         "communityId": "community-03",
         "degree": 3
       },
@@ -19463,7 +19552,7 @@
       "label": "Phase 6B",
       "metrics": {
         "bridge": false,
-        "centrality": 0.07343,
+        "centrality": 0.073583,
         "communityId": "community-03",
         "degree": 3
       },
@@ -19485,7 +19574,7 @@
       "label": "Phase 6",
       "metrics": {
         "bridge": false,
-        "centrality": 0.248145,
+        "centrality": 0.248726,
         "communityId": "community-03",
         "degree": 8
       },
@@ -19507,7 +19596,7 @@
       "label": "Phase 7",
       "metrics": {
         "bridge": false,
-        "centrality": 0.313021,
+        "centrality": 0.31376,
         "communityId": "community-03",
         "degree": 6
       },
@@ -19529,7 +19618,7 @@
       "label": "Phase 4",
       "metrics": {
         "bridge": true,
-        "centrality": 0.388385,
+        "centrality": 0.389326,
         "communityId": "community-03",
         "degree": 18
       },
@@ -19551,7 +19640,7 @@
       "label": "Phase 5",
       "metrics": {
         "bridge": false,
-        "centrality": 0.272395,
+        "centrality": 0.273068,
         "communityId": "community-03",
         "degree": 12
       },
@@ -19573,7 +19662,7 @@
       "label": "Phase 2",
       "metrics": {
         "bridge": true,
-        "centrality": 0.315883,
+        "centrality": 0.31663,
         "communityId": "community-03",
         "degree": 24
       },
@@ -19595,7 +19684,7 @@
       "label": "Phase 3",
       "metrics": {
         "bridge": false,
-        "centrality": 0.331896,
+        "centrality": 0.332699,
         "communityId": "community-03",
         "degree": 18
       },
@@ -19617,7 +19706,7 @@
       "label": "Phase 0",
       "metrics": {
         "bridge": false,
-        "centrality": 0.072417,
+        "centrality": 0.072668,
         "communityId": "community-03",
         "degree": 13
       },
@@ -19639,7 +19728,7 @@
       "label": "Phase 1",
       "metrics": {
         "bridge": false,
-        "centrality": 0.254719,
+        "centrality": 0.255339,
         "communityId": "community-03",
         "degree": 22
       },
@@ -19661,7 +19750,7 @@
       "label": "Phase 8",
       "metrics": {
         "bridge": false,
-        "centrality": 0.109085,
+        "centrality": 0.109324,
         "communityId": "community-03",
         "degree": 5
       },
@@ -19881,7 +19970,7 @@
       "label": "Phase 3",
       "metrics": {
         "bridge": false,
-        "centrality": 0.170697,
+        "centrality": 0.170698,
         "communityId": "community-04",
         "degree": 20
       },
@@ -19947,7 +20036,7 @@
       "label": "Phase 4",
       "metrics": {
         "bridge": false,
-        "centrality": 0.302709,
+        "centrality": 0.30271,
         "communityId": "community-06",
         "degree": 12
       },
@@ -19969,7 +20058,7 @@
       "label": "Phase 5",
       "metrics": {
         "bridge": false,
-        "centrality": 0.600419,
+        "centrality": 0.60042,
         "communityId": "community-06",
         "degree": 15
       },
@@ -20674,7 +20763,7 @@
       "label": "개발 문서 상세 검토 — 2026-04-27",
       "metrics": {
         "bridge": true,
-        "centrality": 0.018385,
+        "centrality": 0.019459,
         "communityId": "community-16",
         "degree": 6
       },
@@ -20693,7 +20782,7 @@
       "label": "Implementation Plan: News Studio 챗봇 — DB 큐레이터 모드 (Phase 5a + 5b 통합)",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018385,
+        "centrality": 0.019459,
         "communityId": "community-03",
         "degree": 4
       },
@@ -20712,30 +20801,11 @@
       "label": "implement-20260428-source-boost.md",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018385,
+        "centrality": 0.019459,
         "communityId": "community-03",
         "degree": 6
       },
       "shortLabel": "implement-20260428-source-boost.md",
-      "summary": "html-news-creator 저장소의 개발 계획입니다.",
-      "tags": [
-        "github-dev-plan",
-        "plan"
-      ]
-    },
-    {
-      "domain": "reasoning",
-      "id": "pub_1c75c0faf3c6955a395cc7d7",
-      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
-      "kind": "system",
-      "label": "implement-20260428-221438.md",
-      "metrics": {
-        "bridge": true,
-        "centrality": 0.018385,
-        "communityId": "community-21",
-        "degree": 3
-      },
-      "shortLabel": "implement-20260428-221438.md",
       "summary": "html-news-creator 저장소의 개발 계획입니다.",
       "tags": [
         "github-dev-plan",
@@ -20751,7 +20821,7 @@
       "metrics": {
         "bridge": true,
         "centrality": 0.028052,
-        "communityId": "community-31",
+        "communityId": "community-32",
         "degree": 2
       },
       "shortLabel": "최종 통합 검증",
@@ -21430,26 +21500,6 @@
     },
     {
       "domain": "reasoning",
-      "id": "pub_25f1f8de09a39f4434b5fa7d",
-      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
-      "kind": "system",
-      "label": "pipeline-notebooklm",
-      "metrics": {
-        "bridge": false,
-        "centrality": 0.015162,
-        "communityId": "community-49",
-        "degree": 0
-      },
-      "shortLabel": "pipeline-notebooklm",
-      "summary": "coreline-ai/pipeline-notebooklm GitHub 저장소입니다.",
-      "tags": [
-        "coreline-ai",
-        "github",
-        "repository"
-      ]
-    },
-    {
-      "domain": "reasoning",
       "id": "pub_fab8e65940a7385116c49ea1",
       "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
       "kind": "system",
@@ -21497,7 +21547,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-30",
+        "communityId": "community-31",
         "degree": 1
       },
       "shortLabel": "graphify-legal-wiki",
@@ -21518,7 +21568,7 @@
         "bridge": true,
         "centrality": 0.015162,
         "communityId": "community-03",
-        "degree": 4
+        "degree": 3
       },
       "shortLabel": "html-news-creator",
       "summary": "coreline-ai/html-news-creator GitHub 저장소입니다.",
@@ -21597,7 +21647,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-31",
+        "communityId": "community-32",
         "degree": 1
       },
       "shortLabel": "cron-agent-dashboard",
@@ -21622,6 +21672,26 @@
       },
       "shortLabel": "CoreMCP-personal-gateway",
       "summary": "coreline-ai/CoreMCP-personal-gateway GitHub 저장소입니다.",
+      "tags": [
+        "coreline-ai",
+        "github",
+        "repository"
+      ]
+    },
+    {
+      "domain": "reasoning",
+      "id": "pub_f3fa7d6e344dc08492825c56",
+      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
+      "kind": "system",
+      "label": "coreline-kakaobot-v3",
+      "metrics": {
+        "bridge": false,
+        "centrality": 0.015162,
+        "communityId": "community-26",
+        "degree": 1
+      },
+      "shortLabel": "coreline-kakaobot-v3",
+      "summary": "coreline-ai/coreline-kakaobot-v3 GitHub 저장소입니다.",
       "tags": [
         "coreline-ai",
         "github",
@@ -21876,9 +21946,9 @@
       "label": "🧰 운영 보조 기능",
       "metrics": {
         "bridge": false,
-        "centrality": 0.015162,
-        "communityId": "community-32",
-        "degree": 0
+        "centrality": 0.039009,
+        "communityId": "community-26",
+        "degree": 1
       },
       "shortLabel": "🧰 운영 보조 기능",
       "summary": "현재 프로젝트에는 운영을 돕는 보조 기능이 포함돼 있습니다.",
@@ -23274,7 +23344,7 @@
       "label": "Verification",
       "metrics": {
         "bridge": true,
-        "centrality": 0.079609,
+        "centrality": 0.07961,
         "communityId": "community-17",
         "degree": 6
       },
@@ -23312,7 +23382,7 @@
       "label": "7. Execution Rules (실행 규칙)",
       "metrics": {
         "bridge": false,
-        "centrality": 0.020372,
+        "centrality": 0.020676,
         "communityId": "community-03",
         "degree": 7
       },
@@ -23332,7 +23402,7 @@
       "label": "Testing Instructions",
       "metrics": {
         "bridge": false,
-        "centrality": 0.01676,
+        "centrality": 0.016765,
         "communityId": "community-03",
         "degree": 3
       },
@@ -23351,7 +23421,7 @@
       "label": "3. Phase Dependencies (페이즈 의존성)",
       "metrics": {
         "bridge": false,
-        "centrality": 0.020372,
+        "centrality": 0.020676,
         "communityId": "community-03",
         "degree": 10
       },
@@ -23371,7 +23441,7 @@
       "label": "4. Implementation Phases (구현 페이즈)",
       "metrics": {
         "bridge": false,
-        "centrality": 0.020372,
+        "centrality": 0.020676,
         "communityId": "community-03",
         "degree": 6
       },
@@ -23396,44 +23466,6 @@
       },
       "shortLabel": "개발 범위",
       "summary": "개발 범위 문서 섹션입니다.",
-      "tags": [
-        "github-dev-plan",
-        "section"
-      ]
-    },
-    {
-      "domain": "reasoning",
-      "id": "pub_afd20d2bc2f52a82e2e9f1a1",
-      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
-      "kind": "concept",
-      "label": "개발 범위",
-      "metrics": {
-        "bridge": false,
-        "centrality": 0.022977,
-        "communityId": "community-21",
-        "degree": 2
-      },
-      "shortLabel": "개발 범위",
-      "summary": "개발 범위 문서 섹션입니다.",
-      "tags": [
-        "github-dev-plan",
-        "section"
-      ]
-    },
-    {
-      "domain": "reasoning",
-      "id": "pub_e9b5a0dca9f61a7fb410b31a",
-      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
-      "kind": "concept",
-      "label": "최종 결과 요약",
-      "metrics": {
-        "bridge": false,
-        "centrality": 0.022977,
-        "communityId": "community-21",
-        "degree": 2
-      },
-      "shortLabel": "최종 결과 요약",
-      "summary": "최종 결과 요약 문서 섹션입니다.",
       "tags": [
         "github-dev-plan",
         "section"
@@ -23487,7 +23519,7 @@
       "label": "4. Phase 의존성",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018288,
+        "centrality": 0.018471,
         "communityId": "community-03",
         "degree": 11
       },
@@ -23507,7 +23539,7 @@
       "label": "10. 실행 규칙",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018288,
+        "centrality": 0.018471,
         "communityId": "community-03",
         "degree": 3
       },
@@ -23527,7 +23559,7 @@
       "label": "7. 수집량 예상 (전체 Phase 완료 후)",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018288,
+        "centrality": 0.018471,
         "communityId": "community-03",
         "degree": 4
       },
@@ -23546,7 +23578,7 @@
       "label": "5. 구현 페이즈",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018288,
+        "centrality": 0.018471,
         "communityId": "community-03",
         "degree": 4
       },
@@ -23565,7 +23597,7 @@
       "label": "3. 범위",
       "metrics": {
         "bridge": false,
-        "centrality": 0.018288,
+        "centrality": 0.018471,
         "communityId": "community-03",
         "degree": 8
       },
@@ -24330,7 +24362,7 @@
       "metrics": {
         "bridge": true,
         "centrality": 0.053831,
-        "communityId": "community-22",
+        "communityId": "community-21",
         "degree": 4
       },
       "shortLabel": "Verification",
@@ -24368,7 +24400,7 @@
       "metrics": {
         "bridge": true,
         "centrality": 0.015162,
-        "communityId": "community-24",
+        "communityId": "community-23",
         "degree": 2
       },
       "shortLabel": "Mode 3 · Single-file (curl + python = 동작)",
@@ -24387,7 +24419,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-24",
+        "communityId": "community-23",
         "degree": 1
       },
       "shortLabel": "🏗️ Build Targets",
@@ -24463,7 +24495,7 @@
       "metrics": {
         "bridge": true,
         "centrality": 0.039009,
-        "communityId": "community-23",
+        "communityId": "community-22",
         "degree": 3
       },
       "shortLabel": "권장 schema 초안",
@@ -24596,7 +24628,7 @@
       "label": "권장 다음 액션",
       "metrics": {
         "bridge": true,
-        "centrality": 0.016208,
+        "centrality": 0.016269,
         "communityId": "community-16",
         "degree": 6
       },
@@ -24615,7 +24647,7 @@
       "label": "결론",
       "metrics": {
         "bridge": true,
-        "centrality": 0.016208,
+        "centrality": 0.016269,
         "communityId": "community-16",
         "degree": 6
       },
@@ -24975,27 +25007,6 @@
     },
     {
       "domain": "memory",
-      "id": "pub_61a1a9e7d4761148145259bc",
-      "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
-      "kind": "system",
-      "label": "sources table",
-      "metrics": {
-        "bridge": false,
-        "centrality": 0.054227,
-        "communityId": "community-21",
-        "degree": 2
-      },
-      "shortLabel": "sources table",
-      "summary": "storage 명시 엔티티입니다.",
-      "tags": [
-        "explicit",
-        "github-dev-plan",
-        "ontology:storage",
-        "storage"
-      ]
-    },
-    {
-      "domain": "memory",
       "id": "pub_250b78cb818f90df31e33ba0",
       "insight": "GitHub Markdown 구조와 원문 line evidence에서 규칙 기반으로 추출했습니다.",
       "kind": "system",
@@ -25003,7 +25014,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.044633,
-        "communityId": "community-23",
+        "communityId": "community-22",
         "degree": 2
       },
       "shortLabel": "workspace table",
@@ -25024,7 +25035,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.031743,
-        "communityId": "community-23",
+        "communityId": "community-22",
         "degree": 1
       },
       "shortLabel": "issue table",
@@ -25205,7 +25216,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-23",
+        "communityId": "community-22",
         "degree": 1
       },
       "shortLabel": "internal/db/migrations/0018_workspace_per_run_worktre…",
@@ -25225,7 +25236,7 @@
       "metrics": {
         "bridge": true,
         "centrality": 0.021607,
-        "communityId": "community-29",
+        "communityId": "community-30",
         "degree": 2
       },
       "shortLabel": "pnpm --filter @hermes-agent-gui/web test",
@@ -25305,7 +25316,7 @@
       "metrics": {
         "bridge": true,
         "centrality": 0.021607,
-        "communityId": "community-29",
+        "communityId": "community-30",
         "degree": 2
       },
       "shortLabel": "pnpm --filter @hermes-agent-gui/web test",
@@ -25445,7 +25456,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-26",
+        "communityId": "community-25",
         "degree": 2
       },
       "shortLabel": "ui/package.json 생성: react@19, react-dom@19, react-rou…",
@@ -25485,7 +25496,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-25",
+        "communityId": "community-24",
         "degree": 1
       },
       "shortLabel": "packages/sdk 신규 패키지 생성 여부 확정 — 신규 @vibeloop/sdk 패키지 생성",
@@ -25726,7 +25737,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.034497,
-        "communityId": "community-24",
+        "communityId": "community-23",
         "degree": 2
       },
       "shortLabel": "@hermes-agent-gui/desktop",
@@ -25768,7 +25779,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.021607,
-        "communityId": "community-26",
+        "communityId": "community-25",
         "degree": 1
       },
       "shortLabel": "@vitejs/plugin-react",
@@ -25789,7 +25800,7 @@
       "metrics": {
         "bridge": true,
         "centrality": 0.051011,
-        "communityId": "community-25",
+        "communityId": "community-24",
         "degree": 4
       },
       "shortLabel": "@vibeloop/sdk",
@@ -25830,7 +25841,7 @@
       "label": "@hermes-agent-gui/web",
       "metrics": {
         "bridge": true,
-        "centrality": 0.249117,
+        "centrality": 0.249118,
         "communityId": "community-12",
         "degree": 11
       },
@@ -26040,7 +26051,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.028052,
-        "communityId": "community-30",
+        "communityId": "community-31",
         "degree": 1
       },
       "shortLabel": "Three.js",
@@ -26059,7 +26070,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.021607,
-        "communityId": "community-26",
+        "communityId": "community-25",
         "degree": 1
       },
       "shortLabel": "@testing-library/react",
@@ -26101,7 +26112,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-29",
+        "communityId": "community-30",
         "degree": 2
       },
       "shortLabel": "pnpm --filter @hermes-agent-gui/web test",
@@ -26227,7 +26238,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-22",
+        "communityId": "community-21",
         "degree": 1
       },
       "shortLabel": "pnpm typecheck → passed.",
@@ -26248,7 +26259,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-22",
+        "communityId": "community-21",
         "degree": 1
       },
       "shortLabel": "python3 -m pytest apps/server -q → 93 passed.",
@@ -26269,7 +26280,7 @@
       "metrics": {
         "bridge": false,
         "centrality": 0.015162,
-        "communityId": "community-22",
+        "communityId": "community-21",
         "degree": 1
       },
       "shortLabel": "pnpm lint → passed.",
