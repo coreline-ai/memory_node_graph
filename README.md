@@ -540,7 +540,7 @@ npm run graph:audit
 - [x] 공개 snapshot 변조·누락을 차단하는 GitHub Actions
 - [x] Vercel Production 공개 정적 배포·실브라우저 QA
 - [x] Vercel GitHub 저장소 연결·`main` 자동 배포 경로 활성화
-- [ ] Vercel Preview 공개 전환·비로그인 QA
+- [x] Vercel Preview는 SSO 보호 유지, 공개 Production 기준으로 프로젝트 종료
 
 ## 📚 관련 문서
 
@@ -565,7 +565,7 @@ npm run graph:audit
 - **Production:** [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app)
 - **배포 상태:** 로그인 없이 공개, Vercel Function·API Route·DB 연결 `0`
 - **기준 snapshot:** `500`노드 · `1,372` 실제 관계 · `400` display 선
-- **Preview:** 배포는 `READY`이지만 Vercel 팀의 기본 SSO 보호가 적용되어 공개 전환은 별도 보안 승인 대기
+- **Preview:** 배포는 `READY`이며 최종 종료 결정에 따라 Vercel 팀 SSO 보호를 유지
 - **자동 재배포:** Vercel Git Integration의 `main` → Production 자동 배포와 배포 metadata의 commit SHA 일치를 실제 검증 완료
 
 ### GitHub 전달용 공개 그래프 데이터

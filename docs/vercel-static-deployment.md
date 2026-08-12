@@ -187,7 +187,7 @@ Vercel Deployments에서 직전 정상 Production을 선택해 **Promote to Prod
 | Vercel CLI 인증 | `hwanchoiganda-7455` 계정 확인 |
 | Vercel project | `ai-systems-atlas` · `prj_Jwh8gVgPf63GFUUukVEwwgjqp9qe` |
 | 기능·snapshot 검증 deployment | [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app) · `dpl_3DrTGRpkqN1EwAVVFoF3dDAChjCa` · `READY` |
-| Preview | [preview URL](https://ai-systems-atlas-8tb620h0y-corelines-projects-277c5e1c.vercel.app) · `dpl_DGsb1gDCTJ1A2oaF5xrxebEggmby` · `READY` · SSO 보호 |
+| Preview | [preview URL](https://ai-systems-atlas-8tb620h0y-corelines-projects-277c5e1c.vercel.app) · `dpl_DGsb1gDCTJ1A2oaF5xrxebEggmby` · `READY` · 최종 정책은 SSO 보호 유지 |
 | GitHub 자동 배포 | `2026-08-13` `main` push → Production 생성 · deployment metadata의 ref/SHA 일치 검증 완료 |
 
 문서-only 후속 commit도 `main` 자동 배포를 새로 만들 수 있으므로 최신 deployment ID는 고정 문서값으로 판단하지 않고 `vercel inspect ai-systems-atlas.vercel.app`으로 확인한다. 위 ID는 기능 코드와 공개 snapshot 자체를 검증한 release 증적이다.
@@ -205,4 +205,4 @@ Vercel Deployments에서 직전 정상 Production을 선택해 **Promote to Prod
 - GitHub `main` commit `35cc2d8` push가 CLI 업로드 없이 Production deployment를 생성했고 Vercel metadata의 `githubCommitRef=main`, `githubCommitSha=35cc2d8...`를 확인했다.
 - 직전 정상 deployment `91eb9a3`로 일시 rollback하여 공개 corpus `500/1,770`을 확인한 뒤, 승인된 최신 deployment `35cc2d8`로 복구해 공개 corpus `500/1,772`와 alias를 재확인했다.
 
-Preview deployment 자체는 생성됐지만 팀의 기본 `ssoProtection: all_except_custom_domains` 때문에 로그인 없는 직접 검증은 아직 완료되지 않았다. 프로젝트 전체의 Preview SSO 보호를 해제하면 현재와 향후 모든 Preview가 공개되므로 별도 명시 승인이 필요하다. Production, GitHub 자동 배포, rollback·원상 복구는 모두 검증 완료 상태다.
+Preview deployment 자체는 생성됐지만 팀의 기본 `ssoProtection: all_except_custom_domains`를 유지한다. 사용자는 `2026-08-13` Production 기준으로 프로젝트 종료를 선택했으며, 현재와 향후 Preview를 비로그인 공개하는 변경은 최종 범위에서 제외했다. Production, GitHub 자동 배포, rollback·원상 복구는 모두 검증 완료 상태다.
