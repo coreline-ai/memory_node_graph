@@ -121,8 +121,9 @@ import {
 } from "./graph/camera-focus";
 import {
   calculateGraphBoundingSphere,
-  perspectiveFitDistance,
+  calculatePerspectiveBoundsFit,
   type CameraFitResult,
+  type CameraSafeFrame,
   type GraphPoint3,
 } from "./graph/camera-fit";
 import {
@@ -1096,11 +1097,13 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   const fitVisibleGraph = useCallback(() => {
     const result = graphApiRef.current?.fitVisible() ?? "empty";
     setCameraFitStatus(
-      result === "moved"
-        ? `현재 표시 중인 ${visibleGraphCount.nodes}개 노드에 화면을 맞췄습니다.`
-        : "화면을 맞출 표시 노드가 없습니다.",
+      result === "home"
+        ? `전체 ${visibleGraphCount.nodes}개 노드를 ${VIEW_LABELS[viewMode]} 기본 구도로 재정렬했습니다.`
+        : result === "fitted"
+          ? `현재 표시 중인 ${visibleGraphCount.nodes}개 노드를 UI 안전 영역에 맞췄습니다.`
+          : "화면을 맞출 표시 노드가 없습니다.",
     );
-  }, [visibleGraphCount.nodes]);
+  }, [viewMode, visibleGraphCount.nodes]);
 
   const cycleNodeSizeMode = useCallback(() => {
     setNodeSizeMode((current) => {
@@ -2508,6 +2511,59 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       host.dataset.cameraTarget = renderedPosition.map((value) => value.toFixed(3)).join(",");
     };
 
+    const cameraSafeFrame = (): CameraSafeFrame => {
+      const hostBounds = host.getBoundingClientRect();
+      const stage = stageRef.current;
+      const padding = compact ? 12 : 18;
+      const gap = compact ? 10 : 16;
+      const frame: CameraSafeFrame = {
+        width: Math.max(1, hostBounds.width),
+        height: Math.max(1, hostBounds.height),
+        left: padding,
+        right: Math.max(padding + 1, hostBounds.width - padding),
+        top: padding,
+        bottom: Math.max(padding + 1, hostBounds.height - padding),
+      };
+      const relativeRect = (selector: string) => {
+        const element = stage?.querySelector<HTMLElement>(selector);
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+        return {
+          left: rect.left - hostBounds.left,
+          right: rect.right - hostBounds.left,
+          top: rect.top - hostBounds.top,
+          bottom: rect.bottom - hostBounds.top,
+        };
+      };
+      const command = relativeRect(".top-command");
+      if (command) frame.top = Math.max(frame.top, command.bottom + gap);
+      const detail = relativeRect(".detail-panel");
+      const title = relativeRect(".graph-title-block");
+      if (title) {
+        if (compact || detail) frame.top = Math.max(frame.top, title.bottom + gap);
+        else frame.left = Math.max(frame.left, title.right + gap);
+      }
+      const controlsRect = relativeRect(".graph-controls");
+      if (controlsRect) frame.bottom = Math.min(frame.bottom, controlsRect.top - gap);
+      if (detail) {
+        if (compact) frame.bottom = Math.min(frame.bottom, detail.top - gap);
+        else frame.right = Math.min(frame.right, detail.left - gap);
+      }
+
+      const minimumWidth = Math.min(frame.width - padding * 2, Math.max(120, frame.width * 0.28));
+      const minimumHeight = Math.min(frame.height - padding * 2, Math.max(120, frame.height * 0.28));
+      if (frame.right - frame.left < minimumWidth) {
+        frame.left = padding;
+        frame.right = Math.max(padding + 1, frame.width - padding);
+      }
+      if (frame.bottom - frame.top < minimumHeight) {
+        frame.top = padding;
+        frame.bottom = Math.max(padding + 1, frame.height - padding);
+      }
+      return frame;
+    };
+
     const fitVisible = (): CameraFitResult => {
       const visibleNodeIds = focusVisibilityRef.current.nodeIds;
       const visiblePoints: GraphPoint3[] = [];
@@ -2523,33 +2579,70 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       const sphere = calculateGraphBoundingSphere(visiblePoints);
       if (!sphere) {
         host.dataset.cameraAction = "fit-empty";
+        host.dataset.fitMode = "empty";
         host.dataset.fitNodeCount = "0";
         return "empty";
       }
 
-      const center = new THREE.Vector3(...sphere.center);
-      const distance = perspectiveFitDistance({
-        radius: sphere.radius,
+      const isFullGraph = sphere.count === simNodes.length && selectedIdRef.current === null;
+      if (isFullGraph) {
+        moveCameraHome(currentView, true);
+        const homePosition = cameraPositionFor(currentView);
+        host.dataset.cameraAction = "fit-home";
+        host.dataset.fitMode = "home";
+        host.dataset.fitNodeCount = String(sphere.count);
+        host.dataset.fitRadius = sphere.radius.toFixed(3);
+        host.dataset.fitDistance = homePosition.length().toFixed(3);
+        delete host.dataset.fitSafeFrame;
+        return "home";
+      }
+
+      const back = camera.position.clone().sub(controls.target);
+      if (back.lengthSq() < 0.0001) back.set(0, 0, 1);
+      back.normalize();
+      const right = new THREE.Vector3().crossVectors(camera.up, back);
+      if (right.lengthSq() < 0.0001) right.set(1, 0, 0);
+      right.normalize();
+      const up = new THREE.Vector3().crossVectors(back, right).normalize();
+      const alignedPoints: GraphPoint3[] = visiblePoints.map(([x, y, z]) => {
+        const point = new THREE.Vector3(x, y, z);
+        return [point.dot(right), point.dot(up), point.dot(back)];
+      });
+      const safeFrame = cameraSafeFrame();
+      const fit = calculatePerspectiveBoundsFit({
+        points: alignedPoints,
         verticalFovDegrees: camera.fov,
         aspect: camera.aspect,
-        margin: 0.15,
-        minimumRadius: graphRadius * 0.16,
+        safeFrame,
+        margin: 0.12,
         minDistance: controls.minDistance,
         maxDistance: controls.maxDistance,
+        nearDistance: Math.max(camera.near * 2, graphRadius * 0.03),
       });
-      const direction = camera.position.clone().sub(controls.target);
-      if (direction.lengthSq() < 0.0001) direction.set(0, 0, 1);
-      direction.normalize();
+      if (!fit) return "empty";
+      const center = right.clone().multiplyScalar(fit.center[0])
+        .add(up.clone().multiplyScalar(fit.center[1]))
+        .add(back.clone().multiplyScalar(fit.center[2]));
+      const target = center
+        .add(right.clone().multiplyScalar(fit.targetOffset[0]))
+        .add(up.clone().multiplyScalar(fit.targetOffset[1]));
       transitionCameraTo(
-        center.clone().add(direction.multiplyScalar(distance)),
-        center,
+        target.clone().add(back.multiplyScalar(fit.distance)),
+        target,
         780,
       );
       host.dataset.cameraAction = "fit-visible";
+      host.dataset.fitMode = "safe-area";
       host.dataset.fitNodeCount = String(sphere.count);
       host.dataset.fitRadius = sphere.radius.toFixed(3);
-      host.dataset.fitDistance = distance.toFixed(3);
-      return "moved";
+      host.dataset.fitDistance = fit.distance.toFixed(3);
+      host.dataset.fitSafeFrame = [
+        safeFrame.left,
+        safeFrame.top,
+        safeFrame.right,
+        safeFrame.bottom,
+      ].map((value) => Math.round(value)).join(",");
+      return "fitted";
     };
 
     const applyNodeSizeMode = (mode: NodeSizeMode) => {
@@ -4075,10 +4168,10 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
               aria-pressed={false}
               aria-describedby="camera-fit-status"
               onClick={fitVisibleGraph}
-              title="현재 화면에 표시된 노드 전체가 잘리지 않도록 맞춤"
+              title="전체 그래프는 기본 구도로 재정렬하고, 일부 그래프는 UI를 피해 화면에 맞춤"
             >
               <span className="fit-visible-icon" aria-hidden="true"><i /></span>
-              <em>화면 맞춤</em>
+              <em>구도 맞춤</em>
             </button>
             <output
               id="camera-fit-status"

@@ -188,7 +188,7 @@ Vercel Deployments에서 직전 정상 Production을 선택해 **Promote to Prod
 | Vercel project | `ai-systems-atlas` · `prj_Jwh8gVgPf63GFUUukVEwwgjqp9qe` |
 | Production | [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app) · `dpl_Cod1YTTR3g9igLuXDSbd7YqLZZ3Z` · `READY` |
 | Preview | [preview URL](https://ai-systems-atlas-8tb620h0y-corelines-projects-277c5e1c.vercel.app) · `dpl_DGsb1gDCTJ1A2oaF5xrxebEggmby` · `READY` · SSO 보호 |
-| GitHub 자동 배포 | Vercel GitHub App 저장소 접근 실패로 미연결 |
+| GitHub 자동 배포 | `2026-08-13` Vercel Git Integration 연결 완료 · 다음 `main` push 검증 대기 |
 
 ### 2026-08-10 실제 배포 QA
 
@@ -200,4 +200,4 @@ Vercel Deployments에서 직전 정상 Production을 선택해 **Promote to Prod
 - 브라우저 warning/error 로그는 `0`건이었다.
 - Vercel inspect에서 Production과 Preview 모두 `READY`, `middleware: []`였고 동일한 정적 rewrite/header 설정을 사용했다.
 
-Preview deployment 자체는 생성됐지만 팀의 기본 `ssoProtection: all_except_custom_domains` 때문에 로그인 없는 직접 검증은 아직 완료되지 않았다. 프로젝트 전체의 Preview SSO 보호를 해제하면 향후 모든 Preview가 공개되므로 별도 명시 승인이 필요하다. GitHub `main` 자동 배포도 Vercel GitHub App이 `coreline-ai/memory_node_graph` 저장소에 접근하도록 조직에서 승인한 다음 연결해야 한다.
+Preview deployment 자체는 생성됐지만 팀의 기본 `ssoProtection: all_except_custom_domains` 때문에 로그인 없는 직접 검증은 아직 완료되지 않았다. 프로젝트 전체의 Preview SSO 보호를 해제하면 향후 모든 Preview가 공개되므로 별도 명시 승인이 필요하다. GitHub App 저장소 접근 승인 후 `2026-08-13` `coreline-ai/memory_node_graph` 연결은 완료했으며, 다음 `main` push가 실제 Production 자동 배포와 commit SHA 일치를 최종 검증한다.

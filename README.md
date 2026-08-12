@@ -23,8 +23,9 @@
 [![Public Atlas checks](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml/badge.svg?branch=main)](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml)
 [![Last Commit](https://img.shields.io/github/last-commit/coreline-ai/memory_node_graph?style=flat-square&logo=github&label=last%20commit)](https://github.com/coreline-ai/memory_node_graph/commits/main)
 [![Live Demo](https://img.shields.io/badge/live%20demo-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://ai-systems-atlas.vercel.app/?scope=corpus&view=constellation)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2ea043?style=flat-square)](./LICENSE.md)
 
-[실시간 데모](#-실시간-공개-데모) · [빠른 시작](#-빠른-시작) · [화면 갤러리](#-화면-갤러리) · [처리 구조](#-처리-구조) · [대시보드](#-atlas-control-room) · [문서](#-관련-문서)
+[실시간 데모](#-실시간-공개-데모) · [빠른 시작](#-빠른-시작) · [화면 갤러리](#-화면-갤러리) · [처리 구조](#-처리-구조) · [대시보드](#-atlas-control-room) · [문서](#-관련-문서) · [라이선스](#-라이선스)
 
 </div>
 
@@ -60,7 +61,7 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 - 🧾 **문서 중심 검증** — 최근 Markdown 또는 문서 ID의 직접 노드와 저장 관계만 최대 500×2,000 투영
 - 🧭 **표시 범위 탐색** — 선택 노드 주변 전체·1단계·2단계 관계를 즉시 전환
 - 🧪 **관계 근거 분리** — 저장 근거선과 비저장 시각 연결을 전체·근거·시각·맞춤으로 구분
-- ⛶ **현재 화면 맞춤** — 필터와 선택 범위로 실제 표시 중인 노드를 viewport에 안전하게 fitting
+- ⛶ **구도 맞춤** — 전체 그래프는 보기별 기본 구도로 복원하고, 필터·선택 범위는 실제 UI 안전 영역 안에 fitting
 - ⬤ **노드 크기 기준** — 유형·연결 수(p95 정규화)·균일 크기로 의미와 허브 구조 비교
 
 ## 🚀 실시간 공개 데모
@@ -194,7 +195,7 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 - 필터: 분야, 노드 유형, 관계 계층, 관계 유형
 - 탐색 범위: 선택 노드 기준 전체, 직접 이웃 `1단계`, 확장 이웃 `2단계`
 - 관계 표시: `전체`, 저장·검증 관계만 보여주는 `근거`, 비저장 화면 연결만 보여주는 `시각`, sidebar 조합을 반영하는 `맞춤`
-- 화면 맞춤: 현재 실제 표시 노드의 bounding sphere를 기준으로 카메라 방향을 유지하며 fitting
+- 구도 맞춤: 전체 표시에서는 보기별 홈 구도를 재사용하고, 부분 표시에서는 카메라 방향·점별 깊이·검색/제목/하단 제어/상세 패널의 실제 DOM 안전 영역을 반영해 fitting
 - 연출: 재정렬, 자동 회전, 라벨·라벨 밀도, 노드 크기 `유형·연결 수·균일`
 - 발광: 기본, 브라이트, 초신성, 커스텀
 - 접근성: `prefers-reduced-motion`에서 저속 회전·즉시 화면 맞춤을 사용하고 모든 신규 제어에 상태명·tooltip·live status 제공
@@ -538,7 +539,8 @@ npm run graph:audit
 - [x] Vercel 전용 정적 Vite build·산출물 보안 검사
 - [x] 공개 snapshot 변조·누락을 차단하는 GitHub Actions
 - [x] Vercel Production 공개 정적 배포·실브라우저 QA
-- [ ] Vercel Preview 공개 전환·GitHub `main` 자동 배포 연결
+- [x] Vercel GitHub 저장소 연결·`main` 자동 배포 경로 활성화
+- [ ] Vercel Preview 공개 전환·비로그인 QA
 
 ## 📚 관련 문서
 
@@ -564,7 +566,7 @@ npm run graph:audit
 - **배포 상태:** 로그인 없이 공개, Vercel Function·API Route·DB 연결 `0`
 - **기준 snapshot:** `500`노드 · `1,495` 실제 관계 · `505` display 선
 - **Preview:** 배포는 `READY`이지만 Vercel 팀의 기본 SSO 보호가 적용되어 공개 전환 대기
-- **자동 재배포:** Vercel GitHub App의 `coreline-ai/memory_node_graph` 접근 승인이 필요해 수동 정적 배포 상태
+- **자동 재배포:** Vercel Git Integration을 `coreline-ai/memory_node_graph`에 연결 완료. 다음 `main` push에서 Production 자동 배포를 최종 검증
 
 ### GitHub 전달용 공개 그래프 데이터
 
@@ -606,6 +608,12 @@ Vercel 공개 웹은 다음 조건을 충족합니다.
 - 비공개 저장소 메타데이터 보호
 - OAuth 토큰·원문·Codex 출력 로그 미포함
 - OpenAI API Key와 LightRAG 미사용
+
+## 📜 라이선스
+
+이 프로젝트는 **MIT License**로 제공됩니다. 소프트웨어의 사용·복제·수정·병합·배포·재라이선스·판매가 허용되며, 저작권 고지와 라이선스 고지를 함께 유지해야 합니다.
+
+Copyright (c) 2026 **Coreline-ai**. 자세한 조건은 [`LICENSE.md`](./LICENSE.md)를 확인하세요.
 
 ---
 

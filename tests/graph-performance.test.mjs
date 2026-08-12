@@ -134,6 +134,117 @@ test("camera fitting handles empty, single, wide, and tall visible ranges", asyn
     }),
     200,
   );
+
+  const fullFrame = {
+    width: 1_000,
+    height: 800,
+    left: 0,
+    right: 1_000,
+    top: 0,
+    bottom: 800,
+  };
+  assert.equal(
+    cameraFit.calculatePerspectiveBoundsFit({
+      points: [],
+      verticalFovDegrees: 50,
+      aspect: 1.25,
+      safeFrame: fullFrame,
+      minDistance: 20,
+      maxDistance: 2_000,
+    }),
+    null,
+  );
+  const singleFit = cameraFit.calculatePerspectiveBoundsFit({
+    points: [[5, -2, 9]],
+    verticalFovDegrees: 50,
+    aspect: 1.25,
+    safeFrame: fullFrame,
+    minDistance: 35,
+    maxDistance: 2_000,
+  });
+  assert.deepEqual(singleFit, {
+    center: [5, -2, 9],
+    targetOffset: [0, 0, 0],
+    distance: 35,
+    count: 1,
+  });
+
+  const alignedPoints = [
+    [-80, -40, -16],
+    [80, 40, 16],
+    [-60, 30, 8],
+    [42, -34, -10],
+  ];
+  const symmetricFit = cameraFit.calculatePerspectiveBoundsFit({
+    points: alignedPoints,
+    verticalFovDegrees: 50,
+    aspect: 1.25,
+    safeFrame: fullFrame,
+    margin: 0.12,
+    minDistance: 20,
+    maxDistance: 2_000,
+    nearDistance: 2,
+  });
+  const uiSafeFit = cameraFit.calculatePerspectiveBoundsFit({
+    points: alignedPoints,
+    verticalFovDegrees: 50,
+    aspect: 1.25,
+    safeFrame: {
+      width: 1_000,
+      height: 800,
+      left: 310,
+      right: 980,
+      top: 74,
+      bottom: 690,
+    },
+    margin: 0.12,
+    minDistance: 20,
+    maxDistance: 2_000,
+    nearDistance: 2,
+  });
+  assert.ok(uiSafeFit.distance > symmetricFit.distance);
+  assert.ok(uiSafeFit.targetOffset[0] < 0);
+  assert.ok(uiSafeFit.targetOffset[1] < 0);
+
+  const tanVertical = Math.tan(50 * Math.PI / 360);
+  const tanHorizontal = tanVertical * 1.25;
+  const innerBounds = {
+    left: ((310 + (670 * 0.12 / 2)) / 1_000) * 2 - 1,
+    right: ((980 - (670 * 0.12 / 2)) / 1_000) * 2 - 1,
+    top: 1 - ((74 + (616 * 0.12 / 2)) / 800) * 2,
+    bottom: 1 - ((690 - (616 * 0.12 / 2)) / 800) * 2,
+  };
+  alignedPoints.forEach(([x, y, z]) => {
+    const depth = uiSafeFit.distance - (z - uiSafeFit.center[2]);
+    const ndcX =
+      (x - uiSafeFit.center[0] - uiSafeFit.targetOffset[0]) /
+      (depth * tanHorizontal);
+    const ndcY =
+      (y - uiSafeFit.center[1] - uiSafeFit.targetOffset[1]) /
+      (depth * tanVertical);
+    assert.ok(ndcX >= innerBounds.left - 1e-9 && ndcX <= innerBounds.right + 1e-9);
+    assert.ok(ndcY >= innerBounds.bottom - 1e-9 && ndcY <= innerBounds.top + 1e-9);
+    assert.ok(depth >= 2);
+  });
+
+  const portraitBoundsFit = cameraFit.calculatePerspectiveBoundsFit({
+    points: alignedPoints,
+    verticalFovDegrees: 50,
+    aspect: 9 / 16,
+    safeFrame: { width: 450, height: 800, left: 12, right: 438, top: 70, bottom: 680 },
+    minDistance: 20,
+    maxDistance: 2_000,
+  });
+  const ultraWideBoundsFit = cameraFit.calculatePerspectiveBoundsFit({
+    points: alignedPoints,
+    verticalFovDegrees: 50,
+    aspect: 32 / 9,
+    safeFrame: { width: 1_600, height: 450, left: 320, right: 1_580, top: 70, bottom: 350 },
+    minDistance: 20,
+    maxDistance: 2_000,
+  });
+  assert.ok(portraitBoundsFit.distance > 0);
+  assert.ok(ultraWideBoundsFit.distance > 0);
 });
 
 test("node sizing switches kind, p95 degree, and uniform modes within a safe range", async () => {

@@ -98,7 +98,8 @@ test("server-renders the graph with grouped controls and the three graph views",
   assert.match(html, /선택 노드 표시 범위/);
   assert.match(html, /관계 표시/);
   assert.match(html, /비저장 화면용 시각 연결만 표시/);
-  assert.match(html, /현재 화면에 표시된 노드 전체가 잘리지 않도록 맞춤/);
+  assert.match(html, /전체 그래프는 기본 구도로 재정렬하고, 일부 그래프는 UI를 피해 화면에 맞춤/);
+  assert.match(html, />구도 맞춤</);
   assert.match(html, /노드 크기 기준: 유형/);
   assert.match(html, /button[^>]*class="is-active"[^>]*aria-pressed="true"[^>]*>[^]*?<em>성운<\/em>/);
   assert.match(html, /class="luminosity-adjust-button has-custom is-custom"/);
