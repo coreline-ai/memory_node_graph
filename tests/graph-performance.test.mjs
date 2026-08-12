@@ -63,6 +63,165 @@ test("orbit selection recenters the camera only when its center changes", async 
     }),
     true,
   );
+  assert.equal(cameraFocus.selectionCameraDistance(265, 35, 420), 265);
+  assert.equal(cameraFocus.selectionCameraDistance(12, 35, 420), 35);
+  assert.equal(cameraFocus.selectionCameraDistance(900, 35, 420), 420);
+  assert.equal(cameraFocus.selectionCameraDistance(Number.NaN, 35, 420), 35);
+});
+
+test("camera fitting handles empty, single, wide, and tall visible ranges", async () => {
+  const cameraFit = await importTypeScript("../app/graph/camera-fit.ts");
+
+  assert.equal(cameraFit.calculateGraphBoundingSphere([]), null);
+  assert.deepEqual(
+    cameraFit.calculateGraphBoundingSphere([[5, -2, 9]]),
+    { center: [5, -2, 9], radius: 0, count: 1 },
+  );
+  const sphere = cameraFit.calculateGraphBoundingSphere([
+    [-10, -4, -2],
+    [10, 4, 2],
+    [0, 0, 0],
+    [Number.NaN, 1, 2],
+  ]);
+  assert.deepEqual(sphere.center, [0, 0, 0]);
+  assert.equal(sphere.count, 3);
+  assert.ok(Math.abs(sphere.radius - Math.hypot(10, 4, 2)) < 1e-9);
+
+  const landscape = cameraFit.perspectiveFitDistance({
+    radius: 100,
+    verticalFovDegrees: 50,
+    aspect: 16 / 9,
+    margin: 0.15,
+    minDistance: 20,
+    maxDistance: 2_000,
+  });
+  const portrait = cameraFit.perspectiveFitDistance({
+    radius: 100,
+    verticalFovDegrees: 50,
+    aspect: 9 / 16,
+    margin: 0.15,
+    minDistance: 20,
+    maxDistance: 2_000,
+  });
+  const ultraWide = cameraFit.perspectiveFitDistance({
+    radius: 100,
+    verticalFovDegrees: 50,
+    aspect: 32 / 9,
+    margin: 0.15,
+    minDistance: 20,
+    maxDistance: 2_000,
+  });
+  assert.ok(portrait > landscape);
+  assert.ok(Math.abs(ultraWide - landscape) < 1e-9);
+  assert.equal(
+    cameraFit.perspectiveFitDistance({
+      radius: 0,
+      minimumRadius: 35,
+      verticalFovDegrees: 50,
+      aspect: 1,
+      minDistance: 20,
+      maxDistance: 200,
+    }) > 20,
+    true,
+  );
+  assert.equal(
+    cameraFit.perspectiveFitDistance({
+      radius: 10_000,
+      verticalFovDegrees: 50,
+      aspect: 1,
+      minDistance: 20,
+      maxDistance: 200,
+    }),
+    200,
+  );
+});
+
+test("node sizing switches kind, p95 degree, and uniform modes within a safe range", async () => {
+  const nodeSizing = await importTypeScript("../app/graph/node-sizing.ts");
+  const kindSizes = {
+    thesis: 18,
+    concept: 10,
+    system: 14,
+    tool: 11,
+    practice: 11,
+    risk: 12,
+  };
+  const kinds = ["thesis", "concept", "system", "tool", "practice", "risk"];
+  const degrees = new Float32Array([0, 1, 4, 8, 16, 10_000]);
+
+  assert.deepEqual(
+    [...nodeSizing.calculateNodeSizes("kind", kinds, degrees, kindSizes)],
+    [18, 10, 14, 11, 11, 12],
+  );
+  assert.deepEqual(
+    [...nodeSizing.calculateNodeSizes("uniform", kinds, degrees, kindSizes)],
+    [11.5, 11.5, 11.5, 11.5, 11.5, 11.5],
+  );
+  const degreeSizes = nodeSizing.calculateNodeSizes(
+    "degree",
+    kinds,
+    degrees,
+    kindSizes,
+  );
+  assert.equal(degreeSizes[0], 8.5);
+  assert.ok(degreeSizes[0] < degreeSizes[1]);
+  assert.ok(degreeSizes[1] < degreeSizes[2]);
+  assert.ok(degreeSizes[2] < degreeSizes[3]);
+  assert.ok(degreeSizes[3] < degreeSizes[4]);
+  assert.equal(degreeSizes[5], 18);
+  assert.deepEqual(nodeSizing.nodeSizeRange(degreeSizes), {
+    minimum: 8.5,
+    maximum: 18,
+  });
+
+  const zeroSizes = nodeSizing.calculateNodeSizes(
+    "degree",
+    Array(500).fill("concept"),
+    new Float32Array(500),
+    kindSizes,
+  );
+  assert.deepEqual(nodeSizing.nodeSizeRange(zeroSizes), {
+    minimum: 8.5,
+    maximum: 8.5,
+  });
+  const equalSizes = nodeSizing.calculateNodeSizes(
+    "degree",
+    Array(12).fill("concept"),
+    new Float32Array(12).fill(7),
+    kindSizes,
+  );
+  assert.deepEqual(nodeSizing.nodeSizeRange(equalSizes), {
+    minimum: 18,
+    maximum: 18,
+  });
+  const extremeDegrees = new Float32Array(500).fill(2);
+  extremeDegrees[499] = 1_000_000;
+  const extremeSizes = nodeSizing.calculateNodeSizes(
+    "degree",
+    Array(500).fill("concept"),
+    extremeDegrees,
+    kindSizes,
+  );
+  assert.equal(extremeSizes[0], 18);
+  assert.equal(extremeSizes[499], 18);
+  assert.ok([...extremeSizes].every((size) => size >= 8.5 && size <= 18));
+  assert.equal(nodeSizing.percentile95([0, 1, 2, 3, 1_000]), 1_000);
+});
+
+test("render positions always synchronize before optional node motion", async () => {
+  const positionSync = await importTypeScript("../app/graph/position-sync.ts");
+  const base = new Float32Array([1, 2, 3, 10, 20, 30]);
+  const rendered = new Float32Array([99, 99, 99, -1, -1, -1]);
+
+  positionSync.syncRenderedNodePositions(base, rendered);
+  assert.deepEqual([...rendered], [...base]);
+  assert.deepEqual(positionSync.renderedNodePosition(rendered, 1), [10, 20, 30]);
+  assert.equal(positionSync.renderedNodePosition(rendered, -1), null);
+  assert.equal(positionSync.renderedNodePosition(rendered, 2), null);
+  assert.throws(
+    () => positionSync.syncRenderedNodePositions(base, new Float32Array(3)),
+    /equal lengths/,
+  );
 });
 
 test("500-node and 2,000-edge fixture is deterministic and layouts stay within CPU budget", async (t) => {
@@ -161,6 +320,134 @@ test("selection focus separates direct, expanded, and unrelated graph tiers", as
   assert.deepEqual([...result.nodeIds].sort(), ["a", "b", "c", "d"]);
   assert.equal(result.nodeIds.has("e"), false);
   assert.equal(focus.EXPANDED_FOCUS_VISIBILITY, 0.62);
+
+  const all = focus.selectionVisibilityForDepth(result, "a", "all");
+  assert.equal(all.nodeIds, null);
+  assert.equal(all.edgeIds, null);
+
+  const direct = focus.selectionVisibilityForDepth(result, "a", "direct");
+  assert.deepEqual([...direct.nodeIds].sort(), ["a", "b"]);
+  assert.deepEqual([...direct.edgeIds], ["a|b|supports"]);
+
+  const expanded = focus.selectionVisibilityForDepth(result, "a", "expanded");
+  assert.deepEqual([...expanded.nodeIds].sort(), ["a", "b", "c", "d"]);
+  assert.deepEqual(
+    [...expanded.edgeIds].sort(),
+    ["a|b|supports", "b|c|uses", "b|d|extends"],
+  );
+
+  const filtered = {
+    nodeIds: new Set(["b", "c", "e"]),
+    edgeIds: new Set(["b|c|uses", "c|e|requires"]),
+  };
+  const intersection = focus.intersectFocusVisibility(
+    expanded,
+    filtered,
+    "a",
+  );
+  assert.deepEqual([...intersection.nodeIds].sort(), ["a", "b", "c"]);
+  assert.deepEqual([...intersection.edgeIds], ["b|c|uses"]);
+
+  const isolated = focus.buildSelectionFocus([], "isolated");
+  const isolatedVisibility = focus.selectionVisibilityForDepth(
+    isolated,
+    "isolated",
+    "expanded",
+  );
+  assert.deepEqual([...isolatedVisibility.nodeIds], ["isolated"]);
+  assert.deepEqual([...isolatedVisibility.edgeIds], []);
+
+  const boundary = focus.buildSelectionFocus([
+    { source: "a", target: "a", type: "supports" },
+    { source: "a", target: "b", type: "supports" },
+    { source: "a", target: "b", type: "supports" },
+    { source: "b", target: "a", type: "requires" },
+  ], "a");
+  assert.deepEqual([...boundary.directNodeIds], ["b"]);
+  assert.deepEqual(
+    [...boundary.directEdgeIds].sort(),
+    ["a|a|supports", "a|b|supports", "b|a|requires"],
+  );
+
+  assert.deepEqual(
+    focus.visibleGraphCounts(
+      ["a", "b", "c"],
+      edges,
+      { nodeIds: new Set(["a", "b"]), edgeIds: new Set(["a|b|supports"]) },
+    ),
+    { nodes: 2, edges: 1 },
+  );
+});
+
+test("relation visibility presets share the sidebar layer state without changing data", async () => {
+  const relationVisibility = await importTypeScript(
+    "../app/graph/relation-visibility.ts",
+  );
+
+  assert.deepEqual(
+    relationVisibility.relationLayersForVisibilityPreset("all"),
+    [],
+  );
+  assert.deepEqual(
+    relationVisibility.relationLayersForVisibilityPreset("evidence"),
+    ["structural", "explicit", "inferred"],
+  );
+  assert.deepEqual(
+    relationVisibility.relationLayersForVisibilityPreset("display"),
+    ["display"],
+  );
+  assert.equal(
+    relationVisibility.relationVisibilityPresetForLayers(new Set()),
+    "all",
+  );
+  assert.equal(
+    relationVisibility.relationVisibilityPresetForLayers(
+      new Set(["structural", "explicit", "inferred", "display"]),
+    ),
+    "all",
+  );
+  assert.equal(
+    relationVisibility.relationVisibilityPresetForLayers(
+      new Set(["structural", "explicit", "inferred"]),
+    ),
+    "evidence",
+  );
+  assert.equal(
+    relationVisibility.relationVisibilityPresetForLayers(new Set(["display"])),
+    "display",
+  );
+  assert.equal(
+    relationVisibility.relationVisibilityPresetForLayers(
+      new Set(["explicit", "display"]),
+    ),
+    "custom",
+  );
+  assert.equal(
+    relationVisibility.relationLayerForEdge({
+      source: "a",
+      target: "b",
+      type: "supports",
+      layer: "explicit",
+    }),
+    "explicit",
+  );
+  assert.equal(
+    relationVisibility.relationLayerForEdge({
+      source: "a",
+      target: "b",
+      type: "related_to",
+      origin: "display",
+    }),
+    "display",
+  );
+  assert.equal(
+    relationVisibility.relationLayerForEdge({
+      source: "a",
+      target: "b",
+      type: "contains",
+    }),
+    "structural",
+  );
 });
 
 test("label LOD increases with zoom and prioritizes selected relationship distance", async () => {
@@ -431,7 +718,11 @@ test("compact graph controls keep grouped horizontal access without dropping con
   assert.ok(phoneStart > compactStart);
 
   const baseRules = css.slice(0, responsiveStart);
-  assert.match(baseRules, /grid-template-areas:\s*"status view data"\s*"status stage stage"/);
+  assert.match(
+    baseRules,
+    /grid-template-areas:\s*"status view data explore"\s*"status stage stage stage"/,
+  );
+  assert.match(baseRules, /\.explore-cluster\s*\{[\s\S]*?grid-area:\s*explore/);
   assert.match(baseRules, /\.stage-cluster\s*\{[\s\S]*?grid-area:\s*stage/);
 
   const responsiveRules = css.slice(responsiveStart, compactStart);
@@ -485,4 +776,6 @@ test("initial graph loading is Strict Mode safe and the relation shader enables 
   const materialSource = source.slice(materialStart, materialEnd);
   assert.match(materialSource, /vertexColors:\s*true/);
   assert.match(materialSource, /vColor = color/);
+  assert.equal(source.match(/setAttribute\("size"/g)?.length, 1);
+  assert.match(source, /nodeGeometry\.attributes\.size\.needsUpdate = true/);
 });

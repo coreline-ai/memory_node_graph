@@ -1211,9 +1211,9 @@ textarea:focus-visible {
   z-index: 16;
   display: grid;
   grid-template-areas:
-    "status view data"
-    "status stage stage";
-  grid-template-columns: 108px auto auto;
+    "status view data explore"
+    "status stage stage stage";
+  grid-template-columns: 108px auto auto auto;
   gap: 1px 0;
   align-items: center;
   max-width: calc(100% - 48px);
@@ -1305,6 +1305,10 @@ textarea:focus-visible {
 
 .data-cluster {
   grid-area: data;
+}
+
+.explore-cluster {
+  grid-area: explore;
 }
 
 .stage-cluster {
@@ -1433,6 +1437,216 @@ textarea:focus-visible {
 
 .utility-switch .label-density-control:disabled {
   cursor: not-allowed;
+}
+
+.utility-switch .node-size-control {
+  min-width: 66px;
+}
+
+.node-size-icon {
+  display: flex;
+  gap: 1px;
+  align-items: flex-end;
+  justify-content: center;
+  width: 15px;
+  height: 14px;
+}
+
+.node-size-icon i {
+  display: block;
+  width: 3px;
+  height: 3px;
+  background: currentColor;
+  border-radius: 50%;
+  box-shadow: 0 0 4px currentColor;
+}
+
+.node-size-icon-kind i:nth-child(2) {
+  width: 7px;
+  height: 7px;
+}
+
+.node-size-icon-kind i:nth-child(3) {
+  width: 5px;
+  height: 5px;
+}
+
+.node-size-icon-degree i:nth-child(2) {
+  width: 5px;
+  height: 5px;
+}
+
+.node-size-icon-degree i:nth-child(3) {
+  width: 8px;
+  height: 8px;
+}
+
+.node-size-icon-uniform i {
+  width: 5px;
+  height: 5px;
+}
+
+.focus-depth-switch button {
+  min-width: 56px;
+}
+
+.focus-depth-switch button:disabled {
+  cursor: not-allowed;
+}
+
+.focus-depth-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  color: #72818b;
+  border: 1px solid rgba(114, 129, 139, 0.32);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.focus-depth-switch button.is-active .focus-depth-icon {
+  color: #bff7e8;
+  border-color: rgba(121, 213, 192, 0.55);
+  background: rgba(121, 213, 192, 0.08);
+  box-shadow: 0 0 10px rgba(121, 213, 192, 0.35);
+}
+
+.relation-visibility-switch button,
+.relation-custom-status {
+  min-width: 50px;
+}
+
+.relation-custom-status {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  height: 31px;
+  padding: 0 9px;
+  color: #bff7e8;
+  background: rgba(121, 213, 192, 0.07);
+  border-radius: 3px;
+}
+
+.relation-custom-status em {
+  font-size: 9px;
+  font-style: normal;
+}
+
+.relation-visibility-icon {
+  position: relative;
+  display: inline-block;
+  width: 14px;
+  height: 12px;
+  color: #72818b;
+}
+
+.relation-visibility-icon i {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: currentColor;
+  transform-origin: center;
+}
+
+.relation-visibility-icon i:first-child {
+  top: 3px;
+  transform: rotate(12deg);
+}
+
+.relation-visibility-icon i:last-child {
+  bottom: 3px;
+  transform: rotate(-12deg);
+}
+
+.relation-visibility-icon-display i {
+  background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 4px);
+}
+
+.relation-visibility-icon-custom i:first-child {
+  transform: rotate(22deg);
+}
+
+.relation-visibility-icon-custom i:last-child {
+  transform: rotate(-22deg);
+}
+
+.relation-visibility-switch button.is-active .relation-visibility-icon,
+.relation-custom-status .relation-visibility-icon {
+  color: #bff7e8;
+  filter: drop-shadow(0 0 5px rgba(121, 213, 192, 0.58));
+}
+
+.control-live-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.graph-controls .fit-visible-control {
+  min-width: 80px;
+  color: #7892a2;
+}
+
+.fit-visible-icon {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
+
+.fit-visible-icon::before,
+.fit-visible-icon::after,
+.fit-visible-icon i::before,
+.fit-visible-icon i::after {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  content: "";
+  border-color: currentColor;
+  border-style: solid;
+}
+
+.fit-visible-icon::before {
+  top: 2px;
+  left: 2px;
+  border-width: 1px 0 0 1px;
+}
+
+.fit-visible-icon::after {
+  top: 2px;
+  right: 2px;
+  border-width: 1px 1px 0 0;
+}
+
+.fit-visible-icon i::before {
+  bottom: 2px;
+  left: 2px;
+  border-width: 0 0 1px 1px;
+}
+
+.fit-visible-icon i::after {
+  right: 2px;
+  bottom: 2px;
+  border-width: 0 1px 1px 0;
+}
+
+.graph-controls .fit-visible-control:hover .fit-visible-icon,
+.graph-controls .fit-visible-control:focus-visible .fit-visible-icon {
+  color: #b9e8ff;
+  box-shadow: 0 0 9px rgba(101, 181, 255, 0.3);
 }
 
 .motion-preference-status {
@@ -2428,7 +2642,7 @@ textarea:focus-visible {
   position: absolute;
   top: 73px;
   right: 24px;
-  bottom: 81px;
+  bottom: 116px;
   z-index: 30;
   width: min(376px, calc(100% - 48px));
   overflow: hidden;
@@ -3038,9 +3252,9 @@ textarea:focus-visible {
 @media (max-width: 640px) {
   .graph-controls {
     grid-template-areas:
-      "view data"
-      "stage stage";
-    grid-template-columns: auto auto;
+      "view data explore"
+      "stage stage stage";
+    grid-template-columns: auto auto auto;
   }
 
   .control-status {
@@ -3112,7 +3326,7 @@ textarea:focus-visible {
   .detail-panel {
     top: auto;
     right: 10px;
-    bottom: 78px;
+    bottom: 108px;
     left: 10px;
     width: auto;
     height: min(66svh, 570px);

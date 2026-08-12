@@ -17,11 +17,12 @@
 [![Knowledge Nodes](https://img.shields.io/badge/nodes-89%2C669-8250DF?style=flat-square&logo=databricks&logoColor=white)](#-데이터-기준선)
 [![Knowledge Relations](https://img.shields.io/badge/relations-94%2C506-1F6FEB?style=flat-square&logo=graphql&logoColor=white)](#-데이터-기준선)
 [![OpenAI API Key](https://img.shields.io/badge/OpenAI%20API%20Key-not%20required-2EA043?style=flat-square&logo=openai&logoColor=white)](#-oauth와-api-경계)
-[![Tests](https://img.shields.io/badge/tests-206%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
+[![Tests](https://img.shields.io/badge/tests-216%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
 [![Public Atlas checks](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml/badge.svg?branch=main)](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml)
 [![Last Commit](https://img.shields.io/github/last-commit/coreline-ai/memory_node_graph?style=flat-square&logo=github&label=last%20commit)](https://github.com/coreline-ai/memory_node_graph/commits/main)
+[![Live Demo](https://img.shields.io/badge/live%20demo-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://ai-systems-atlas.vercel.app/?scope=corpus&view=constellation)
 
-[빠른 시작](#-빠른-시작) · [화면 갤러리](#-화면-갤러리) · [처리 구조](#-처리-구조) · [대시보드](#-atlas-control-room) · [문서](#-관련-문서)
+[실시간 데모](#-실시간-공개-데모) · [빠른 시작](#-빠른-시작) · [화면 갤러리](#-화면-갤러리) · [처리 구조](#-처리-구조) · [대시보드](#-atlas-control-room) · [문서](#-관련-문서)
 
 </div>
 
@@ -55,10 +56,38 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 - 🛡️ **안전한 기본값** — LLM/OAuth가 없어도 규칙 기반 그래프 정상 동작
 - 🔍 **전체 노드 검색** — D1 FTS, 화면 밖 노드 출처 문서, 클릭 시 1/2-hop 문서 궤도
 - 🧾 **문서 중심 검증** — 최근 Markdown 또는 문서 ID의 직접 노드와 저장 관계만 최대 500×2,000 투영
+- 🧭 **표시 범위 탐색** — 선택 노드 주변 전체·1단계·2단계 관계를 즉시 전환
+- 🧪 **관계 근거 분리** — 저장 근거선과 비저장 시각 연결을 전체·근거·시각·맞춤으로 구분
+- ⛶ **현재 화면 맞춤** — 필터와 선택 범위로 실제 표시 중인 노드를 viewport에 안전하게 fitting
+- ⬤ **노드 크기 기준** — 유형·연결 수(p95 정규화)·균일 크기로 의미와 허브 구조 비교
+
+## 🚀 실시간 공개 데모
+
+로그인 없이 Vercel 공개 배포본을 바로 열어 그래프를 회전·이동·확대하고 노드 관계를 탐색할 수 있습니다. 공개 앱은 GitHub에 커밋된 검증 JSON만 읽는 **읽기 전용 정적 배포**이며 운영 D1, API Route, OAuth 토큰을 포함하지 않습니다.
+
+<p align="center">
+  <a href="https://ai-systems-atlas.vercel.app/?scope=corpus&amp;view=constellation"><strong>🌌 전체 지식 우주 열기</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://ai-systems-atlas.vercel.app/?scope=corpus&amp;view=nebula">☁️ 성운 보기</a>
+  &nbsp;·&nbsp;
+  <a href="https://ai-systems-atlas.vercel.app/?showcase=gold&amp;view=constellation">✦ Gold Graph</a>
+  &nbsp;·&nbsp;
+  <a href="https://ai-systems-atlas.vercel.app/?showcase=max&amp;view=constellation">⠿ 최대 밀도</a>
+</p>
+
+| 공개 상태 | 내용 |
+|---|---|
+| Production | [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app) |
+| 접근 방식 | 로그인 불필요 · 읽기 전용 · 브라우저에서 즉시 실행 |
+| 공개 데이터 | 500노드 · 1,370개 근거 관계 · 400개 비저장 시각 연결 |
+| 보안 경계 | Vercel Function 0 · API Route 0 · DB 연결 0 · OAuth/원문 미포함 |
+
+> [!NOTE]
+> 배포 화면은 마지막 Production 배포를 기준으로 하므로, 아래 로컬 최신 UI 캡처와 일시적으로 차이가 날 수 있습니다.
 
 ## 🖼️ 화면 갤러리
 
-모든 이미지는 현재 로컬 D1과 실제 UI를 직접 캡처한 화면입니다. 그래프 6종은 과노출을 줄이기 위해 캡처 가능한 최저 발광값(`전체 50 · 관계선 20 · 후광 0 · 배경 입자 0`)으로 다시 촬영했습니다. 전체 캡처 목록과 재촬영 기준은 [스크린샷 카탈로그](./docs/screenshots/README.md)에 있습니다.
+모든 이미지는 `2026-08-12 KST` 현재 로컬 D1과 Phase 2~5 최신 UI를 직접 캡처한 화면입니다. 그래프 6종은 과노출을 줄이기 위해 `기본` 발광 프리셋으로 다시 촬영했으며, 관계 표시·화면 맞춤·노드 크기 제어가 포함된 최신 하단 메뉴를 보여줍니다. 전체 캡처 목록과 재촬영 기준은 [스크린샷 카탈로그](./docs/screenshots/README.md)에 있습니다.
 
 ### 전체 지식 우주
 
@@ -107,8 +136,8 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 
 ### Atlas Control Room
 
-> [!WARNING]
-> 아래 대시보드 캡처는 Phase 5 이전 운영 화면을 보존한 자료입니다. 현재 앱은 Codex·GitHub별 `OAuth 연결됨`, `로그인 필요`, `처리 중`, `재로그인 필요`와 실제 문서 작업 상태를 표시합니다.
+> [!NOTE]
+> 아래 화면은 통합 Codex·GitHub OAuth 상태, 116개 저장소 discovery, 853개 Markdown 문서와 최신 작업 상태를 다시 촬영한 현재 대시보드입니다.
 
 <table>
   <tr>
@@ -161,9 +190,12 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 
 - 렌즈: 전체 우주, 에이전트, 지능의 기억, 신뢰와 안전, AI 제품
 - 필터: 분야, 노드 유형, 관계 계층, 관계 유형
-- 연출: 재정렬, 자동 회전, 라벨, 관계 흐름
+- 탐색 범위: 선택 노드 기준 전체, 직접 이웃 `1단계`, 확장 이웃 `2단계`
+- 관계 표시: `전체`, 저장·검증 관계만 보여주는 `근거`, 비저장 화면 연결만 보여주는 `시각`, sidebar 조합을 반영하는 `맞춤`
+- 화면 맞춤: 현재 실제 표시 노드의 bounding sphere를 기준으로 카메라 방향을 유지하며 fitting
+- 연출: 재정렬, 자동 회전, 라벨·라벨 밀도, 노드 크기 `유형·연결 수·균일`
 - 발광: 기본, 브라이트, 초신성, 커스텀
-- 접근성: `prefers-reduced-motion`에서 자동 회전 기본 정지
+- 접근성: `prefers-reduced-motion`에서 저속 회전·즉시 화면 맞춤을 사용하고 모든 신규 제어에 상태명·tooltip·live status 제공
 
 ## 📊 데이터 기준선
 

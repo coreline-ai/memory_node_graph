@@ -88,12 +88,18 @@ test("server-renders the graph with grouped controls and the three graph views",
   assert.match(html, /현재 제어 상태:/);
   assert.match(html, /class="control-cluster view-cluster"/);
   assert.match(html, /class="control-cluster data-cluster"/);
+  assert.match(html, /class="control-cluster explore-cluster"/);
   assert.match(html, /class="control-cluster stage-cluster"/);
   assert.match(html, /graph-controls-scroll-hint/);
   assert.match(html, /작은 화면에서는 가로로 스크롤/);
   assert.match(html, /그래프 데이터 선택/);
   assert.match(html, />커스텀</);
   assert.match(html, /텍스트 라벨 표시 개수: 보통/);
+  assert.match(html, /선택 노드 표시 범위/);
+  assert.match(html, /관계 표시/);
+  assert.match(html, /비저장 화면용 시각 연결만 표시/);
+  assert.match(html, /현재 화면에 표시된 노드 전체가 잘리지 않도록 맞춤/);
+  assert.match(html, /노드 크기 기준: 유형/);
   assert.match(html, /button[^>]*class="is-active"[^>]*aria-pressed="true"[^>]*>[^]*?<em>성운<\/em>/);
   assert.match(html, /class="luminosity-adjust-button has-custom is-custom"/);
   assert.match(html, /관계 계층/);

@@ -26,3 +26,18 @@ export function shouldRecenterLayoutCamera({
     (nextView === "orbit" && previousCenterId !== nextCenterId)
   );
 }
+
+export function selectionCameraDistance(
+  currentDistance: number,
+  minDistance: number,
+  maxDistance: number,
+) {
+  const safeMinimum = Number.isFinite(minDistance) ? Math.max(0, minDistance) : 0;
+  const safeMaximum = Number.isFinite(maxDistance)
+    ? Math.max(safeMinimum, maxDistance)
+    : safeMinimum;
+  const safeCurrent = Number.isFinite(currentDistance)
+    ? currentDistance
+    : safeMinimum;
+  return Math.min(safeMaximum, Math.max(safeMinimum, safeCurrent));
+}

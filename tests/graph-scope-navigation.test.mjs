@@ -134,6 +134,7 @@ test("scope 이력은 선택 노드와 필터를 보존하면서 기존 history 
       activeDomains: ["agents", "memory", "agents"],
       activeKinds: ["system"],
       activeRelations: ["contains", "contains"],
+      activeLayers: ["explicit", "display", "explicit"],
     },
   );
 
@@ -144,6 +145,7 @@ test("scope 이력은 선택 노드와 필터를 보존하면서 기존 history 
     activeDomains: ["agents", "memory"],
     activeKinds: ["system"],
     activeRelations: ["contains"],
+    activeLayers: ["explicit", "display"],
   });
 });
 

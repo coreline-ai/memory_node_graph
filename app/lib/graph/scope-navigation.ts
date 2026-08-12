@@ -12,6 +12,7 @@ export type GraphScopeHistoryState = {
   activeDomains: string[];
   activeKinds: string[];
   activeRelations: string[];
+  activeLayers: string[];
 };
 
 export type GraphApiRequest = {
@@ -47,6 +48,9 @@ export function graphScopeHistoryStateFromHistoryState(
     activeDomains: uniqueStrings(candidate.activeDomains),
     activeKinds: uniqueStrings(candidate.activeKinds),
     activeRelations: uniqueStrings(candidate.activeRelations),
+    activeLayers: isStringList(candidate.activeLayers)
+      ? uniqueStrings(candidate.activeLayers)
+      : [],
   };
 }
 
@@ -63,6 +67,7 @@ export function historyStateWithGraphScopeState(
       activeDomains: uniqueStrings(scopeState.activeDomains),
       activeKinds: uniqueStrings(scopeState.activeKinds),
       activeRelations: uniqueStrings(scopeState.activeRelations),
+      activeLayers: uniqueStrings(scopeState.activeLayers),
     },
   };
 }

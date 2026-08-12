@@ -73,11 +73,23 @@ import {
 import {
   buildFilteredFocus,
   buildSelectionFocus,
+  emptyFocusVisibility,
   emptyFocusState,
   EXPANDED_FOCUS_VISIBILITY,
   graphEdgeId as edgeId,
+  intersectFocusVisibility,
+  selectionVisibilityForDepth,
+  visibleGraphCounts,
+  type FocusDepth,
   type FocusState,
+  type FocusVisibility,
 } from "./graph/focus";
+import {
+  relationLayerForEdge,
+  relationLayersForVisibilityPreset,
+  relationVisibilityPresetForLayers,
+  type RelationVisibilityPreset,
+} from "./graph/relation-visibility";
 import {
   resolveLabelLod,
   scoreLabelCandidate,
@@ -103,7 +115,25 @@ import {
   toggleAutoRotateIntent,
   type AutoRotateIntent,
 } from "./graph/auto-rotate";
-import { shouldRecenterLayoutCamera } from "./graph/camera-focus";
+import {
+  selectionCameraDistance,
+  shouldRecenterLayoutCamera,
+} from "./graph/camera-focus";
+import {
+  calculateGraphBoundingSphere,
+  perspectiveFitDistance,
+  type CameraFitResult,
+  type GraphPoint3,
+} from "./graph/camera-fit";
+import {
+  renderedNodePosition,
+  syncRenderedNodePositions,
+} from "./graph/position-sync";
+import {
+  calculateNodeSizes,
+  nodeSizeRange,
+  type NodeSizeMode,
+} from "./graph/node-sizing";
 
 type SimNode = KnowledgeNode & {
   x?: number;
@@ -132,10 +162,12 @@ type PerformanceMetrics = {
 
 type GraphApi = {
   reset: () => void;
+  fitVisible: () => CameraFitResult;
   flyTo: (id: string) => void;
   setAutoRotate: (value: boolean, speed: number) => void;
   setLabelsVisible: (value: boolean) => void;
   setLabelDensity: (density: LabelDensity) => void;
+  setNodeSizeMode: (mode: NodeSizeMode) => void;
   setViewMode: (mode: GraphViewMode, selectedId?: string | null) => void;
   setLuminosity: (preset: LuminosityPreset) => void;
   setLuminosityControls?: (controls: LuminosityControls) => void;
@@ -143,10 +175,13 @@ type GraphApi = {
 
 type ShowcaseState = {
   viewMode: GraphViewMode;
+  focusDepth: FocusDepth;
   activeLens: string;
   activeDomains: Domain[];
   activeKinds: NodeKind[];
   activeRelations: RelationKind[];
+  activeLayers: RelationLayer[];
+  nodeSizeMode: NodeSizeMode;
   selectedId: string | null;
   autoRotateIntent: AutoRotateIntent;
   labelsVisible: boolean;
@@ -187,6 +222,35 @@ const LABEL_DENSITY_LABELS: Record<LabelDensity, string> = {
 };
 
 const LABEL_DENSITIES: LabelDensity[] = ["low", "medium", "high"];
+
+const FOCUS_DEPTH_LABELS: Record<FocusDepth, string> = {
+  all: "전체",
+  direct: "1단계",
+  expanded: "2단계",
+};
+
+const FOCUS_DEPTHS: FocusDepth[] = ["all", "direct", "expanded"];
+
+const NODE_SIZE_MODE_LABELS: Record<NodeSizeMode, string> = {
+  kind: "유형",
+  degree: "연결 수",
+  uniform: "균일",
+};
+
+const NODE_SIZE_MODES: NodeSizeMode[] = ["kind", "degree", "uniform"];
+
+const RELATION_VISIBILITY_LABELS: Record<RelationVisibilityPreset, string> = {
+  all: "전체",
+  evidence: "근거",
+  display: "시각",
+  custom: "맞춤",
+};
+
+const RELATION_VISIBILITY_PRESETS: Array<Exclude<RelationVisibilityPreset, "custom">> = [
+  "all",
+  "evidence",
+  "display",
+];
 
 // Keep the floating source chooser away from both viewport edges.  The same
 // values are mirrored in `.data-source-panel` so its measured placement and
@@ -265,16 +329,6 @@ const RELATION_LAYER_STYLES: Record<RelationLayer, { color: string; dash: string
   display: { color: "#6c657c", dash: "long" },
 };
 
-const relationLayerForEdge = (edge: KnowledgeEdge): RelationLayer =>
-  edge.layer
-  ?? (edge.origin === "codex"
-    ? "inferred"
-    : edge.origin === "display"
-      ? "display"
-      : ["documents", "plans", "contains"].includes(edge.type)
-        ? "structural"
-        : "explicit");
-
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
@@ -338,6 +392,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const graphApiRef = useRef<GraphApi | null>(null);
   const focusRef = useRef<FocusState>(emptyFocusState());
+  const focusVisibilityRef = useRef<FocusVisibility>(emptyFocusVisibility());
   const luminosityButtonRef = useRef<HTMLButtonElement>(null);
   const luminosityPanelRef = useRef<HTMLElement>(null);
   const dataMenuButtonRef = useRef<HTMLButtonElement>(null);
@@ -354,6 +409,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     ...defaultCustomLuminosityControls,
   });
   const selectedIdRef = useRef<string | null>(null);
+  const nodeSizeModeRef = useRef<NodeSizeMode>("kind");
   const autoRotateIntentRef = useRef<AutoRotateIntent>(initialAutoRotateIntent(false));
   const graphRevisionRef = useRef("");
   const graphLoadingRef = useRef(true);
@@ -376,6 +432,9 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   const [labelDensity, setLabelDensity] = useState<LabelDensity>("medium");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<GraphViewMode>("nebula");
+  const [focusDepth, setFocusDepth] = useState<FocusDepth>("all");
+  const [cameraFitStatus, setCameraFitStatus] = useState("");
+  const [nodeSizeMode, setNodeSizeMode] = useState<NodeSizeMode>("kind");
   const [luminosity, setLuminosity] = useState<LuminosityPreset>("normal");
   const [luminosityControls, setLuminosityControls] = useState<LuminosityControls>(
     () => ({ ...defaultCustomLuminosityControls }),
@@ -415,7 +474,8 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   const [activeKinds, toggleKind, clearKinds, replaceKinds] = useSetToggle<NodeKind>();
   const [activeRelations, toggleRelation, clearRelations, replaceRelations] =
     useSetToggle<RelationKind>();
-  const [activeLayers, toggleLayer, clearLayers] = useSetToggle<RelationLayer>();
+  const [activeLayers, toggleLayer, clearLayers, replaceLayers] =
+    useSetToggle<RelationLayer>();
 
   const changeViewMode = useCallback(
     (nextMode: GraphViewMode) => {
@@ -425,6 +485,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
           : selectedId;
       if (nextMode === "orbit" && nextSelected && !selectedId) {
         setSelectedId(nextSelected);
+        setFocusDepth("expanded");
       }
       setViewMode(nextMode);
       graphApiRef.current?.setViewMode(nextMode, nextSelected);
@@ -437,6 +498,13 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     [graphData.edges, graphData.nodes, selectedId],
   );
 
+  const applyRelationVisibilityPreset = useCallback(
+    (preset: Exclude<RelationVisibilityPreset, "custom">) => {
+      replaceLayers(relationLayersForVisibilityPreset(preset));
+    },
+    [replaceLayers],
+  );
+
   const knowledgeNodes = graphData.nodes;
   const knowledgeEdges = graphData.edges;
 
@@ -447,8 +515,9 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       activeDomains: [...activeDomains],
       activeKinds: [...activeKinds],
       activeRelations: [...activeRelations],
+      activeLayers: [...activeLayers],
     }),
-    [activeDomains, activeKinds, activeLens, activeRelations, selectedId],
+    [activeDomains, activeKinds, activeLayers, activeLens, activeRelations, selectedId],
   );
 
   const restoreGraphScopeState = useCallback((state: GraphScopeHistoryState) => {
@@ -464,7 +533,10 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     replaceRelations(state.activeRelations.filter((value): value is RelationKind =>
       includesKey(relationLabels, value),
     ));
-  }, [replaceDomains, replaceKinds, replaceRelations]);
+    replaceLayers(state.activeLayers.filter((value): value is RelationLayer =>
+      includesKey(RELATION_LAYER_LABELS, value),
+    ));
+  }, [replaceDomains, replaceKinds, replaceLayers, replaceRelations]);
 
   const loadGraph = useCallback(async () => {
     graphLoadingRef.current = true;
@@ -531,11 +603,12 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       }
       if (savedScopeState) restoreGraphScopeState(savedScopeState);
       const requestedNode = pageUrl.searchParams.get("node") ?? savedScopeState?.selectedNodeId;
-      setSelectedId(
+      const nextSelectedId =
         requestedNode && payload.nodes.some((node) => node.id === requestedNode)
           ? requestedNode
-          : null,
-      );
+          : null;
+      setSelectedId(nextSelectedId);
+      setFocusDepth(nextSelectedId ? "expanded" : "all");
       setGraphRequestedScope(payload.meta.scope ?? null);
       graphRevisionRef.current = payload.meta.graphRevision ?? "";
       setGraphData(payload);
@@ -569,6 +642,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         nextUrl,
       );
       setSelectedId(focusNodeId ?? null);
+      setFocusDepth(focusNodeId ? "expanded" : "all");
       if (focusNodeId) {
         setViewMode("orbit");
         viewModeRef.current = "orbit";
@@ -612,10 +686,13 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   const captureShowcaseState = useCallback(() => {
     showcaseStateRef.current = {
       viewMode,
+      focusDepth,
       activeLens,
       activeDomains: [...activeDomains],
       activeKinds: [...activeKinds],
       activeRelations: [...activeRelations],
+      activeLayers: [...activeLayers],
+      nodeSizeMode,
       selectedId,
       autoRotateIntent: { ...autoRotateIntent },
       labelsVisible,
@@ -629,13 +706,16 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     activeDomains,
     activeKinds,
     activeLens,
+    activeLayers,
     activeRelations,
     autoRotateIntent,
+    focusDepth,
     labelsVisible,
     labelDensity,
     luminosity,
     luminosityControls,
     luminosityCustom,
+    nodeSizeMode,
     savedCustomControls,
     selectedId,
     viewMode,
@@ -646,7 +726,10 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     clearDomains();
     clearKinds();
     clearRelations();
+    clearLayers();
     setSelectedId(null);
+    setFocusDepth("all");
+    setNodeSizeMode("kind");
     setViewMode("constellation");
     updateAutoRotateIntent(initialAutoRotateIntent(prefersReducedMotion));
     setLabelsVisible(false);
@@ -656,14 +739,17 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     setLuminosityCustom(false);
     setLuminosityPanelOpen(false);
     shouldFitShowcaseRef.current = true;
-  }, [clearDomains, clearKinds, clearRelations, prefersReducedMotion, updateAutoRotateIntent]);
+  }, [clearDomains, clearKinds, clearLayers, clearRelations, prefersReducedMotion, updateAutoRotateIntent]);
 
   const applyGoldPresentation = useCallback(() => {
     setActiveLens("all");
     clearDomains();
     clearKinds();
     clearRelations();
+    clearLayers();
     setSelectedId(null);
+    setFocusDepth("all");
+    setNodeSizeMode("kind");
     setViewMode("constellation");
     updateAutoRotateIntent(initialAutoRotateIntent(prefersReducedMotion));
     setLabelsVisible(true);
@@ -672,14 +758,17 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     setLuminosityCustom(false);
     setLuminosityPanelOpen(false);
     shouldFitShowcaseRef.current = true;
-  }, [clearDomains, clearKinds, clearRelations, prefersReducedMotion, updateAutoRotateIntent]);
+  }, [clearDomains, clearKinds, clearLayers, clearRelations, prefersReducedMotion, updateAutoRotateIntent]);
 
   const restoreShowcaseState = useCallback((state: ShowcaseState) => {
     setActiveLens(state.activeLens);
     replaceDomains(state.activeDomains);
     replaceKinds(state.activeKinds);
     replaceRelations(state.activeRelations);
+    replaceLayers(state.activeLayers);
+    setNodeSizeMode(state.nodeSizeMode);
     setSelectedId(state.selectedId);
+    setFocusDepth(state.focusDepth);
     setViewMode(state.viewMode);
     updateAutoRotateIntent({ ...state.autoRotateIntent });
     setLabelsVisible(state.labelsVisible);
@@ -692,7 +781,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     setLuminosityCustom(state.luminosityCustom);
     setLuminosityPanelOpen(false);
     showcaseStateRef.current = null;
-  }, [replaceDomains, replaceKinds, replaceRelations, updateAutoRotateIntent]);
+  }, [replaceDomains, replaceKinds, replaceLayers, replaceRelations, updateAutoRotateIntent]);
 
   const selectDataSource = useCallback(
     async (source: "current" | "corpus" | "public" | "overview" | "gold" | "max") => {
@@ -718,6 +807,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         url = pageUrlForGraphDataSource(url, "public-snapshot");
         setLocalPublicSnapshotMode(true);
         setSelectedId(null);
+        setFocusDepth("all");
         setHovered(null);
         setQuery("");
         setSearchOpen(false);
@@ -727,6 +817,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
           : pageUrlForGraphScope(url, source);
         setLocalPublicSnapshotMode(false);
         setSelectedId(null);
+        setFocusDepth("all");
         setHovered(null);
         setQuery("");
         setSearchOpen(false);
@@ -739,6 +830,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         );
         if (!restoreState && wasPresentation) {
           setSelectedId(null);
+          setFocusDepth("all");
           setViewMode("nebula");
           setLabelsVisible(false);
           setLabelDensity("medium");
@@ -929,7 +1021,120 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     return counts;
   }, [knowledgeEdges]);
 
+  const relationVisibilityPreset = useMemo(
+    () => relationVisibilityPresetForLayers(activeLayers),
+    [activeLayers],
+  );
+
+  const baseFilterState = useMemo(() => {
+    const nodeIds = new Set<string>();
+    const edgeIds = new Set<string>();
+    const hasFilters =
+      activeDomains.size > 0 ||
+      activeKinds.size > 0 ||
+      activeRelations.size > 0 ||
+      activeLayers.size > 0;
+
+    if (hasFilters) {
+      knowledgeNodes.forEach((item) => {
+        const domainMatch =
+          activeDomains.size === 0 || activeDomains.has(item.domain);
+        const kindMatch = activeKinds.size === 0 || activeKinds.has(item.kind);
+        if (domainMatch && kindMatch) nodeIds.add(item.id);
+      });
+
+      knowledgeEdges.forEach((item) => {
+        const relationMatch =
+          activeRelations.size === 0 || activeRelations.has(item.type);
+        const layerMatch =
+          activeLayers.size === 0 || activeLayers.has(relationLayerForEdge(item));
+        if (
+          relationMatch && layerMatch &&
+          (nodeIds.has(item.source) || nodeIds.has(item.target))
+        ) {
+          edgeIds.add(edgeId(item));
+          nodeIds.add(item.source);
+          nodeIds.add(item.target);
+        }
+      });
+    }
+
+    return {
+      focus: hasFilters
+        ? buildFilteredFocus(nodeIds, edgeIds)
+        : emptyFocusState(),
+      visibility: hasFilters
+        ? { nodeIds, edgeIds }
+        : emptyFocusVisibility(),
+    };
+  }, [activeDomains, activeKinds, activeLayers, activeRelations, knowledgeEdges, knowledgeNodes]);
+
+  const selectionFocus = useMemo(
+    () => selectedId ? buildSelectionFocus(knowledgeEdges, selectedId) : null,
+    [knowledgeEdges, selectedId],
+  );
+
+  const currentFocusState = selectionFocus ?? baseFilterState.focus;
+  const currentFocusVisibility = useMemo(() => {
+    if (!selectedId || !selectionFocus) return baseFilterState.visibility;
+    return intersectFocusVisibility(
+      selectionVisibilityForDepth(selectionFocus, selectedId, focusDepth),
+      baseFilterState.visibility,
+      selectedId,
+    );
+  }, [baseFilterState.visibility, focusDepth, selectedId, selectionFocus]);
+
+  const visibleGraphCount = useMemo(
+    () => visibleGraphCounts(
+      knowledgeNodes.map((node) => node.id),
+      knowledgeEdges,
+      currentFocusVisibility,
+    ),
+    [currentFocusVisibility, knowledgeEdges, knowledgeNodes],
+  );
+
+  const fitVisibleGraph = useCallback(() => {
+    const result = graphApiRef.current?.fitVisible() ?? "empty";
+    setCameraFitStatus(
+      result === "moved"
+        ? `현재 표시 중인 ${visibleGraphCount.nodes}개 노드에 화면을 맞췄습니다.`
+        : "화면을 맞출 표시 노드가 없습니다.",
+    );
+  }, [visibleGraphCount.nodes]);
+
+  const cycleNodeSizeMode = useCallback(() => {
+    setNodeSizeMode((current) => {
+      const index = NODE_SIZE_MODES.indexOf(current);
+      return NODE_SIZE_MODES[(index + 1) % NODE_SIZE_MODES.length];
+    });
+  }, []);
+
   const selectedNode = selectedId ? nodeMap.get(selectedId) ?? null : null;
+  const focusDepthCounts = useMemo(() => {
+    const allNodeIds = knowledgeNodes.map((node) => node.id);
+    if (!selectedId) {
+      return {
+        all: visibleGraphCounts(allNodeIds, knowledgeEdges, baseFilterState.visibility),
+        direct: { nodes: 0, edges: 0 },
+        expanded: { nodes: 0, edges: 0 },
+      };
+    }
+    const selectionFocus = buildSelectionFocus(knowledgeEdges, selectedId);
+    const countDepth = (depth: FocusDepth) => visibleGraphCounts(
+      allNodeIds,
+      knowledgeEdges,
+      intersectFocusVisibility(
+        selectionVisibilityForDepth(selectionFocus, selectedId, depth),
+        baseFilterState.visibility,
+        selectedId,
+      ),
+    );
+    return {
+      all: countDepth("all"),
+      direct: countDepth("direct"),
+      expanded: countDepth("expanded"),
+    };
+  }, [baseFilterState.visibility, knowledgeEdges, knowledgeNodes, selectedId]);
   const showcaseActive = graphData.meta.provider === "performance-fixture";
   const goldGraphActive = graphData.meta.provider === "gold-graph-fixture";
   const presentationFixtureActive = showcaseActive || goldGraphActive;
@@ -992,7 +1197,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   const controlLuminosityStatus = luminosityCustom
     ? `커스텀 ${luminosityControls.overall}%`
     : LUMINOSITY_LABELS[luminosity];
-  const controlStatusLabel = `${VIEW_LABELS[viewMode]} · ${controlDataStatus} · ${controlLuminosityStatus}`;
+  const controlStatusLabel = `${VIEW_LABELS[viewMode]} · ${controlDataStatus} · ${controlLuminosityStatus}${selectedId ? ` · ${FOCUS_DEPTH_LABELS[focusDepth]}` : ""}`;
 
   const connectedItems = useMemo(() => {
     if (!selectedId) return [];
@@ -1048,6 +1253,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       clearRelations();
       clearLayers();
       setSelectedId(null);
+      setFocusDepth("all");
 
       const lensDomains: Record<string, Domain[]> = {
         agents: ["agents"],
@@ -1063,6 +1269,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
 
   const selectNode = useCallback((id: string) => {
     setSelectedId(id);
+    setFocusDepth("expanded");
     setQuery("");
     setSearchOpen(false);
     setSidebarOpen(false);
@@ -1084,6 +1291,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       return;
     }
     setSelectedId(result.node.id);
+    setFocusDepth("expanded");
     setQuery("");
     setSearchOpen(false);
     setSidebarOpen(false);
@@ -1097,47 +1305,9 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   }, [navigateGraphScope]);
 
   useEffect(() => {
-    const nodeIds = new Set<string>();
-    const edgeIds = new Set<string>();
-    const hasFilters =
-      activeDomains.size > 0 ||
-      activeKinds.size > 0 ||
-      activeRelations.size > 0 ||
-      activeLayers.size > 0;
-
-    if (selectedId) {
-      focusRef.current = buildSelectionFocus(knowledgeEdges, selectedId);
-      return;
-    }
-
-    if (hasFilters) {
-      knowledgeNodes.forEach((item) => {
-        const domainMatch =
-          activeDomains.size === 0 || activeDomains.has(item.domain);
-        const kindMatch = activeKinds.size === 0 || activeKinds.has(item.kind);
-        if (domainMatch && kindMatch) nodeIds.add(item.id);
-      });
-
-      knowledgeEdges.forEach((item) => {
-        const relationMatch =
-          activeRelations.size === 0 || activeRelations.has(item.type);
-        const layerMatch =
-          activeLayers.size === 0 || activeLayers.has(relationLayerForEdge(item));
-        if (
-          relationMatch && layerMatch &&
-          (nodeIds.has(item.source) || nodeIds.has(item.target))
-        ) {
-          edgeIds.add(edgeId(item));
-          nodeIds.add(item.source);
-          nodeIds.add(item.target);
-        }
-      });
-      focusRef.current = buildFilteredFocus(nodeIds, edgeIds);
-      return;
-    }
-
-    focusRef.current = emptyFocusState();
-  }, [activeDomains, activeKinds, activeLayers, activeRelations, knowledgeEdges, knowledgeNodes, selectedId, viewMode]);
+    focusRef.current = currentFocusState;
+    focusVisibilityRef.current = currentFocusVisibility;
+  }, [currentFocusState, currentFocusVisibility]);
 
   useEffect(() => {
     graphApiRef.current?.setAutoRotate(autoRotate, currentAutoRotateSpeed);
@@ -1152,6 +1322,11 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     labelDensityRef.current = labelDensity;
     graphApiRef.current?.setLabelDensity(labelDensity);
   }, [labelDensity]);
+
+  useEffect(() => {
+    nodeSizeModeRef.current = nodeSizeMode;
+    graphApiRef.current?.setNodeSizeMode(nodeSizeMode);
+  }, [nodeSizeMode]);
 
   useEffect(() => {
     selectedIdRef.current = selectedId;
@@ -1213,6 +1388,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     const frame = window.requestAnimationFrame(() => {
       if (requestedNode && graphData.nodes.some((node) => node.id === requestedNode)) {
         setSelectedId(requestedNode);
+        setFocusDepth("expanded");
       }
       if (
         requestedView === "constellation" ||
@@ -1244,6 +1420,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
           return;
         }
         setSelectedId(null);
+        setFocusDepth("all");
         setSearchOpen(false);
         setSidebarOpen(false);
       } else if (!isTyping && event.key.toLowerCase() === "v") {
@@ -1362,6 +1539,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     const nodeSizes = new Float32Array(nodeCount);
     const nodeSeeds = new Float32Array(nodeCount);
     const nodeBoosts = new Float32Array(nodeCount).fill(1);
+    const nodeVisibility = new Float32Array(nodeCount).fill(1);
     const nodeMotion = new Float32Array(nodeCount * 7);
     const nodeDegrees = new Float32Array(nodeCount);
     const random = xorshift(240817);
@@ -1385,7 +1563,6 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       constellationPositions.push([x, y, z]);
       color.setHex(NODE_COLORS[item.kind]);
       nodeColors.set([color.r, color.g, color.b], index * 3);
-      nodeSizes[index] = NODE_SIZES[item.kind];
       nodeSeeds[index] = random() * Math.PI * 2;
       nodeMotion.set(
         [
@@ -1400,6 +1577,12 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         index * 7,
       );
     });
+    nodeSizes.set(calculateNodeSizes(
+      nodeSizeModeRef.current,
+      simNodes.map((item) => item.kind),
+      nodeDegrees,
+      NODE_SIZES,
+    ));
 
     const nodeGeometry = new THREE.BufferGeometry();
     nodeGeometry.setAttribute(
@@ -1412,6 +1595,10 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     nodeGeometry.setAttribute(
       "boost",
       new THREE.BufferAttribute(nodeBoosts, 1),
+    );
+    nodeGeometry.setAttribute(
+      "visibility",
+      new THREE.BufferAttribute(nodeVisibility, 1),
     );
 
     const nodeMaterial = new THREE.ShaderMaterial({
@@ -1433,9 +1620,11 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         attribute float size;
         attribute float seed;
         attribute float boost;
+        attribute float visibility;
         varying vec3 vColor;
         varying float vFade;
         varying float vBoost;
+        varying float vVisibility;
         uniform float uTime;
         uniform float uNear;
         uniform float uFar;
@@ -1446,9 +1635,10 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         void main() {
           vColor = color;
           vBoost = boost;
+          vVisibility = visibility;
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
           float breath = 1.0 + 0.10 * uBreath * sin(uTime * 0.9 + seed);
-          gl_PointSize = size * breath * (420.0 / -mvPosition.z) * clamp(boost, 1.0, 1.58) * uViewScale * mix(0.96, 1.16, clamp(uLuminosity - 0.9, 0.0, 1.0));
+          gl_PointSize = visibility * size * breath * (420.0 / -mvPosition.z) * clamp(boost, 1.0, 1.58) * uViewScale * mix(0.96, 1.16, clamp(uLuminosity - 0.9, 0.0, 1.0));
           vFade = max(0.16, 1.0 - smoothstep(uNear, uFar, -mvPosition.z));
           gl_Position = projectionMatrix * mvPosition;
         }
@@ -1457,11 +1647,13 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         varying vec3 vColor;
         varying float vFade;
         varying float vBoost;
+        varying float vVisibility;
         uniform float uLuminosity;
         uniform float uOutputCeiling;
         uniform float uSafeOutput;
 
         void main() {
+          if (vVisibility < 0.5) discard;
           vec2 uv = gl_PointCoord - 0.5;
           float distanceFromCenter = length(uv) * 2.0;
           if (distanceFromCenter > 1.0) discard;
@@ -2033,10 +2225,21 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
 
     const raycaster = new THREE.Raycaster();
     raycaster.params.Points!.threshold = graphRadius * 0.028;
+    const firstVisibleNodeHit = () => {
+      const visibleNodeIds = focusVisibilityRef.current.nodeIds;
+      return raycaster
+        .intersectObject(nodePoints, false)
+        .find(
+          (hit) =>
+            hit.index !== undefined &&
+            (!visibleNodeIds || visibleNodeIds.has(simNodes[hit.index].id)),
+        );
+    };
     const pointer = new THREE.Vector2();
     let pointerDirty = false;
     let pointerDown: { x: number; y: number } | null = null;
     let hoveredId: string | null = null;
+    let appliedFocusVisibility: FocusVisibility | null = null;
     let frame = 0;
     let cameraTransitionFrame = 0;
     let cameraTransitionSerial = 0;
@@ -2088,11 +2291,12 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         return;
       setPointer(event as unknown as PointerEvent);
       raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObject(nodePoints, false)[0];
+      const hit = firstVisibleNodeHit();
       if (hit && hit.index !== undefined) {
         selectNode(simNodes[hit.index].id);
       } else {
         setSelectedId(null);
+        setFocusDepth("all");
       }
     };
 
@@ -2280,19 +2484,90 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     const flyTo = (id: string) => {
       const index = positionsById.get(id);
       if (index === undefined) return;
-      const target = new THREE.Vector3(
-        baseNodePositions[index * 3],
-        baseNodePositions[index * 3 + 1],
-        baseNodePositions[index * 3 + 2],
+      const renderedPosition = renderedNodePosition(
+        animatedNodePositions,
+        index,
       );
+      if (!renderedPosition) return;
+      const target = new THREE.Vector3(...renderedPosition);
       const direction = camera.position
         .clone()
         .sub(controls.target)
         .normalize();
+      const focusDistance = selectionCameraDistance(
+        camera.position.distanceTo(controls.target),
+        controls.minDistance,
+        controls.maxDistance,
+      );
       const endCamera = target
         .clone()
-        .add(direction.multiplyScalar(graphRadius * 0.78));
+        .add(direction.multiplyScalar(focusDistance));
       transitionCameraTo(endCamera, target, 860);
+      host.dataset.cameraAction = "fly-to";
+      host.dataset.cameraNodeId = id;
+      host.dataset.cameraTarget = renderedPosition.map((value) => value.toFixed(3)).join(",");
+    };
+
+    const fitVisible = (): CameraFitResult => {
+      const visibleNodeIds = focusVisibilityRef.current.nodeIds;
+      const visiblePoints: GraphPoint3[] = [];
+      simNodes.forEach((node, index) => {
+        if (visibleNodeIds && !visibleNodeIds.has(node.id)) return;
+        const offset = index * 3;
+        visiblePoints.push([
+          animatedNodePositions[offset],
+          animatedNodePositions[offset + 1],
+          animatedNodePositions[offset + 2],
+        ]);
+      });
+      const sphere = calculateGraphBoundingSphere(visiblePoints);
+      if (!sphere) {
+        host.dataset.cameraAction = "fit-empty";
+        host.dataset.fitNodeCount = "0";
+        return "empty";
+      }
+
+      const center = new THREE.Vector3(...sphere.center);
+      const distance = perspectiveFitDistance({
+        radius: sphere.radius,
+        verticalFovDegrees: camera.fov,
+        aspect: camera.aspect,
+        margin: 0.15,
+        minimumRadius: graphRadius * 0.16,
+        minDistance: controls.minDistance,
+        maxDistance: controls.maxDistance,
+      });
+      const direction = camera.position.clone().sub(controls.target);
+      if (direction.lengthSq() < 0.0001) direction.set(0, 0, 1);
+      direction.normalize();
+      transitionCameraTo(
+        center.clone().add(direction.multiplyScalar(distance)),
+        center,
+        780,
+      );
+      host.dataset.cameraAction = "fit-visible";
+      host.dataset.fitNodeCount = String(sphere.count);
+      host.dataset.fitRadius = sphere.radius.toFixed(3);
+      host.dataset.fitDistance = distance.toFixed(3);
+      return "moved";
+    };
+
+    const applyNodeSizeMode = (mode: NodeSizeMode) => {
+      nodeSizes.set(calculateNodeSizes(
+        mode,
+        simNodes.map((item) => item.kind),
+        nodeDegrees,
+        NODE_SIZES,
+      ));
+      nodeGeometry.attributes.size.needsUpdate = true;
+      const range = nodeSizeRange(nodeSizes);
+      raycaster.params.Points!.threshold =
+        graphRadius * 0.028 * clamp(range.maximum / NODE_SIZES.thesis, 0.72, 1.2);
+      host.dataset.nodeSizeMode = mode;
+      host.dataset.nodeSizeMinimum = range.minimum.toFixed(2);
+      host.dataset.nodeSizeMaximum = range.maximum.toFixed(2);
+      host.dataset.raycastThreshold = raycaster.params.Points!.threshold.toFixed(3);
+      pointerDirty = true;
     };
 
     graphApiRef.current = {
@@ -2303,6 +2578,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
           780,
         );
       },
+      fitVisible,
       flyTo,
       setAutoRotate: (value, speed) => {
         controls.autoRotate = cameraTransitionActive ? false : value;
@@ -2316,11 +2592,13 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         labelLayer.dataset.density = density;
         labelSelectionKey = "";
       },
+      setNodeSizeMode: applyNodeSizeMode,
       setViewMode: (mode, centerId) => applyLayout(mode, centerId),
       setLuminosity: applyLuminosity,
       setLuminosityControls: applyLuminosityControls,
     };
 
+    applyNodeSizeMode(nodeSizeModeRef.current);
     applyLayout(viewModeRef.current, selectedIdRef.current, false);
     if (luminosityPreviewEnabled) {
       applyLuminosityControls(luminosityControlsRef.current);
@@ -2356,6 +2634,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         if (progress >= 1) layoutTransitionDuration = 0;
       }
 
+      syncRenderedNodePositions(baseNodePositions, animatedNodePositions);
       if (!reducedMotion) {
         for (let index = 0; index < nodeCount; index += 1) {
           const motionOffset = index * 7;
@@ -2363,30 +2642,27 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
           const amplitude =
             nodeMotion[motionOffset + 6] *
             (currentView === "orbit" ? 0.24 : currentView === "nebula" ? 0.64 : 1);
-          animatedNodePositions[positionOffset] =
-            baseNodePositions[positionOffset] +
+          animatedNodePositions[positionOffset] +=
             amplitude *
               Math.sin(
                 time * nodeMotion[motionOffset] +
                   nodeMotion[motionOffset + 1],
               );
-          animatedNodePositions[positionOffset + 1] =
-            baseNodePositions[positionOffset + 1] +
+          animatedNodePositions[positionOffset + 1] +=
             amplitude *
               Math.sin(
                 time * nodeMotion[motionOffset + 2] +
                   nodeMotion[motionOffset + 3],
               );
-          animatedNodePositions[positionOffset + 2] =
-            baseNodePositions[positionOffset + 2] +
+          animatedNodePositions[positionOffset + 2] +=
             amplitude *
               Math.sin(
                 time * nodeMotion[motionOffset + 4] +
                   nodeMotion[motionOffset + 5],
               );
         }
-        nodeGeometry.attributes.position.needsUpdate = true;
       }
+      nodeGeometry.attributes.position.needsUpdate = true;
 
       if (!reducedMotion && now - lastPulse > 920) {
         lastPulse = now;
@@ -2402,6 +2678,37 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       }
 
       const focus = focusRef.current;
+      const focusVisibility = focusVisibilityRef.current;
+      let focusVisibilityChanged = false;
+      if (focusVisibility !== appliedFocusVisibility) {
+        let visibleNodeCount = 0;
+        for (let index = 0; index < nodeCount; index += 1) {
+          nodeVisibility[index] =
+            !focusVisibility.nodeIds || focusVisibility.nodeIds.has(simNodes[index].id)
+              ? 1
+              : 0;
+          if (nodeVisibility[index] > 0.5) visibleNodeCount += 1;
+        }
+        let visibleEdgeCount = 0;
+        for (let index = 0; index < edgeCount; index += 1) {
+          const sourceIndex = edgeIndexData[index * 2];
+          const targetIndex = edgeIndexData[index * 2 + 1];
+          const id = edgeId(knowledgeEdges[index]);
+          if (
+            (!focusVisibility.edgeIds || focusVisibility.edgeIds.has(id)) &&
+            nodeVisibility[sourceIndex] > 0.5 &&
+            nodeVisibility[targetIndex] > 0.5
+          ) {
+            visibleEdgeCount += 1;
+          }
+        }
+        host.dataset.visibleNodeCount = String(visibleNodeCount);
+        host.dataset.visibleEdgeCount = String(visibleEdgeCount);
+        nodeGeometry.attributes.visibility.needsUpdate = true;
+        appliedFocusVisibility = focusVisibility;
+        focusVisibilityChanged = true;
+        pointerDirty = true;
+      }
       const selectedNodeId = selectedIdRef.current;
       edgeMaterial.uniforms.uTime.value = time;
       const ambientNodeBoost = luminosityPreviewEnabled
@@ -2477,6 +2784,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       const updateEdges =
         qualityProfiles[renderQuality].edgeStride === 1 ||
         frameSerial % qualityProfiles[renderQuality].edgeStride === 0 ||
+        focusVisibilityChanged ||
         layoutTransitionDuration > 0;
       if (updateEdges) {
         const focusedEdgeIntensity = luminosityPreviewEnabled
@@ -2500,15 +2808,21 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
           );
 
           const id = edgeId(knowledgeEdges[index]);
-          let brightness = focus.edgeIds
+          const edgeIsVisible =
+            (!focusVisibility.edgeIds || focusVisibility.edgeIds.has(id)) &&
+            nodeVisibility[sourceIndex] > 0.5 &&
+            nodeVisibility[targetIndex] > 0.5;
+          let brightness = edgeIsVisible
+            ? focus.edgeIds
             ? focus.directEdgeIds?.has(id)
               ? focusedEdgeIntensity
               : focus.expandedEdgeIds?.has(id)
                 ? focusedEdgeIntensity * EXPANDED_FOCUS_VISIBILITY
                 : activeFocusContrastSettings.dimmedEdgeBrightness *
                   focusedEdgeIntensity
-            : activeLuminositySettings.ambientEdgeBrightness;
-          if (focus.edgeIds) {
+            : activeLuminositySettings.ambientEdgeBrightness
+            : 0;
+          if (edgeIsVisible && focus.edgeIds) {
             const relationLayer = relationLayerForEdge(knowledgeEdges[index]);
             brightness *= relationLayer === "structural"
               ? focus.directEdgeIds?.has(id) ? 0.78 : 0.58
@@ -2516,7 +2830,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
                 ? 0.5
                 : focus.directEdgeIds?.has(id) ? 1.18 : 1.04;
           }
-          if (!focus.edgeIds && !reducedMotion) {
+          if (edgeIsVisible && !focus.edgeIds && !reducedMotion) {
             brightness *=
               1 +
               0.24 *
@@ -2540,13 +2854,19 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         if (selectedNodeId && focus.edgeIds) {
           for (let index = 0; index < edgeCount; index += 1) {
             const id = edgeId(knowledgeEdges[index]);
-            if (focus.directEdgeIds?.has(id)) {
+            if (
+              focus.directEdgeIds?.has(id) &&
+              (!focusVisibility.edgeIds || focusVisibility.edgeIds.has(id))
+            ) {
               selectedPathEdges.push({ index, expanded: false });
             }
           }
           for (let index = 0; index < edgeCount; index += 1) {
             const id = edgeId(knowledgeEdges[index]);
-            if (focus.expandedEdgeIds?.has(id)) {
+            if (
+              focus.expandedEdgeIds?.has(id) &&
+              (!focusVisibility.edgeIds || focusVisibility.edgeIds.has(id))
+            ) {
               selectedPathEdges.push({ index, expanded: true });
             }
           }
@@ -2646,7 +2966,11 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       } else if (!reducedMotion && edgeCount > 0 && renderQuality !== "low") {
         const activeEdgeIndexes: number[] = [];
         for (let index = 0; index < edgeCount; index += 1) {
-          if (!focus.edgeIds || focus.edgeIds.has(edgeId(knowledgeEdges[index]))) {
+          const id = edgeId(knowledgeEdges[index]);
+          if (
+            (!focus.edgeIds || focus.edgeIds.has(id)) &&
+            (!focusVisibility.edgeIds || focusVisibility.edgeIds.has(id))
+          ) {
             activeEdgeIndexes.push(index);
           }
         }
@@ -2794,7 +3118,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       if (pointerDirty) {
         pointerDirty = false;
         raycaster.setFromCamera(pointer, camera);
-        const hit = raycaster.intersectObject(nodePoints, false)[0];
+        const hit = firstVisibleNodeHit();
         const nextId =
           hit && hit.index !== undefined ? simNodes[hit.index].id : null;
         if (nextId !== hoveredId) {
@@ -2816,20 +3140,23 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
           focus.directNodeIds ? [...focus.directNodeIds].sort().join(",") : "",
           focus.expandedNodeIds ? [...focus.expandedNodeIds].sort().join(",") : "",
           focus.nodeIds && !selectedNodeId ? [...focus.nodeIds].sort().join(",") : "",
+          focusVisibility.nodeIds ? [...focusVisibility.nodeIds].sort().join(",") : "ALL",
         ].join("|");
 
         if (nextLabelSelectionKey !== labelSelectionKey) {
           labelSelectionKey = nextLabelSelectionKey;
           activeLabelLod = nextLabelLod;
           labelLayer.dataset.lod = activeLabelLod;
-          const labelCandidates = labels.map(({ id, kind, degree }) => {
+          const labelCandidates = labels
+            .filter(({ id }) => !focusVisibility.nodeIds || focusVisibility.nodeIds.has(id))
+            .map(({ id, kind, degree }) => {
             let focusTier: LabelFocusTier = "ambient";
             if (id === selectedNodeId) focusTier = "selected";
             else if (focus.directNodeIds?.has(id)) focusTier = "direct";
             else if (focus.expandedNodeIds?.has(id)) focusTier = "expanded";
             else if (focus.nodeIds?.has(id)) focusTier = "direct";
             return { id, kind, degree, focusTier };
-          });
+            });
           activeLabelIds = selectLabelIds(
             labelCandidates,
             activeLabelLod,
@@ -2862,13 +3189,16 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
           element.dataset.focusTier = focusTier;
         }
 
-        const lodVisible = activeLabelIds.has(id);
+        const nodeIsVisible =
+          !focusVisibility.nodeIds || focusVisibility.nodeIds.has(id);
+        const lodVisible = nodeIsVisible && activeLabelIds.has(id);
         if (label.lodVisible !== lodVisible) {
           label.lodVisible = lodVisible;
           element.setAttribute("aria-hidden", String(!lodVisible));
           element.tabIndex = lodVisible ? 0 : -1;
         }
         if (!lodVisible) {
+          if (document.activeElement === element) element.blur();
           element.style.display = "none";
           return;
         }
@@ -3085,6 +3415,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
 
   const clearFocus = () => {
     setSelectedId(null);
+    setFocusDepth("all");
     setActiveLens("all");
     clearDomains();
     clearKinds();
@@ -3658,6 +3989,106 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
             </div>
           </div>
 
+          <div className="control-cluster explore-cluster" role="group" aria-label="선택 관계 탐색 범위">
+            <span className="control-cluster-label" aria-hidden="true">탐색</span>
+            <div className="control-group focus-depth-switch" aria-label="선택 노드 표시 범위">
+              {FOCUS_DEPTHS.map((depth) => {
+                const count = focusDepthCounts[depth];
+                const disabled = depth !== "all" && !selectedId;
+                return (
+                  <button
+                    key={depth}
+                    type="button"
+                    data-depth={depth}
+                    className={focusDepth === depth ? "is-active" : ""}
+                    aria-pressed={focusDepth === depth}
+                    aria-label={`${FOCUS_DEPTH_LABELS[depth]} 관계 범위${disabled ? ", 노드를 먼저 선택하세요" : `, ${count.nodes}개 노드와 ${count.edges}개 관계`}`}
+                    disabled={disabled}
+                    onClick={() => setFocusDepth(depth)}
+                    title={disabled
+                      ? `${FOCUS_DEPTH_LABELS[depth]} 범위 · 노드를 먼저 선택하세요`
+                      : `${FOCUS_DEPTH_LABELS[depth]} 범위 · ${count.nodes}노드 / ${count.edges}관계`}
+                  >
+                    <span className={`focus-depth-icon focus-depth-icon-${depth}`} aria-hidden="true">
+                      {depth === "all" ? "∞" : depth === "direct" ? "1" : "2"}
+                    </span>
+                    <em>{FOCUS_DEPTH_LABELS[depth]}</em>
+                  </button>
+                );
+              })}
+            </div>
+            <span className="control-subseparator" aria-hidden="true" />
+            <div className="control-group relation-visibility-switch" aria-label="관계 표시">
+              {RELATION_VISIBILITY_PRESETS.map((preset) => {
+                const isActive = relationVisibilityPreset === preset;
+                const presetCount = preset === "display"
+                  ? relationLayerCounts.get("display") ?? 0
+                  : preset === "evidence"
+                    ? (relationLayerCounts.get("structural") ?? 0)
+                      + (relationLayerCounts.get("explicit") ?? 0)
+                      + (relationLayerCounts.get("inferred") ?? 0)
+                    : knowledgeEdges.length;
+                const description = preset === "display"
+                  ? "비저장 화면용 시각 연결만 표시"
+                  : preset === "evidence"
+                    ? "저장·검증 가능한 근거 관계만 표시"
+                    : "근거 관계와 비저장 시각 연결을 모두 표시";
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    data-relation-preset={preset}
+                    className={isActive ? "is-active" : ""}
+                    aria-pressed={isActive}
+                    aria-label={`${RELATION_VISIBILITY_LABELS[preset]} 관계 표시, ${description}, 전체 ${presetCount}개`}
+                    onClick={() => applyRelationVisibilityPreset(preset)}
+                    title={`${RELATION_VISIBILITY_LABELS[preset]} · ${description} · ${presetCount}관계`}
+                  >
+                    <span className={`relation-visibility-icon relation-visibility-icon-${preset}`} aria-hidden="true">
+                      <i />
+                      <i />
+                    </span>
+                    <em>{RELATION_VISIBILITY_LABELS[preset]}</em>
+                  </button>
+                );
+              })}
+              {relationVisibilityPreset === "custom" && (
+                <output
+                  className="relation-custom-status is-active"
+                  aria-label="사이드바에서 선택한 맞춤 관계 계층 표시 중"
+                >
+                  <span className="relation-visibility-icon relation-visibility-icon-custom" aria-hidden="true">
+                    <i />
+                    <i />
+                  </span>
+                  <em>맞춤</em>
+                </output>
+              )}
+              <output className="control-live-status" aria-live="polite">
+                {RELATION_VISIBILITY_LABELS[relationVisibilityPreset]} 관계 표시 · 현재 {visibleGraphCount.edges}개 관계
+              </output>
+            </div>
+            <span className="control-subseparator" aria-hidden="true" />
+            <button
+              type="button"
+              className="fit-visible-control"
+              aria-pressed={false}
+              aria-describedby="camera-fit-status"
+              onClick={fitVisibleGraph}
+              title="현재 화면에 표시된 노드 전체가 잘리지 않도록 맞춤"
+            >
+              <span className="fit-visible-icon" aria-hidden="true"><i /></span>
+              <em>화면 맞춤</em>
+            </button>
+            <output
+              id="camera-fit-status"
+              className="control-live-status"
+              aria-live="polite"
+            >
+              {cameraFitStatus}
+            </output>
+          </div>
+
           <div className="control-cluster stage-cluster" role="group" aria-label="연출">
             <span className="control-cluster-label" aria-hidden="true">연출</span>
             <div className="control-group utility-switch">
@@ -3709,6 +4140,24 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
                 </span>
                 <em>{LABEL_DENSITY_LABELS[labelDensity]}</em>
               </button>
+              <button
+                type="button"
+                className={`node-size-control ${nodeSizeMode !== "kind" ? "is-active" : ""}`}
+                aria-pressed={nodeSizeMode !== "kind"}
+                aria-label={`노드 크기 기준: ${NODE_SIZE_MODE_LABELS[nodeSizeMode]}`}
+                onClick={cycleNodeSizeMode}
+                title={`노드 크기: ${NODE_SIZE_MODE_LABELS[nodeSizeMode]} · 클릭하여 유형, 연결 수, 균일 순환`}
+              >
+                <span className={`node-size-icon node-size-icon-${nodeSizeMode}`} aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <em>{NODE_SIZE_MODE_LABELS[nodeSizeMode]}</em>
+              </button>
+              <output className="control-live-status" aria-live="polite">
+                노드 크기 기준 {NODE_SIZE_MODE_LABELS[nodeSizeMode]}
+              </output>
             </div>
             <span className="control-subseparator" aria-hidden="true" />
             <div className="control-group luminosity-switch" aria-label="발광 강도">
@@ -4109,7 +4558,10 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedId(null)}
+                onClick={() => {
+                  setSelectedId(null);
+                  setFocusDepth("all");
+                }}
                 aria-label="상세 닫기"
               >
                 ×
