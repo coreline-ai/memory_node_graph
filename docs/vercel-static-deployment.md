@@ -180,15 +180,17 @@ Vercel Deployments에서 직전 정상 Production을 선택해 **Promote to Prod
 | 항목 | 현재 기록 |
 |---|---|
 | 기능 구현 commit | `91eb9a384dadefa779ad33547137b20a04a48fba` |
-| 배포 기준 commit | `35cc2d8be8868a7a845b794c3cd24f7792041bf6` |
+| 기능·snapshot 검증 기준 commit | `35cc2d8be8868a7a845b794c3cd24f7792041bf6` |
 | GitHub main push | 완료 |
 | GitHub Actions | [Public Atlas static checks · success](https://github.com/coreline-ai/memory_node_graph/actions/runs/31639959848) |
 | Clean clone | `npm ci && npm run graph:verify-public && npm run build:vercel` 성공 |
 | Vercel CLI 인증 | `hwanchoiganda-7455` 계정 확인 |
 | Vercel project | `ai-systems-atlas` · `prj_Jwh8gVgPf63GFUUukVEwwgjqp9qe` |
-| Production | [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app) · `dpl_3DrTGRpkqN1EwAVVFoF3dDAChjCa` · `READY` |
+| 기능·snapshot 검증 deployment | [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app) · `dpl_3DrTGRpkqN1EwAVVFoF3dDAChjCa` · `READY` |
 | Preview | [preview URL](https://ai-systems-atlas-8tb620h0y-corelines-projects-277c5e1c.vercel.app) · `dpl_DGsb1gDCTJ1A2oaF5xrxebEggmby` · `READY` · SSO 보호 |
 | GitHub 자동 배포 | `2026-08-13` `main` push → Production 생성 · deployment metadata의 ref/SHA 일치 검증 완료 |
+
+문서-only 후속 commit도 `main` 자동 배포를 새로 만들 수 있으므로 최신 deployment ID는 고정 문서값으로 판단하지 않고 `vercel inspect ai-systems-atlas.vercel.app`으로 확인한다. 위 ID는 기능 코드와 공개 snapshot 자체를 검증한 release 증적이다.
 
 ### 2026-08-13 최종 Production·복구 QA
 
