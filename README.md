@@ -2,6 +2,8 @@
 
 # ✦ AI Systems Atlas
 
+<img width="2752" height="1536" alt="AI_시스템_아틀라스_기능_안내" src="https://github.com/user-attachments/assets/754ce5fd-1160-458d-9ade-1445aef36484" />
+
 ### Markdown을 살아 있는 관계형 지식 우주로
 
 문서 구조와 근거를 파싱해 노드·관계를 만들고, 빛나는 Three.js 그래프에서 지식을 탐색하는 로컬 우선 Knowledge Graph 웹앱입니다.
