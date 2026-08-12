@@ -379,7 +379,7 @@ test("luminosity v2 keeps the reduced preset hierarchy on compact screens and cl
   );
   assert.deepEqual(luminosity.defaultCustomLuminosityControls, {
     overall: 150,
-    edges: 50,
+    edges: 20,
     bloom: 20,
     particles: 100,
     focusContrast: "medium",
