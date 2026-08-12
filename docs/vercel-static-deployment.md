@@ -34,7 +34,7 @@ flowchart LR
 Public Corpus snapshot SHA-256:
 
 ```text
-dbbafdc40f25bc02fd39a8ae6ee3b300c8473ef5498f669fba9c6f76aba065c7
+8fcc13b245c5e0abe0820129c550fdcb133217151303ca9535122b011dd264d2
 ```
 
 Gold Graph snapshot SHA-256:
@@ -142,7 +142,7 @@ git push github main
 
 ## 배포 후 QA
 
-- 로그인 없이 Public Corpus가 `500 노드 / 2,000 관계`로 표시된다.
+- 로그인 없이 Public Corpus가 `500 노드 / 1,372 실제 관계 + 400 display 선`으로 표시된다.
 - 공개 원본 `53,377노드 / 56,406관계`와 화면 투영이 구분된다.
 - Gold는 `68/101`, Max Density는 `500/2,000 DEMO`로 표시된다.
 - 검색·필터·노드 선택·별자리·성운·궤도·pan·zoom·발광·커스텀이 동작한다.
@@ -179,25 +179,28 @@ Vercel Deployments에서 직전 정상 Production을 선택해 **Promote to Prod
 
 | 항목 | 현재 기록 |
 |---|---|
-| 기능 구현 commit | `1998f9bb65627b7b7df2cea764d60514535205c1` |
-| 배포 기준 commit | `3213aa5c7bb525c2da6f97e065c5f173070de1d4` |
+| 기능 구현 commit | `91eb9a384dadefa779ad33547137b20a04a48fba` |
+| 배포 기준 commit | `35cc2d8be8868a7a845b794c3cd24f7792041bf6` |
 | GitHub main push | 완료 |
-| GitHub Actions | [Public Atlas static checks · success](https://github.com/coreline-ai/memory_node_graph/actions/runs/31395725350) |
+| GitHub Actions | [Public Atlas static checks · success](https://github.com/coreline-ai/memory_node_graph/actions/runs/31639959848) |
 | Clean clone | `npm ci && npm run graph:verify-public && npm run build:vercel` 성공 |
 | Vercel CLI 인증 | `hwanchoiganda-7455` 계정 확인 |
 | Vercel project | `ai-systems-atlas` · `prj_Jwh8gVgPf63GFUUukVEwwgjqp9qe` |
-| Production | [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app) · `dpl_Cod1YTTR3g9igLuXDSbd7YqLZZ3Z` · `READY` |
+| Production | [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app) · `dpl_3DrTGRpkqN1EwAVVFoF3dDAChjCa` · `READY` |
 | Preview | [preview URL](https://ai-systems-atlas-8tb620h0y-corelines-projects-277c5e1c.vercel.app) · `dpl_DGsb1gDCTJ1A2oaF5xrxebEggmby` · `READY` · SSO 보호 |
-| GitHub 자동 배포 | `2026-08-13` Vercel Git Integration 연결 완료 · 다음 `main` push 검증 대기 |
+| GitHub 자동 배포 | `2026-08-13` `main` push → Production 생성 · deployment metadata의 ref/SHA 일치 검증 완료 |
 
-### 2026-08-10 실제 배포 QA
+### 2026-08-13 최종 Production·복구 QA
 
-- Production은 로그인 없이 Public Corpus `500/2,000`을 표시했다.
+- Production은 로그인 없이 Public Corpus `500노드 / 1,372 실제 관계 + 400 display 선`을 표시했다.
 - Gold `68/101`, Max Density `500/2,000 DEMO`, 별자리·성운·궤도, 검색·노드 선택, 렌즈 필터, pan·zoom, 초신성·커스텀 밝기를 실제 브라우저에서 확인했다.
-- `360px`, `768px`, `1280px`에서 `documentElement`와 `body`의 `scrollWidth`가 viewport와 같았고, 하단 제어와 커스텀 항목이 화면 안에 있었다.
+- 필터 적용 후 `구도 맞춤`이 표시 중인 212노드와 545관계를 UI 안전 영역에 맞추는 상태 메시지를 확인했다.
+- `390×844` 모바일에서 `documentElement`와 `body`의 `scrollWidth`가 모두 `390`이었고, canvas·필터·하단 제어가 정상 로드됐다.
 - `/dashboard`는 `/`로 안전하게 이동했고 `/knowledge/demo` 직접 접근은 SPA fallback으로 정상 로드됐다.
 - 관찰된 네트워크 자산은 정적 JS/CSS/favicon과 `/atlas/atlas-graph-snapshot.json`, `/atlas/atlas-graph-manifest.json`뿐이며 `/api/*`, OAuth, D1, DB 요청은 없었다.
 - 브라우저 warning/error 로그는 `0`건이었다.
 - Vercel inspect에서 Production과 Preview 모두 `READY`, `middleware: []`였고 동일한 정적 rewrite/header 설정을 사용했다.
+- GitHub `main` commit `35cc2d8` push가 CLI 업로드 없이 Production deployment를 생성했고 Vercel metadata의 `githubCommitRef=main`, `githubCommitSha=35cc2d8...`를 확인했다.
+- 직전 정상 deployment `91eb9a3`로 일시 rollback하여 공개 corpus `500/1,770`을 확인한 뒤, 승인된 최신 deployment `35cc2d8`로 복구해 공개 corpus `500/1,772`와 alias를 재확인했다.
 
-Preview deployment 자체는 생성됐지만 팀의 기본 `ssoProtection: all_except_custom_domains` 때문에 로그인 없는 직접 검증은 아직 완료되지 않았다. 프로젝트 전체의 Preview SSO 보호를 해제하면 향후 모든 Preview가 공개되므로 별도 명시 승인이 필요하다. GitHub App 저장소 접근 승인 후 `2026-08-13` `coreline-ai/memory_node_graph` 연결은 완료했으며, 다음 `main` push가 실제 Production 자동 배포와 commit SHA 일치를 최종 검증한다.
+Preview deployment 자체는 생성됐지만 팀의 기본 `ssoProtection: all_except_custom_domains` 때문에 로그인 없는 직접 검증은 아직 완료되지 않았다. 프로젝트 전체의 Preview SSO 보호를 해제하면 현재와 향후 모든 Preview가 공개되므로 별도 명시 승인이 필요하다. Production, GitHub 자동 배포, rollback·원상 복구는 모두 검증 완료 상태다.

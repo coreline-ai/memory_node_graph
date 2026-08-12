@@ -95,3 +95,16 @@ npm run graph:audit -- --db=/absolute/path/to/backup.sqlite
 - 작업 상태: completed 11 · queued 10,893 · stale 78. queued는 current provider 68개와 구형 provider 10,825개로 분리된다.
 - data fingerprint: `fdaa8da576cd961933d7c18c5047a77bab844f6a4064c1f076af3aed8e9af53f`
 - 이 시험은 D1 안전성은 확인했지만 `contains`·문서 순서 `precedes`가 13/18개여서 의미 관계 품질이 부족했다. 후보 점수에서 구조·중복 관계를 제외하기 전에는 다음 25개 또는 전체 배치를 실행하지 않는다.
+
+## 2026-08-13 최종 종료 감사 기준선
+
+`npm run db:baseline`과 `npm run graph:audit`을 다시 실행한 현재 운영 기준선이다. 위 날짜별 수치는 실행 당시 영수증으로 보존하며, 새 작업 판단에는 이 절을 우선한다.
+
+- 문서 853 · 근거 블록 148,655 · mention 99,393 · 고유 엔티티 89,669
+- 규칙 관계 94,487 · 검증된 Codex 관계 89 · 전체 관계 94,576
+- enrichment job 10,982: completed 73 · legacy queued 10,825 · stale 78 · warning 6
+- 현재 provider queued 0이며 legacy 10,825개는 자동 변환·claim·실행 금지
+- SQLite integrity `ok` · orphan 0 · duplicate relation 0 · staging row 0
+- data fingerprint: `736d816a546c01f1c154be9ade3b76b38931eeb55055c6f41be71d3d62c99ab0`
+- 로컬 corpus 투영: 500노드 · 1,539 factual + 400 display = 1,939선
+- 공개 정적 투영: 500노드 · 1,372 factual + 400 display = 1,772선

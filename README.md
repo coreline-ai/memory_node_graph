@@ -17,7 +17,7 @@
 
 [![Markdown Documents](https://img.shields.io/badge/Markdown-853%20documents-6f42c1?style=flat-square&logo=markdown&logoColor=white)](#-데이터-기준선)
 [![Knowledge Nodes](https://img.shields.io/badge/nodes-89%2C669-8250DF?style=flat-square&logo=databricks&logoColor=white)](#-데이터-기준선)
-[![Knowledge Relations](https://img.shields.io/badge/relations-94%2C506-1F6FEB?style=flat-square&logo=graphql&logoColor=white)](#-데이터-기준선)
+[![Knowledge Relations](https://img.shields.io/badge/relations-94%2C576-1F6FEB?style=flat-square&logo=graphql&logoColor=white)](#-데이터-기준선)
 [![OpenAI API Key](https://img.shields.io/badge/OpenAI%20API%20Key-not%20required-2EA043?style=flat-square&logo=openai&logoColor=white)](#-oauth와-api-경계)
 [![Tests](https://img.shields.io/badge/tests-216%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
 [![Public Atlas checks](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml/badge.svg?branch=main)](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml)
@@ -202,7 +202,7 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 
 ## 📊 데이터 기준선
 
-2026-08-07 로컬 D1 감사 기준입니다.
+2026-08-13 로컬 D1 최종 감사 기준입니다.
 
 | 항목 | 수량 | 설명 |
 |---|---:|---|
@@ -213,9 +213,9 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 | 문서별 노드 합계 | 99,393 | 대시보드 집계 |
 | 고유 엔티티 | 89,669 | canonical entity 집계 |
 | 규칙 관계 | 94,487 | 구조·명시 관계 |
-| Codex 근거 관계 | 1 | 실제 OAuth smoke 결과 |
-| 전체 저장 관계 | 94,506 | 규칙 + 검증된 Codex 관계 |
-| Codex 청크 | 10,904 | 1개 완료 · 10,903개 대기 |
+| Codex 근거 관계 | 89 | 검증을 통과해 저장된 OAuth 보강 관계 |
+| 전체 저장 관계 | 94,576 | 규칙 94,487 + 검증된 Codex 89 |
+| Codex 작업 | 10,982 | 완료 73 · legacy 대기 10,825 · stale 78 · warning 6 |
 
 > [!TIP]
 > 대시보드의 `99,393 노드`는 문서별 node count 합계이고, corpus의 `89,669 노드`는 같은 의미 mention을 통합한 고유 엔티티 수입니다.
@@ -518,7 +518,7 @@ npm run graph:audit
 - GitHub preview·stage·apply·증분 변경 판정
 - 대시보드·필터·URL 상태·Three.js 관계선
 
-현재 전체 **206개 테스트를 통과**합니다.
+현재 전체 **216개 테스트를 통과**합니다.
 
 ## 🗺️ Roadmap
 
@@ -565,8 +565,8 @@ npm run graph:audit
 - **Production:** [https://ai-systems-atlas.vercel.app](https://ai-systems-atlas.vercel.app)
 - **배포 상태:** 로그인 없이 공개, Vercel Function·API Route·DB 연결 `0`
 - **기준 snapshot:** `500`노드 · `1,372` 실제 관계 · `400` display 선
-- **Preview:** 배포는 `READY`이지만 Vercel 팀의 기본 SSO 보호가 적용되어 공개 전환 대기
-- **자동 재배포:** Vercel Git Integration을 `coreline-ai/memory_node_graph`에 연결 완료. 다음 `main` push에서 Production 자동 배포를 최종 검증
+- **Preview:** 배포는 `READY`이지만 Vercel 팀의 기본 SSO 보호가 적용되어 공개 전환은 별도 보안 승인 대기
+- **자동 재배포:** Vercel Git Integration의 `main` → Production 자동 배포와 배포 metadata의 commit SHA 일치를 실제 검증 완료
 
 ### GitHub 전달용 공개 그래프 데이터
 

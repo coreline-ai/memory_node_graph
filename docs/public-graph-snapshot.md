@@ -45,7 +45,7 @@ Gold snapshot SHA-256:
 원본 D1 기준 fingerprint:
 
 ```text
-fdaa8da576cd961933d7c18c5047a77bab844f6a4064c1f076af3aed8e9af53f
+736d816a546c01f1c154be9ade3b76b38931eeb55055c6f41be71d3d62c99ab0
 ```
 
 ## 공개 안전 정책

@@ -1,6 +1,6 @@
 # 현재 OAuth 통합 런타임
 
-최근 업데이트: `2026-08-08 KST`
+최근 업데이트: `2026-08-13 KST`
 
 이 문서는 AI Systems Atlas의 현재 인증·실행·Markdown 갱신 구조의 정본이다. 과거 계획은 당시 개발 이력으로 보존하며, 새 변경 판단은 이 문서와 [최신 구현 계획](../dev-plan/implement_20260807_220621.md)을 우선한다.
 
@@ -96,10 +96,11 @@ flowchart LR
 - 저장소: 111개
 - 근거 블록: 148,655개
 - 고유 엔티티: 89,669개
-- 저장 관계: 94,488개
+- 저장 관계: 94,576개 (규칙 94,487 · 검증된 Codex 89)
 - 기본 corpus 투영: 최대 500노드·2,000선
 - 무결성: orphan 0 · 중복 관계 0 · stage row 0 · SQLite `ok`
-- data fingerprint: `fb0456967b27077f6bb52a30d941c5dd97883d014d0748d4fdb2d3629ed9675d`
+- enrichment job: 완료 73 · legacy queued 10,825 · stale 78 · warning 6
+- data fingerprint: `736d816a546c01f1c154be9ade3b76b38931eeb55055c6f41be71d3d62c99ab0`
 
 이 기준선은 런타임 전환 중 데이터 회귀 확인용이다. 문서 증분 동기화 또는 재처리 후에는 `npm run db:baseline` 결과로 갱신한다.
 
