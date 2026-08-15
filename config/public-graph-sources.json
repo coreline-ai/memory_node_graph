@@ -397,6 +397,11 @@
       "url": "https://github.com/coreline-ai/validation-skill-base"
     },
     {
+      "githubId": "R_kgDOThrnNA",
+      "nameWithOwner": "coreline-ai/voice-tracker-find",
+      "url": "https://github.com/coreline-ai/voice-tracker-find"
+    },
+    {
       "githubId": "R_kgDOQ2CuFA",
       "nameWithOwner": "coreline-ai/web_coreline_public",
       "url": "https://github.com/coreline-ai/web_coreline_public"
@@ -409,5 +414,5 @@
   ],
   "schemaVersion": "atlas-public-graph-sources/v1",
   "verification": "GitHub gh OAuth · visibility=PUBLIC · isPrivate=false",
-  "verifiedAt": "2026-08-12T20:53:14.507Z"
+  "verifiedAt": "2026-08-15T02:41:41.157Z"
 }

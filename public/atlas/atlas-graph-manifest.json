@@ -2,14 +2,14 @@
   "counts": {
     "displayEdges": 400,
     "excludedMixedProvenanceNodes": 94,
-    "policyRepositories": 81,
-    "projectedFactualEdges": 1372,
-    "projectedLines": 1772,
+    "policyRepositories": 82,
+    "projectedFactualEdges": 1414,
+    "projectedLines": 1814,
     "projectedNodes": 500,
-    "publicCorpusEdges": 56406,
-    "publicCorpusNodes": 53377,
-    "publicDocuments": 519,
-    "publicRepositories": 78
+    "publicCorpusEdges": 60286,
+    "publicCorpusNodes": 57988,
+    "publicDocuments": 554,
+    "publicRepositories": 79
   },
   "generatedAt": "2026-08-08T11:45:16.747Z",
   "privacy": {
@@ -23,11 +23,11 @@
   },
   "schemaVersion": "atlas-public-graph-manifest/v1",
   "snapshotPath": "/atlas/atlas-graph-snapshot.json",
-  "snapshotSha256": "8fcc13b245c5e0abe0820129c550fdcb133217151303ca9535122b011dd264d2",
+  "snapshotSha256": "3a9b3b51501ac196f47d25b14d5c56f05e435abf601ee0d5233e328816d9fad4",
   "source": {
     "dataFingerprint": "736d816a546c01f1c154be9ade3b76b38931eeb55055c6f41be71d3d62c99ab0",
     "kind": "local-d1-public-projection",
-    "policySha256": "72237f5cc87f68226267d58d4a9dd783cf64a339cbecae9c8ab0c35319432292",
+    "policySha256": "7bac7d8200432c95cf6a22053400bea49fb1598de19ceb82e9d60dd4c9bcd2f2",
     "sourcePolicySchema": "atlas-public-graph-sources/v1"
   }
 }
