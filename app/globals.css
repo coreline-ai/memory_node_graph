@@ -1225,6 +1225,10 @@ textarea:focus-visible {
   backdrop-filter: blur(15px);
 }
 
+.mobile-graph-controls {
+  display: none;
+}
+
 .control-scroll-hint {
   position: absolute;
   width: 1px;
@@ -3251,10 +3255,107 @@ textarea:focus-visible {
 
 @media (max-width: 640px) {
   .graph-controls {
-    grid-template-areas:
-      "view data explore"
-      "stage stage stage";
-    grid-template-columns: auto auto auto;
+    display: none;
+  }
+
+  .mobile-graph-controls {
+    position: absolute;
+    right: 8px;
+    bottom: calc(34px + env(safe-area-inset-bottom, 0px));
+    left: 8px;
+    z-index: 16;
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+    padding: 4px;
+    overflow: hidden;
+    background: rgba(11, 14, 17, 0.88);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    box-shadow: 0 15px 38px rgba(0, 0, 0, 0.34);
+    backdrop-filter: blur(15px);
+  }
+
+  .mobile-control-row {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .mobile-primary-controls {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .mobile-stage-controls {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    padding-top: 1px;
+    border-top: 1px solid rgba(255, 255, 255, 0.055);
+  }
+
+  .mobile-graph-controls button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    height: 40px;
+    padding: 0;
+    color: #657078;
+    background: transparent;
+    border: 0;
+    border-radius: 3px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition:
+      color 160ms ease,
+      background 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .mobile-graph-controls button:hover,
+  .mobile-graph-controls button:focus-visible,
+  .mobile-graph-controls button.is-active {
+    color: #c8e9e0;
+    background: rgba(121, 213, 192, 0.075);
+  }
+
+  .mobile-graph-controls button:focus-visible {
+    outline: 1px solid rgba(101, 181, 255, 0.82);
+    outline-offset: -2px;
+  }
+
+  .mobile-graph-controls button:disabled {
+    cursor: not-allowed;
+    opacity: 0.32;
+  }
+
+  .mobile-graph-controls .view-icon,
+  .mobile-graph-controls .fit-visible-icon,
+  .mobile-graph-controls .node-size-icon,
+  .mobile-graph-controls .relation-visibility-icon {
+    transform: scale(0.92);
+  }
+
+  .mobile-graph-controls .data-source-icon {
+    width: 8px;
+  }
+
+  .mobile-graph-controls .focus-depth-icon {
+    color: currentColor;
+    font-size: 9px;
+  }
+
+  .mobile-graph-controls .mobile-relation-control.is-active .relation-visibility-icon,
+  .mobile-graph-controls .mobile-custom-control.is-custom {
+    color: #bff7e8;
+    filter: drop-shadow(0 0 5px rgba(121, 213, 192, 0.48));
+  }
+
+  .mobile-graph-controls .mobile-data-control.is-active .data-source-icon i,
+  .mobile-graph-controls .mobile-data-control:hover .data-source-icon i,
+  .mobile-graph-controls .mobile-data-control:focus-visible .data-source-icon i {
+    background: var(--mint);
+    box-shadow: 0 0 7px rgba(121, 213, 192, 0.8);
   }
 
   .control-status {
@@ -3301,7 +3402,7 @@ textarea:focus-visible {
 
   .luminosity-panel {
     right: 12px;
-    bottom: 116px;
+    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
     width: min(310px, calc(100% - 24px));
     max-height: calc(100svh - 112px);
     overflow-y: auto;
@@ -3319,14 +3420,14 @@ textarea:focus-visible {
   .performance-hud {
     top: auto;
     right: 12px;
-    bottom: 78px;
+    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
     min-width: 190px;
   }
 
   .detail-panel {
     top: auto;
     right: 10px;
-    bottom: 108px;
+    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
     left: 10px;
     width: auto;
     height: min(66svh, 570px);
@@ -3371,6 +3472,18 @@ textarea:focus-visible {
 
   .orbit-depth-marker span {
     max-width: 76px;
+  }
+}
+
+@media (max-width: 360px) {
+  .mobile-graph-controls {
+    right: 6px;
+    left: 6px;
+    padding: 3px;
+  }
+
+  .mobile-control-row {
+    gap: 1px;
   }
 }
 

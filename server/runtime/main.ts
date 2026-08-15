@@ -5,7 +5,7 @@ import type { CodexRuntimeStatus } from "../../app/lib/llm/codex-runtime-status.
 import { IntegratedRuntimeClient } from "./client.js";
 import { IntegratedRuntimeRunner } from "./runner.js";
 import { CodexEngineError, CodexEnrichmentEngine } from "../codex/codex-engine.js";
-import { codexRuntimeConfig } from "./config.js";
+import { assertRuntimeProductionConfiguration, codexRuntimeConfig } from "./config.js";
 import { acquireRuntimeSingletonLock, RuntimeAlreadyRunningError } from "./singleton-lock.js";
 import { parseRuntimeRunOptions } from "./run-policy.js";
 
@@ -49,6 +49,7 @@ async function runIntegrated(runtimeWasAuthenticated: boolean) {
 }
 
 async function main() {
+  assertRuntimeProductionConfiguration();
   if (!codexRuntimeConfig.internalRuntimeSecret && process.env.NODE_ENV === "production") {
     throw new Error("통합 런타임 IPC 보안 값이 생성되지 않았습니다. 통합 실행기로 시작하세요.");
   }

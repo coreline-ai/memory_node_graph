@@ -105,6 +105,7 @@ npm run build:vercel
 npm run lint
 npx tsc --noEmit
 npm test
+npm audit --omit=dev --audit-level=high
 git diff --check
 ```
 
@@ -115,7 +116,45 @@ git diff --check
 - SQLite/DB 파일, source map, private key, token, 로컬 절대경로
 - Cloudflare runtime, D1 client, Drizzle DB client, Codex SDK, 내부 `/api/*` 호출이 포함된 브라우저 bundle
 
-GitHub Actions는 커밋된 snapshot을 **검증만** 한다. Actions에서 원본 D1 snapshot을 생성하거나 수정하지 않는다.
+GitHub Actions는 커밋된 snapshot을 **검증만** 한다. Actions에서 원본 D1 snapshot을 생성하거나 수정하지 않는다. production dependency에 대해 `npm audit --omit=dev --audit-level=high`도 실행한다.
+
+## 브라우저 보안 헤더
+
+`vercel.json`과 `npm run preview:vercel`은 동일한 공개 정적 보안 정책을 사용한다.
+
+- `script-src 'self'`; inline script와 `unsafe-eval`을 허용하지 않음
+- `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'`
+- Three.js 화면에 필요한 `img-src 'self' data: blob:`과 React inline style을 위한 `style-src 'self' 'unsafe-inline'`만 허용
+- `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`
+- camera·microphone·geolocation 권한 비활성화
+
+로컬 static preview에서는 응답 헤더와 320px·390px·desktop 브라우저의 CSP violation 0건을 확인한다. Vercel Production 응답 검증은 보안 헤더가 포함된 commit이 실제 배포된 뒤 수행하며, 소스 반영만으로 실배포 완료를 보고하지 않는다.
+
+## GitHub Check와 Production Gate
+
+`Public Atlas static checks`는 PR 및 `main` push마다 live public source visibility, snapshot, lint/type, 정적 산출물과 production dependency High 감사를 수행한다. 다만 `2026-08-15` 읽기 전용 확인 기준으로 `main` branch protection과 repository ruleset은 설정되어 있지 않다. 또한 Vercel Git Integration은 GitHub status check 성공을 기다리는 강제 직렬 gate임을 저장소 코드만으로 보장하지 않는다.
+
+현재 운영 규칙은 다음과 같다.
+
+1. 일반 변경은 PR에서 `Public Atlas static checks` 성공 후 `main`에 반영한다.
+2. public source가 private/deleted로 바뀌었다는 실패가 발생하면 새 Production을 승인하지 않는다.
+3. 이미 자동 배포가 시작됐다면 마지막 정상 deployment를 즉시 Promote하고, 해당 source를 제외해 snapshot을 재생성한 수정 commit을 배포한다.
+4. 완전한 강제 gate가 필요하면 별도 승인 하에 main branch required check와 Vercel의 배포 승인 정책을 설정한다. 저장소 secret이나 PAT를 코드·환경 파일에 추가하는 우회는 사용하지 않는다.
+
+### 공개 철회 절차
+
+```bash
+# 1. live public source drift 확인 — 실패 결과를 무시하지 않는다.
+npm run graph:verify-public-sources
+
+# 2. private/deleted source를 로컬 D1 공개 대상과 source 정책에서 제외
+# 3. 공개 artifact를 새로 생성·검증
+npm run graph:prepare-public
+npm run build:vercel
+
+# 4. diff에서 철회 대상의 노드·관계가 사라졌는지 검토 후 새 commit 배포
+git diff -- public/atlas config/public-graph-sources.json
+```
 
 ## Markdown 추가 후 공개 데이터 갱신
 

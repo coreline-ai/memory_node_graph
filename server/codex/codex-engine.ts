@@ -40,23 +40,71 @@ export class CodexEngineError extends Error {
   }
 }
 
-const SECRET_ENVIRONMENT_KEYS = new Set([
-  "OPENAI_API_KEY",
-  "CODEX_API_KEY",
-  "LIGHTRAG_API_KEY",
-  "ATLAS_INTERNAL_RUNTIME_SECRET",
-]);
+const CODEX_ENVIRONMENT_ALLOWLIST = [
+  "PATH",
+  "HOME",
+  "CODEX_HOME",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "LC_ALL",
+  "LC_CTYPE",
+  "TERM",
+  "NO_COLOR",
+  "SHELL",
+  "XDG_CONFIG_HOME",
+  "XDG_CACHE_HOME",
+  "XDG_DATA_HOME",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "NODE_EXTRA_CA_CERTS",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "SystemRoot",
+  "ComSpec",
+  "PATHEXT",
+] as const;
+
+const SENSITIVE_ENVIRONMENT_KEY = /(?:^|_)(?:API_KEY|TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE_KEY|ACCESS_KEY|DATABASE_URL|CONNECTION_STRING|CREDENTIALS?)$/i;
+const OUTPUT_SECRET_PATTERNS = [
+  /\b(?:gh[oprsu]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/,
+  /\bsk-[A-Za-z0-9_-]{20,}\b/,
+  /\bAKIA[A-Z0-9]{16}\b/,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /\bBearer\s+[A-Za-z0-9._~+\/-]{20,}={0,2}\b/i,
+] as const;
 
 export const cleanCodexEnvironment = (
   environment: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv & Record<string, string> => ({
-  ...Object.fromEntries(Object.entries(environment).flatMap(([key, value]) =>
-    value !== undefined && !SECRET_ENVIRONMENT_KEYS.has(key) && !key.startsWith("ATLAS_RUNTIME_")
-      ? [[key, value]]
-      : [],
-  )),
-  NODE_ENV: process.env.NODE_ENV ?? "production",
+  ...Object.fromEntries(CODEX_ENVIRONMENT_ALLOWLIST.flatMap((key) => {
+    const value = environment[key];
+    return value === undefined ? [] : [[key, value]];
+  })),
+  NODE_ENV: environment.NODE_ENV ?? "production",
 });
+
+export function assertCodexOutputSafe(
+  output: string,
+  environment: NodeJS.ProcessEnv = process.env,
+) {
+  const containsKnownPattern = OUTPUT_SECRET_PATTERNS.some((pattern) => pattern.test(output));
+  const containsInheritedSecret = Object.entries(environment).some(([key, value]) =>
+    SENSITIVE_ENVIRONMENT_KEY.test(key)
+    && typeof value === "string"
+    && value.length >= 8
+    && output.includes(value),
+  );
+  if (containsKnownPattern || containsInheritedSecret) {
+    throw new CodexEngineError(
+      "invalid_result",
+      false,
+      "Codex 출력에서 비밀 형식이 감지되어 결과를 격리했습니다.",
+    );
+  }
+}
 
 async function defaultCodexCommand() {
   const local = join(process.cwd(), "node_modules", ".bin", "codex");
@@ -192,6 +240,7 @@ export class CodexEnrichmentEngine {
         signal: combinedSignal,
       });
       threadId = thread.id;
+      assertCodexOutputSafe(turn.finalResponse);
       let parsed: unknown;
       try {
         parsed = JSON.parse(turn.finalResponse);
@@ -261,6 +310,7 @@ export class CodexEnrichmentEngine {
         signal: combinedSignal,
       });
       threadId = thread.id;
+      assertCodexOutputSafe(turn.finalResponse);
       let parsed: unknown;
       try {
         parsed = JSON.parse(turn.finalResponse);

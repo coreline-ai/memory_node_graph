@@ -6,7 +6,7 @@ import {
   retrieveGraphContext,
 } from "../../../lib/graph/graph-retrieval";
 import { asObject, readLimitedJson } from "../../../lib/http/enrichment-api";
-import { requireAtlasWriteAccess } from "../../../lib/auth/write-access";
+import { requireAtlasReadAccess, requireAtlasWriteAccess } from "../../../lib/auth/write-access";
 import { getCodexRuntimeAvailability } from "../../../lib/llm/runtime-availability";
 import {
   buildGraphAnswerJobInput,
@@ -14,6 +14,7 @@ import {
 } from "../../../lib/llm/graph-answer-contracts";
 import { getGraphAnswerJobRepository } from "../../../lib/storage/graph-answer-job-repository";
 import { getGraphRetrievalSource } from "../../../lib/storage/graph-repository";
+import { internalApiError } from "../../../lib/http/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -31,16 +32,17 @@ const errorResponse = (error: unknown) => {
       { status: 400, headers: { "cache-control": "no-store" } },
     );
   }
-  return NextResponse.json(
-    {
-      error: error instanceof Error ? error.message : "그래프 근거를 검색하지 못했습니다.",
-      code: "graph_query_failed",
-    },
-    { status: 500, headers: { "cache-control": "no-store" } },
-  );
+  return internalApiError(error, {
+    message: "그래프 근거를 검색하지 못했습니다.",
+    code: "graph_query_failed",
+    headers: { "cache-control": "no-store" },
+    scope: "graph-query",
+  });
 };
 
 export async function GET(request: Request) {
+  const unauthorized = requireAtlasReadAccess(request);
+  if (unauthorized) return unauthorized;
   try {
     const params = new URL(request.url).searchParams;
     return NextResponse.json(await executeQuery(params.get("q"), {
@@ -54,6 +56,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const readUnauthorized = requireAtlasReadAccess(request);
+  if (readUnauthorized) return readUnauthorized;
   try {
     const body = asObject(await readLimitedJson(request, 8_000));
     const retrieval = await executeQuery(body.question, body.limits);

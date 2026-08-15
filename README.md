@@ -9,8 +9,8 @@
 문서 구조와 근거를 파싱해 노드·관계를 만들고, 빛나는 Three.js 그래프에서 지식을 탐색하는 로컬 우선 Knowledge Graph 웹앱입니다.
 
 [![Project Status](https://img.shields.io/badge/status-active%20prototype-2ea043?style=flat-square&logo=github&logoColor=white)](https://github.com/coreline-ai/memory_node_graph)
-[![Next.js](https://img.shields.io/badge/Next.js-16.2.6-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![React](https://img.shields.io/badge/React-19.2.6-087EA4?style=flat-square&logo=react&logoColor=white)](https://react.dev/)
+[![Next.js](https://img.shields.io/badge/Next.js-16.3.1-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.2.8-087EA4?style=flat-square&logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.3-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-0.185.1-000000?style=flat-square&logo=threedotjs&logoColor=white)](https://threejs.org/)
 [![Cloudflare D1](https://img.shields.io/badge/Cloudflare-D1-F38020?style=flat-square&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/d1/)
@@ -19,7 +19,7 @@
 [![Knowledge Nodes](https://img.shields.io/badge/nodes-89%2C669-8250DF?style=flat-square&logo=databricks&logoColor=white)](#-데이터-기준선)
 [![Knowledge Relations](https://img.shields.io/badge/relations-94%2C576-1F6FEB?style=flat-square&logo=graphql&logoColor=white)](#-데이터-기준선)
 [![OpenAI API Key](https://img.shields.io/badge/OpenAI%20API%20Key-not%20required-2EA043?style=flat-square&logo=openai&logoColor=white)](#-oauth와-api-경계)
-[![Tests](https://img.shields.io/badge/tests-216%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
+[![Tests](https://img.shields.io/badge/tests-229%20passing-2EA043?style=flat-square&logo=checkmarx&logoColor=white)](#-검증)
 [![Public Atlas checks](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml/badge.svg?branch=main)](https://github.com/coreline-ai/memory_node_graph/actions/workflows/public-atlas-check.yml)
 [![Last Commit](https://img.shields.io/github/last-commit/coreline-ai/memory_node_graph?style=flat-square&logo=github&label=last%20commit)](https://github.com/coreline-ai/memory_node_graph/commits/main)
 [![Live Demo](https://img.shields.io/badge/live%20demo-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://ai-systems-atlas.vercel.app/?scope=corpus&view=constellation)
@@ -198,6 +198,7 @@ AI Systems Atlas는 `README.md`, `dev-plan/**/*.md`, 수동 업로드 `.md/.mdx`
 - 구도 맞춤: 전체 표시에서는 보기별 홈 구도를 재사용하고, 부분 표시에서는 카메라 방향·점별 깊이·검색/제목/하단 제어/상세 패널의 실제 DOM 안전 영역을 반영해 fitting
 - 연출: 재정렬, 자동 회전, 라벨·라벨 밀도, 노드 크기 `유형·연결 수·균일`
 - 발광: 기본, 브라이트, 초신성, 커스텀
+- 모바일: 640px 이하에서는 가로 스크롤 없이 5개·7개 아이콘의 2단 메뉴를 사용하며, 보기·탐색·관계·발광 버튼은 현재 상태에서 다음 값으로 순환
 - 접근성: `prefers-reduced-motion`에서 저속 회전·즉시 화면 맞춤을 사용하고 모든 신규 제어에 상태명·tooltip·live status 제공
 
 ## 📊 데이터 기준선
@@ -340,6 +341,16 @@ curl --get --data-urlencode 'q=에이전트 메모리 검색' \
 - 공개 그래프 읽기와 인증된 문서/GitHub 쓰기 분리
 
 여기서 `API 미사용`은 **OpenAI 유료 API·API Key 기반 모델 호출을 사용하지 않는다**는 의미입니다. 브라우저와 서버가 사용하는 Atlas 내부 HTTP Route까지 제거한다는 의미는 아닙니다.
+
+### 실행·노출 모드
+
+| 모드 | 기본 경계 | 읽기·쓰기 정책 |
+|---|---|---|
+| `local` | 기본값, `127.0.0.1` loopback | 단일 로컬 사용자가 로그인 없이 D1 읽기·관리를 수행하며 cross-site 변경 요청은 거부 |
+| `proxy` | 신뢰 OAuth reverse proxy 뒤에서만 opt-in | `ATLAS_APP_ORIGIN`과 proxy가 검증해 주입한 identity가 없는 full D1 read/write를 거부 |
+| `public-static` | Vercel `dist-vercel` 정적 배포 | 검증된 `public/atlas/*.json`만 읽고 Function·D1·OAuth·변경 Route는 포함하지 않음 |
+
+`proxy` 모드에서 vinext 포트를 인터넷에 직접 노출하면 안 됩니다. 프록시는 외부 요청의 `oai-authenticated-user-id`, `x-openai-user-id`, `cf-access-authenticated-user-email`을 먼저 제거한 뒤 검증된 사용자 값만 주입해야 합니다.
 
 ## 🚀 빠른 시작
 
@@ -492,11 +503,16 @@ tests/                             # 계약·API·D1·시각 데이터 테스트
 기본 로컬 실행에는 환경 변수가 필요하지 않습니다.
 
 ```bash
-# 신뢰 가능한 OAuth 프록시 뒤에서 쓰기 보호
+# 선택 사항: 기본 loopback 단일 사용자 모드를 명시
+ATLAS_EXPOSURE_MODE=local
+
+# 원격 접근은 신뢰 가능한 OAuth 프록시 뒤에서만 허용
+ATLAS_EXPOSURE_MODE=proxy
+ATLAS_APP_ORIGIN=https://atlas.example.com
 ATLAS_WRITE_ACCESS=authenticated
 ```
 
-통합 런타임은 외부 비밀 환경 변수를 요구하지 않습니다. 실행기가 프로세스 내부 통신용 일회성 값을 자동 생성하며 브라우저·D1·Codex 자식 환경에 전달하지 않습니다.
+통합 런타임은 외부 비밀 환경 변수를 요구하지 않습니다. 실행기가 프로세스 내부 통신용 일회성 값을 자동 생성합니다. Codex 자식 프로세스에는 OAuth 실행에 필요한 경로·홈·locale·인증서 변수만 allowlist로 전달하고, 임의 token/secret/DB 변수는 전달하지 않습니다. 구조화 결과에서 token·private-key·부모 secret이 탐지되면 저장 전에 격리합니다.
 
 ## 🧪 검증
 
@@ -518,7 +534,7 @@ npm run graph:audit
 - GitHub preview·stage·apply·증분 변경 판정
 - 대시보드·필터·URL 상태·Three.js 관계선
 
-현재 전체 **216개 테스트를 통과**합니다.
+현재 전체 **229개 테스트를 통과**합니다.
 
 ## 🗺️ Roadmap
 
@@ -555,6 +571,8 @@ npm run graph:audit
 | [공개 그래프 스냅샷](./docs/public-graph-snapshot.md) | 공개 JSON 계약·수량·갱신 |
 | [Vercel 공개 정적 배포](./docs/vercel-static-deployment.md) | DB 없는 build·배포·검증·rollback |
 | [Vercel 정적 배포 구현 계획](./dev-plan/implement_20260810_213534.md) | Phase 1~6 진행 정본 |
+| [보안 재검토·구현 보고서](./security_best_practices_report.md) | 공개 정적/로컬 통합 경계와 완료·잔여 보안 항목 |
+| [보안 구현 계획](./dev-plan/implement_20260815_104040.md) | loopback·same-origin·Codex 격리·의존성·CSP 구현 기록 |
 
 ## 📦 배포 원칙
 
@@ -608,6 +626,8 @@ Vercel 공개 웹은 다음 조건을 충족합니다.
 - 비공개 저장소 메타데이터 보호
 - OAuth 토큰·원문·Codex 출력 로그 미포함
 - OpenAI API Key와 LightRAG 미사용
+- `script-src 'self'` CSP, `frame-ancestors 'none'`, `X-Frame-Options: DENY`, nosniff 적용
+- GitHub Actions에서 공개 source 상태·snapshot·production dependency High 감사·정적 산출물 검사
 
 ## 📜 라이선스
 

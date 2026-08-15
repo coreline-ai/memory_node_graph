@@ -11,6 +11,22 @@ const { d1, r2 } = hostingConfig;
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
+const configuredProxyHost = (() => {
+  if (process.env.ATLAS_EXPOSURE_MODE !== "proxy") return null;
+  try {
+    const origin = new URL(process.env.ATLAS_APP_ORIGIN ?? "");
+    return origin.protocol === "http:" || origin.protocol === "https:" ? origin.hostname : null;
+  } catch {
+    return null;
+  }
+})();
+const allowedAtlasHosts = [
+  "localhost",
+  "127.0.0.1",
+  "::1",
+  ...(configuredProxyHost ? [configuredProxyHost] : []),
+];
+
 const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
@@ -66,9 +82,15 @@ export default defineConfig(async () => {
         },
       },
     },
-    server: isCodexSeatbeltSandbox
-      ? { watch: { useFsEvents: false, usePolling: true } }
-      : undefined,
+    server: {
+      allowedHosts: allowedAtlasHosts,
+      ...(isCodexSeatbeltSandbox
+        ? { watch: { useFsEvents: false, usePolling: true } }
+        : {}),
+    },
+    preview: {
+      allowedHosts: allowedAtlasHosts,
+    },
     plugins: [
       vinext(),
       sites(),

@@ -4,10 +4,14 @@ import {
   normalizeGraphQuestion,
 } from "../../../lib/graph/graph-retrieval";
 import { searchGraphNodeIndex } from "../../../lib/storage/graph-repository";
+import { requireAtlasReadAccess } from "../../../lib/auth/write-access";
+import { internalApiError } from "../../../lib/http/api-error";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const unauthorized = requireAtlasReadAccess(request);
+  if (unauthorized) return unauthorized;
   try {
     const params = new URL(request.url).searchParams;
     const query = normalizeGraphQuestion(params.get("q"));
@@ -26,9 +30,6 @@ export async function GET(request: Request) {
         { status: 400 },
       );
     }
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "지식 노드를 검색하지 못했습니다." },
-      { status: 500 },
-    );
+    return internalApiError(error, { message: "지식 노드를 검색하지 못했습니다.", scope: "graph-search" });
   }
 }

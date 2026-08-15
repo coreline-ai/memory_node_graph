@@ -5,6 +5,7 @@ import {
 import { EnrichmentValidationError } from "../llm/enrichment-result-validator";
 import { GraphAnswerValidationError } from "../llm/graph-answer-result-validator";
 import { GraphAnswerRepositoryError } from "../storage/graph-answer-job-repository";
+import { internalApiError } from "./api-error";
 
 export class RequestBodyError extends Error {
   constructor(message: string) {
@@ -47,10 +48,11 @@ export function enrichmentApiError(error: unknown) {
     const status = error.code === "lease_conflict" || error.code === "lease_expired" ? 409 : 400;
     return NextResponse.json({ error: error.message, code: error.code }, { status });
   }
-  return NextResponse.json(
-    { error: error instanceof Error ? error.message : "보강 작업 요청을 처리하지 못했습니다.", code: "unknown" },
-    { status: 500 },
-  );
+  return internalApiError(error, {
+    message: "보강 작업 요청을 처리하지 못했습니다.",
+    code: "unknown",
+    scope: "enrichment",
+  });
 }
 
 export const asObject = (value: unknown): Record<string, unknown> =>

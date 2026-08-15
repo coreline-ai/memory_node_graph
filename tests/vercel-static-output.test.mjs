@@ -17,6 +17,8 @@ import test from "node:test";
 const execFileAsync = promisify(execFile);
 const projectRoot = new URL("..", import.meta.url).pathname;
 const verifierPath = new URL("../scripts/verify-vercel-static-output.mjs", import.meta.url).pathname;
+const vercelConfigPath = new URL("../vercel.json", import.meta.url).pathname;
+const vitePublicConfigPath = new URL("../vite.public.config.ts", import.meta.url).pathname;
 const atlasFiles = [
   "atlas-graph-snapshot.json",
   "atlas-graph-manifest.json",
@@ -50,6 +52,32 @@ const verify = (directory) => execFileAsync(
   [verifierPath, directory],
   { cwd: projectRoot },
 );
+
+test("공개 정적 배포와 local preview는 동일한 최소 브라우저 보안 헤더를 사용한다", async () => {
+  const vercelConfig = JSON.parse(await readFile(vercelConfigPath, "utf8"));
+  const globalHeaders = Object.fromEntries(
+    vercelConfig.headers
+      .find((rule) => rule.source === "/(.*)")
+      .headers
+      .map((header) => [header.key.toLowerCase(), header.value]),
+  );
+  const csp = globalHeaders["content-security-policy"] ?? "";
+
+  assert.match(csp, /(?:^|;\s*)script-src 'self'(?:;|$)/);
+  assert.match(csp, /(?:^|;\s*)object-src 'none'(?:;|$)/);
+  assert.match(csp, /(?:^|;\s*)base-uri 'none'(?:;|$)/);
+  assert.match(csp, /(?:^|;\s*)frame-ancestors 'none'(?:;|$)/);
+  assert.match(csp, /(?:^|;\s*)img-src 'self' data: blob:(?:;|$)/);
+  assert.doesNotMatch(csp, /'unsafe-eval'/);
+  assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/);
+  assert.equal(globalHeaders["x-frame-options"], "DENY");
+  assert.equal(globalHeaders["x-content-type-options"], "nosniff");
+
+  const viteConfig = await readFile(vitePublicConfigPath, "utf8");
+  assert.match(viteConfig, /"Content-Security-Policy"/);
+  assert.match(viteConfig, /"X-Frame-Options": "DENY"/);
+  assert.match(viteConfig, /preview:\s*\{[\s\S]*?host:\s*"127\.0\.0\.1"/);
+});
 
 test("Vercel 정적 output verifier는 정상 공개 artifact를 승인한다", async (t) => {
   const output = await makeOutput();

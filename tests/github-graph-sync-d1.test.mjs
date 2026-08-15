@@ -9,6 +9,7 @@ import {
 delete process.env.ATLAS_MEMORY_STORAGE;
 process.env.ATLAS_TEST_MODE = "true";
 process.env.ATLAS_WRITE_ACCESS = "public";
+process.env.ATLAS_INTERNAL_RUNTIME_SECRET = "d1-graph-sync-runtime-secret";
 
 class SqliteD1Statement {
   constructor(database, sql, bindings = []) {
@@ -80,6 +81,7 @@ const runtimeHeaders = {
   authorization: "Bearer d1-graph-sync-secret",
   "content-type": "application/json",
   "x-atlas-runtime-id": "d1-graph-sync-runtime",
+  "x-atlas-internal-runtime-secret": "d1-graph-sync-runtime-secret",
 };
 const capability = {
   capability: "github-source",

@@ -6,6 +6,8 @@ import { createGitHubApplyStageChunks } from "../.runtime-dist/app/lib/github/ap
 
 process.env.ATLAS_MEMORY_STORAGE = "true";
 process.env.ATLAS_TEST_MODE = "true";
+process.env.NODE_ENV = "test";
+process.env.ATLAS_INTERNAL_RUNTIME_SECRET = "atlas-runtime-test-secret";
 
 let workerPromise;
 
@@ -17,9 +19,13 @@ async function worker() {
 }
 
 async function request(path, init) {
+  return requestAt("http://localhost", path, init);
+}
+
+async function requestAt(origin, path, init) {
   const handler = await worker();
   return handler.fetch(
-    new Request(`http://localhost${path}`, init),
+    new Request(`${origin}${path}`, init),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
     { waitUntil() {}, passThroughOnException() {} },
   );
@@ -92,6 +98,12 @@ test("server-renders the graph with grouped controls and the three graph views",
   assert.match(html, /class="control-cluster stage-cluster"/);
   assert.match(html, /graph-controls-scroll-hint/);
   assert.match(html, /작은 화면에서는 가로로 스크롤/);
+  assert.match(html, /class="mobile-graph-controls"/);
+  assert.match(html, /aria-label="모바일 그래프 화면 제어"/);
+  assert.match(html, /현재 성운 보기. 누르면 궤도 보기로 전환/);
+  assert.match(html, /그래프 데이터 선택. 현재/);
+  assert.match(html, /관계 범위 선택. 노드를 먼저 선택하세요/);
+  assert.match(html, /커스텀 발광 세부 조절/);
   assert.match(html, /그래프 데이터 선택/);
   assert.match(html, />커스텀</);
   assert.match(html, /텍스트 라벨 표시 개수: 보통/);
@@ -224,6 +236,7 @@ test("Graph RAG 답변 생성은 통합 런타임 오프라인 fallback과 conte
   const runtimeHeaders = {
     "content-type": "application/json",
     "x-atlas-runtime-id": "runtime-graph-answer-test",
+    "x-atlas-internal-runtime-secret": "atlas-runtime-test-secret",
     authorization: "Bearer graph-answer-test-secret",
   };
   try {
@@ -395,6 +408,99 @@ test("write access can be separated from public reads behind an OAuth proxy", as
     assert.equal(trusted.status, 400);
   } finally {
     process.env.ATLAS_WRITE_ACCESS = "public";
+  }
+});
+
+test("local access blocks hostile hosts and cross-site mutations without breaking same-origin use", async () => {
+  delete process.env.ATLAS_EXPOSURE_MODE;
+  process.env.ATLAS_WRITE_ACCESS = "public";
+
+  const hostileHost = await requestAt("http://evil.example", "/api/documents", {
+    method: "POST",
+    body: new FormData(),
+  });
+  assert.equal(hostileHost.status, 403);
+  assert.match(await hostileHost.text(), /Forbidden|ATLAS_HOST_FORBIDDEN/);
+
+  const crossSite = await request("/api/documents", {
+    method: "POST",
+    headers: {
+      origin: "https://evil.example",
+      "sec-fetch-site": "cross-site",
+    },
+    body: new FormData(),
+  });
+  assert.equal(crossSite.status, 403);
+  assert.match(await crossSite.text(), /Forbidden|ATLAS_CROSS_SITE_FORBIDDEN/);
+
+  const sameOrigin = await request("/api/documents", {
+    method: "POST",
+    headers: {
+      origin: "http://localhost",
+      "sec-fetch-site": "same-origin",
+    },
+    body: new FormData(),
+  });
+  assert.equal(sameOrigin.status, 400);
+
+  const oversized = await request("/api/documents", {
+    method: "POST",
+    headers: { "content-length": "999999999" },
+  });
+  assert.equal(oversized.status, 413);
+  assert.equal((await oversized.json()).code, "ATLAS_UPLOAD_TOO_LARGE");
+});
+
+test("proxy exposure requires identity for full D1 reads and mutations", async () => {
+  process.env.ATLAS_EXPOSURE_MODE = "proxy";
+  process.env.ATLAS_APP_ORIGIN = "http://localhost";
+  try {
+    const blockedGraph = await request("/api/graph");
+    assert.equal(blockedGraph.status, 401);
+
+    const blockedDashboard = await request("/api/documents");
+    assert.equal(blockedDashboard.status, 401);
+
+    const trustedGraph = await request("/api/graph", {
+      headers: { "oai-authenticated-user-id": "proxy-user" },
+    });
+    assert.equal(trustedGraph.status, 200);
+
+    const crossSiteTrusted = await request("/api/documents", {
+      method: "POST",
+      headers: {
+        "oai-authenticated-user-id": "proxy-user",
+        origin: "https://evil.example",
+        "sec-fetch-site": "cross-site",
+      },
+      body: new FormData(),
+    });
+    assert.equal(crossSiteTrusted.status, 403);
+  } finally {
+    delete process.env.ATLAS_EXPOSURE_MODE;
+    delete process.env.ATLAS_APP_ORIGIN;
+    process.env.ATLAS_WRITE_ACCESS = "public";
+  }
+});
+
+test("production runtime routes never accept the test-mode bypass", async () => {
+  const previousNodeEnvironment = process.env.NODE_ENV;
+  process.env.NODE_ENV = "production";
+  process.env.ATLAS_TEST_MODE = "true";
+  try {
+    const response = await request("/api/runtime/status", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-atlas-runtime-id": "production-bypass-test",
+      },
+      body: JSON.stringify({ status: "online", version: "test" }),
+    });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, "ATLAS_RUNTIME_AUTH_NOT_CONFIGURED");
+  } finally {
+    process.env.NODE_ENV = previousNodeEnvironment ?? "test";
+    process.env.ATLAS_TEST_MODE = "true";
   }
 });
 
@@ -605,6 +711,7 @@ test("통합 런타임 API authenticates, validates evidence, and merges one ide
     authorization: "Bearer runtime-test-token",
     "content-type": "application/json",
     "x-atlas-runtime-id": "runtime-test-1",
+    "x-atlas-internal-runtime-secret": "atlas-runtime-test-secret",
   };
   const form = new FormData();
   form.append(
@@ -830,6 +937,7 @@ test("GitHub source 작업 API는 OAuth 쓰기 경계와 통합 런타임 capabi
     authorization: "Bearer github-source-runtime-secret",
     "content-type": "application/json",
     "x-atlas-runtime-id": "github-source-api-test",
+    "x-atlas-internal-runtime-secret": "atlas-runtime-test-secret",
   };
 
   try {
@@ -1085,6 +1193,7 @@ test("P4-A~F apply는 stage·원자 적용·무결성 초기화·영수증 복�
     authorization: "Bearer github-apply-runtime-secret",
     "content-type": "application/json",
     "x-atlas-runtime-id": "github-apply-runtime",
+    "x-atlas-internal-runtime-secret": "atlas-runtime-test-secret",
   };
   const capability = {
     capability: "github-source",

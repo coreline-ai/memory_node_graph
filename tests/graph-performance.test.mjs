@@ -846,6 +846,24 @@ test("compact graph controls keep grouped horizontal access without dropping con
   assert.match(compactRules, /\.graph-controls button em,[\s\S]*?display:\s*none/);
 });
 
+test("phone controls use a clipped-safe two-row grid without horizontal scrolling", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const phoneStart = css.indexOf("@media (max-width: 640px)");
+  const narrowPhoneStart = css.indexOf("@media (max-width: 360px)");
+  const phoneRules = css.slice(phoneStart, narrowPhoneStart);
+
+  assert.ok(phoneStart >= 0);
+  assert.ok(narrowPhoneStart > phoneStart);
+  assert.match(phoneRules, /\.graph-controls\s*\{\s*display:\s*none/);
+  assert.match(phoneRules, /\.mobile-graph-controls\s*\{[\s\S]*?right:\s*8px[\s\S]*?left:\s*8px/);
+  assert.match(phoneRules, /\.mobile-graph-controls\s*\{[\s\S]*?overflow:\s*hidden/);
+  assert.match(phoneRules, /bottom:\s*calc\(34px \+ env\(safe-area-inset-bottom, 0px\)\)/);
+  assert.match(phoneRules, /\.mobile-primary-controls\s*\{\s*grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(phoneRules, /\.mobile-stage-controls\s*\{[\s\S]*?grid-template-columns:\s*repeat\(7, minmax\(0, 1fr\)\)/);
+  assert.match(phoneRules, /\.mobile-graph-controls button\s*\{[\s\S]*?min-width:\s*0[\s\S]*?height:\s*40px/);
+  assert.doesNotMatch(phoneRules, /\.mobile-graph-controls\s*\{[\s\S]*?overflow-x:\s*auto/);
+});
+
 test("the public deployment data option uses a self-contained SVG icon", async () => {
   const source = await readFile(
     new URL("../app/knowledge-graph.tsx", import.meta.url),

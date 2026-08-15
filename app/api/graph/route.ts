@@ -10,6 +10,8 @@ import {
   projectGraphRepository,
 } from "../../lib/graph/scope-projection";
 import { getGraphSnapshotForScope } from "../../lib/storage/graph-repository";
+import { requireAtlasReadAccess } from "../../lib/auth/write-access";
+import { internalApiError } from "../../lib/http/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +68,8 @@ export async function GET(request: Request) {
         headers: { "cache-control": "no-store" },
       });
     }
+    const unauthorized = requireAtlasReadAccess(request);
+    if (unauthorized) return unauthorized;
     const effectiveScope = scope ?? "corpus";
     const storedSnapshot = await getGraphSnapshotForScope({
       scope: effectiveScope,
@@ -107,9 +111,6 @@ export async function GET(request: Request) {
       },
     );
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "그래프를 불러오지 못했습니다." },
-      { status: 500 },
-    );
+    return internalApiError(error, { message: "그래프를 불러오지 못했습니다.", scope: "graph" });
   }
 }

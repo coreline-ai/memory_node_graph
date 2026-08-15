@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { GitHubSourceContractError } from "../github/source-job-contracts";
 import { GitHubSourceRepositoryError } from "../storage/github-source-job-repository";
 import { RequestBodyError } from "./enrichment-api";
+import { internalApiError } from "./api-error";
 
 export function githubSourceApiError(error: unknown) {
   if (error instanceof RequestBodyError || error instanceof GitHubSourceContractError) {
@@ -18,12 +19,9 @@ export function githubSourceApiError(error: unknown) {
         : 400;
     return NextResponse.json({ error: error.message, code: error.code }, { status });
   }
-  console.error(
-    "[github-source-api] unhandled",
-    error instanceof Error ? `${error.name}: ${error.message}` : "unknown error",
-  );
-  return NextResponse.json(
-    { error: "GitHub source 작업 요청을 처리하지 못했습니다.", code: "unknown" },
-    { status: 500 },
-  );
+  return internalApiError(error, {
+    message: "GitHub source 작업 요청을 처리하지 못했습니다.",
+    code: "unknown",
+    scope: "github-source",
+  });
 }

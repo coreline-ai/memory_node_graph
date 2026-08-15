@@ -1,8 +1,8 @@
 # 현재 OAuth 통합 런타임
 
-최근 업데이트: `2026-08-13 KST`
+최근 업데이트: `2026-08-15 KST`
 
-이 문서는 AI Systems Atlas의 현재 인증·실행·Markdown 갱신 구조의 정본이다. 과거 계획은 당시 개발 이력으로 보존하며, 새 변경 판단은 이 문서와 [최신 구현 계획](../dev-plan/implement_20260807_220621.md)을 우선한다.
+이 문서는 AI Systems Atlas의 현재 인증·실행·Markdown 갱신 구조의 정본이다. 과거 계획은 당시 개발 이력으로 보존하며, 새 보안 경계 판단은 이 문서와 [보안 구현 계획](../dev-plan/implement_20260815_104040.md)을 우선한다.
 
 ## 확정 요구사항
 
@@ -22,7 +22,7 @@
 
 ```mermaid
 flowchart LR
-  U["공유 웹 사용자"] --> W["AI Systems Atlas 웹앱"]
+  U["로컬 사용자 또는 인증 프록시 사용자"] --> W["AI Systems Atlas 통합 웹앱"]
   W --> D["D1 문서·노드·관계"]
   W --> R["통합 작업 런타임"]
   R --> C["Codex SDK"]
@@ -41,7 +41,8 @@ flowchart LR
 | 내부 상태 기록 | `runtime_status`, `github_runtime_status` |
 | OpenAI API Key | 사용하지 않음 |
 
-- 공유 웹의 서버 런타임은 Codex 프로세스와 OAuth 세션을 안전하게 보관할 수 있는 상시 Node 환경이어야 한다.
+- 통합 앱은 기본적으로 `127.0.0.1`에만 바인딩한다. 원격 접근은 `ATLAS_EXPOSURE_MODE=proxy`와 `ATLAS_APP_ORIGIN`을 설정하고 신뢰 OAuth reverse proxy 뒤에서만 허용한다.
+- 원격 프록시는 외부 identity header를 제거하고 검증된 사용자 identity만 주입해야 한다. 이 모드에서는 identity가 없는 full D1 read/write를 거부한다.
 - Cloudflare 정적 배포 또는 Worker-only 환경은 Codex CLI 프로세스를 직접 실행할 수 없으므로 이 로컬 OAuth 실행 구조의 단독 호스트가 될 수 없다.
 - D1 작업 큐, Lease, 결과 검증, 인용 재검증은 장애 복구와 무결성을 위해 유지한다.
 
@@ -87,7 +88,8 @@ flowchart LR
 - `server/github`: 읽기 전용 GitHub 명령, discovery·preview·apply, Blob SHA 재검증을 담당한다.
 - `server/runtime`: singleton lock, claim·lease·timeout·retry·cancel, graceful shutdown, 상태 동기화를 담당한다.
 - 통합 런타임은 `atlas-integrated-github-runtime-1`과 `codex-sdk-0.146.0+atlas-runtime.1` generation만 claim한다. 과거 대기열은 자동 소비하지 않는다.
-- 프로세스 내부 secret은 실행 시 생성되고, Codex·GitHub 자식 환경에서 제거된다.
+- 프로세스 내부 secret은 실행 시 생성된다. Codex 자식 환경은 `PATH`, `HOME`/`CODEX_HOME`, 임시 디렉터리, locale, 인증서 등 OAuth 실행에 필요한 값만 allowlist로 전달한다.
+- `GH_TOKEN`, 임의 `*_TOKEN`·`*_SECRET`, `DATABASE_URL`, `NODE_OPTIONS` 등은 Codex 자식 환경에 전달하지 않는다. Codex 구조화 출력에서 token·private key·부모 환경 secret이 탐지되면 결과를 저장하지 않고 격리한다.
 - 공개 상태 Route는 인증 상태와 작업 상태만 공개하며, 계정명·저장소명·경로·원문 링크를 포함하지 않는다.
 
 ## 현재 데이터 기준선
@@ -111,3 +113,6 @@ flowchart LR
 - 비공개 저장소 이름·경로·원문 링크는 인증되지 않은 공유 화면에서 숨긴다.
 - Codex 출력은 허용 노드, relation ontology, source block evidence, citation ID로 재검증한다.
 - OAuth 실패·프로세스 재시작·작업 timeout에서도 기존 규칙 그래프를 보존한다.
+- local 모드는 Host를 loopback으로 제한하고 모든 변경 Route에서 `Origin`과 Fetch Metadata를 검사한다.
+- `ATLAS_TEST_MODE`는 production 실행을 시작하기 전에 거부하고, API 500 응답은 고정 메시지와 request ID만 반환한다.
+- 공개 Vercel 앱은 D1 Route 대신 검증된 정적 JSON만 사용하며 CSP와 iframe 차단 헤더를 적용한다.

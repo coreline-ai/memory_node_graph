@@ -210,11 +210,15 @@ const VIEW_LABELS: Record<GraphViewMode, string> = {
   orbit: "궤도",
 };
 
+const GRAPH_VIEW_MODES: GraphViewMode[] = ["constellation", "nebula", "orbit"];
+
 const LUMINOSITY_LABELS: Record<LuminosityPreset, string> = {
   normal: "기본",
   bright: "브라이트",
   supernova: "초신성",
 };
+
+const LUMINOSITY_PRESETS: LuminosityPreset[] = ["normal", "bright", "supernova"];
 
 const LABEL_DENSITY_LABELS: Record<LabelDensity, string> = {
   low: "적게",
@@ -252,6 +256,17 @@ const RELATION_VISIBILITY_PRESETS: Array<Exclude<RelationVisibilityPreset, "cust
   "evidence",
   "display",
 ];
+
+function nextControlValue<T>(values: readonly T[], current: T): T {
+  const currentIndex = values.indexOf(current);
+  return values[(currentIndex + 1) % values.length] ?? values[0] ?? current;
+}
+
+function visibleControlButton(
+  ...buttons: Array<HTMLButtonElement | null>
+): HTMLButtonElement | null {
+  return buttons.find((button) => button && button.getClientRects().length > 0) ?? null;
+}
 
 // Keep the floating source chooser away from both viewport edges.  The same
 // values are mirrored in `.data-source-panel` so its measured placement and
@@ -395,8 +410,10 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   const focusRef = useRef<FocusState>(emptyFocusState());
   const focusVisibilityRef = useRef<FocusVisibility>(emptyFocusVisibility());
   const luminosityButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileLuminosityButtonRef = useRef<HTMLButtonElement>(null);
   const luminosityPanelRef = useRef<HTMLElement>(null);
   const dataMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileDataMenuButtonRef = useRef<HTMLButtonElement>(null);
   const dataMenuPanelRef = useRef<HTMLElement>(null);
   const urlInitializedRef = useRef(false);
   const showcaseStateRef = useRef<ShowcaseState | null>(null);
@@ -659,7 +676,11 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   );
 
   const positionDataMenu = useCallback(() => {
-    const bounds = dataMenuButtonRef.current?.getBoundingClientRect();
+    const trigger = visibleControlButton(
+      mobileDataMenuButtonRef.current,
+      dataMenuButtonRef.current,
+    );
+    const bounds = trigger?.getBoundingClientRect();
     if (!bounds) return;
     const panelWidth = Math.min(
       DATA_SOURCE_PANEL_MAX_WIDTH,
@@ -849,7 +870,10 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       setDataMenuOpen(false);
       await loadGraph();
       if (restoreState) restoreShowcaseState(restoreState);
-      dataMenuButtonRef.current?.focus();
+      visibleControlButton(
+        mobileDataMenuButtonRef.current,
+        dataMenuButtonRef.current,
+      )?.focus();
     },
     [applyGoldPresentation, applyShowcasePresentation, captureShowcaseState, loadGraph, restoreShowcaseState],
   );
@@ -1106,11 +1130,24 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   }, [viewMode, visibleGraphCount.nodes]);
 
   const cycleNodeSizeMode = useCallback(() => {
-    setNodeSizeMode((current) => {
-      const index = NODE_SIZE_MODES.indexOf(current);
-      return NODE_SIZE_MODES[(index + 1) % NODE_SIZE_MODES.length];
-    });
+    setNodeSizeMode((current) => nextControlValue(NODE_SIZE_MODES, current));
   }, []);
+
+  const cycleMobileViewMode = useCallback(() => {
+    changeViewMode(nextControlValue(GRAPH_VIEW_MODES, viewMode));
+  }, [changeViewMode, viewMode]);
+
+  const cycleMobileFocusDepth = useCallback(() => {
+    if (!selectedId) return;
+    setFocusDepth((current) => nextControlValue(FOCUS_DEPTHS, current));
+  }, [selectedId]);
+
+  const cycleMobileRelationVisibility = useCallback(() => {
+    const current = relationVisibilityPreset === "custom"
+      ? RELATION_VISIBILITY_PRESETS[RELATION_VISIBILITY_PRESETS.length - 1]
+      : relationVisibilityPreset;
+    applyRelationVisibilityPreset(nextControlValue(RELATION_VISIBILITY_PRESETS, current));
+  }, [applyRelationVisibilityPreset, relationVisibilityPreset]);
 
   const selectedNode = selectedId ? nodeMap.get(selectedId) ?? null : null;
   const focusDepthCounts = useMemo(() => {
@@ -1353,6 +1390,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       const target = event.target as Node;
       if (
         !luminosityButtonRef.current?.contains(target) &&
+        !mobileLuminosityButtonRef.current?.contains(target) &&
         !luminosityPanelRef.current?.contains(target)
       ) {
         setLuminosityPanelOpen(false);
@@ -1368,6 +1406,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       const target = event.target as Node;
       if (
         !dataMenuButtonRef.current?.contains(target) &&
+        !mobileDataMenuButtonRef.current?.contains(target) &&
         !dataMenuPanelRef.current?.contains(target)
       ) {
         setDataMenuOpen(false);
@@ -1414,12 +1453,18 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
       if (event.key === "Escape") {
         if (dataMenuOpen) {
           setDataMenuOpen(false);
-          dataMenuButtonRef.current?.focus();
+          visibleControlButton(
+            mobileDataMenuButtonRef.current,
+            dataMenuButtonRef.current,
+          )?.focus();
           return;
         }
         if (luminosityPanelOpen) {
           setLuminosityPanelOpen(false);
-          luminosityButtonRef.current?.focus();
+          visibleControlButton(
+            mobileLuminosityButtonRef.current,
+            luminosityButtonRef.current,
+          )?.focus();
           return;
         }
         setSelectedId(null);
@@ -1427,9 +1472,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
         setSearchOpen(false);
         setSidebarOpen(false);
       } else if (!isTyping && event.key.toLowerCase() === "v") {
-        const order: GraphViewMode[] = ["constellation", "nebula", "orbit"];
-        const next = order[(order.indexOf(viewMode) + 1) % order.length];
-        changeViewMode(next);
+        changeViewMode(nextControlValue(GRAPH_VIEW_MODES, viewMode));
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -3522,6 +3565,13 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
     setLuminosityCustom(false);
   };
 
+  const cycleMobileLuminosity = () => {
+    const current = luminosityCustom
+      ? LUMINOSITY_PRESETS[LUMINOSITY_PRESETS.length - 1]
+      : luminosity;
+    selectLuminosityPreset(nextControlValue(LUMINOSITY_PRESETS, current));
+  };
+
   const openOrRestoreCustomLuminosity = () => {
     if (!savedCustomControls) {
       const defaults = { ...defaultCustomLuminosityControls };
@@ -3565,10 +3615,7 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
   };
 
   const cycleLabelDensity = () => {
-    setLabelDensity((current) => {
-      const currentIndex = LABEL_DENSITIES.indexOf(current);
-      return LABEL_DENSITIES[(currentIndex + 1) % LABEL_DENSITIES.length];
-    });
+    setLabelDensity((current) => nextControlValue(LABEL_DENSITIES, current));
   };
 
   const hoveredNode = hovered ? nodeMap.get(hovered.id) : null;
@@ -4288,6 +4335,160 @@ export default function KnowledgeGraph({ dataMode = "api" }: KnowledgeGraphProps
             </div>
           </div>
         </div>
+
+        <nav className="mobile-graph-controls" aria-label="모바일 그래프 화면 제어">
+          <div className="mobile-control-row mobile-primary-controls">
+            <button
+              type="button"
+              className="mobile-view-control is-active"
+              aria-label={`현재 ${VIEW_LABELS[viewMode]} 보기. 누르면 ${VIEW_LABELS[nextControlValue(GRAPH_VIEW_MODES, viewMode)]} 보기로 전환`}
+              onClick={cycleMobileViewMode}
+              title={`${VIEW_LABELS[viewMode]} · 다음 보기로 전환`}
+            >
+              <span className={`view-icon view-icon-${viewMode}`} aria-hidden="true" />
+            </button>
+            <button
+              ref={mobileDataMenuButtonRef}
+              type="button"
+              className={`mobile-data-control ${presentationFixtureActive ? "is-active" : ""}`}
+              aria-expanded={dataMenuOpen}
+              aria-controls="graph-data-source-panel"
+              aria-haspopup="dialog"
+              aria-label={`그래프 데이터 선택. 현재 ${controlDataStatus}`}
+              onClick={toggleDataMenu}
+              title={`데이터 선택 · ${controlDataStatus}`}
+            >
+              <span className="data-source-icon" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`mobile-focus-control ${selectedId ? "is-active" : ""}`}
+              disabled={!selectedId}
+              aria-label={selectedId
+                ? `현재 ${FOCUS_DEPTH_LABELS[focusDepth]} 관계 범위. 누르면 ${FOCUS_DEPTH_LABELS[nextControlValue(FOCUS_DEPTHS, focusDepth)]} 범위로 전환`
+                : "관계 범위 선택. 노드를 먼저 선택하세요"}
+              onClick={cycleMobileFocusDepth}
+              title={selectedId ? `${FOCUS_DEPTH_LABELS[focusDepth]} · 다음 관계 범위` : "노드를 먼저 선택하세요"}
+            >
+              <span className={`focus-depth-icon focus-depth-icon-${focusDepth}`} aria-hidden="true">
+                {focusDepth === "all" ? "∞" : focusDepth === "direct" ? "1" : "2"}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="mobile-relation-control is-active"
+              aria-label={`현재 ${RELATION_VISIBILITY_LABELS[relationVisibilityPreset]} 관계 표시. 누르면 다음 표시 방식으로 전환`}
+              onClick={cycleMobileRelationVisibility}
+              title={`${RELATION_VISIBILITY_LABELS[relationVisibilityPreset]} 관계 · 다음 표시 방식`}
+            >
+              <span
+                className={`relation-visibility-icon relation-visibility-icon-${relationVisibilityPreset}`}
+                aria-hidden="true"
+              >
+                <i />
+                <i />
+              </span>
+            </button>
+            <button
+              type="button"
+              className="mobile-fit-control"
+              aria-describedby="camera-fit-status"
+              onClick={fitVisibleGraph}
+              title="현재 그래프 구도 맞춤"
+              aria-label="현재 그래프를 화면 안전 영역에 맞춤"
+            >
+              <span className="fit-visible-icon" aria-hidden="true"><i /></span>
+            </button>
+          </div>
+
+          <div className="mobile-control-row mobile-stage-controls">
+            <button
+              type="button"
+              onClick={() => graphApiRef.current?.reset()}
+              title="화면 중앙으로 재정렬"
+              aria-label="화면 중앙으로 재정렬"
+            >
+              <span className="reset-icon" aria-hidden="true">↻</span>
+            </button>
+            <button
+              type="button"
+              className={autoRotate ? "is-active" : ""}
+              aria-pressed={autoRotate}
+              onClick={() => updateAutoRotateIntent(toggleAutoRotateIntent(autoRotateIntentRef.current))}
+              title={autoRotateStatus}
+              aria-label={autoRotateStatus}
+            >
+              <span className="orbit-icon" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className={labelsVisible ? "is-active" : ""}
+              aria-pressed={labelsVisible}
+              onClick={() => setLabelsVisible((value) => !value)}
+              title="핵심 주장 라벨"
+              aria-label={`텍스트 라벨 ${labelsVisible ? "끄기" : "켜기"}`}
+            >
+              <span className="label-icon" aria-hidden="true">Aa</span>
+            </button>
+            <button
+              type="button"
+              className={labelsVisible ? "is-active" : ""}
+              disabled={!labelsVisible}
+              onClick={cycleLabelDensity}
+              title={`라벨 표시 개수: ${LABEL_DENSITY_LABELS[labelDensity]}`}
+              aria-label={`텍스트 라벨 표시 개수: ${LABEL_DENSITY_LABELS[labelDensity]}. 누르면 다음 단계`}
+            >
+              <span className="label-density-icon" aria-hidden="true">
+                {labelDensity === "low" ? "1×" : labelDensity === "medium" ? "2×" : "3×"}
+              </span>
+            </button>
+            <button
+              type="button"
+              className={nodeSizeMode !== "kind" ? "is-active" : ""}
+              onClick={cycleNodeSizeMode}
+              title={`노드 크기: ${NODE_SIZE_MODE_LABELS[nodeSizeMode]}`}
+              aria-label={`노드 크기 기준: ${NODE_SIZE_MODE_LABELS[nodeSizeMode]}. 누르면 다음 기준`}
+            >
+              <span className={`node-size-icon node-size-icon-${nodeSizeMode}`} aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+            </button>
+            <button
+              type="button"
+              className={!luminosityCustom ? "is-active" : ""}
+              onClick={cycleMobileLuminosity}
+              title={`${controlLuminosityStatus} · 다음 발광 프리셋`}
+              aria-label={`현재 발광 ${controlLuminosityStatus}. 누르면 다음 기본 프리셋`}
+            >
+              {luminosityCustom
+                ? <span className="adjust-icon" aria-hidden="true">✦</span>
+                : <span className={`light-icon light-icon-${luminosity}`} aria-hidden="true" />}
+            </button>
+            <button
+              ref={mobileLuminosityButtonRef}
+              type="button"
+              className={`mobile-custom-control ${savedCustomControls ? "has-custom" : ""} ${luminosityCustom ? "is-active is-custom" : ""}`}
+              aria-pressed={luminosityCustom}
+              aria-expanded={luminosityPanelOpen}
+              aria-controls="luminosity-control-panel"
+              onClick={openOrRestoreCustomLuminosity}
+              title="발광 세부 조절"
+              aria-label="커스텀 발광 세부 조절"
+            >
+              <span className="adjust-icon" aria-hidden="true">✦</span>
+            </button>
+          </div>
+          <output className="control-live-status" aria-live="polite">
+            현재 {controlStatusLabel}
+          </output>
+        </nav>
 
         {dataMenuOpen && (
           <section

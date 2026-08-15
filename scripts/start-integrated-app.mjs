@@ -2,7 +2,12 @@ import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 
 const production = process.argv.includes("--production");
+if (production && process.env.ATLAS_TEST_MODE === "true") {
+  console.error("[atlas-app] production에서는 ATLAS_TEST_MODE를 사용할 수 없습니다.");
+  process.exit(1);
+}
 const port = Number(process.env.PORT) || 3000;
+const hostname = "127.0.0.1";
 const baseUrl = process.env.ATLAS_RUNTIME_ORIGIN?.trim() || `http://localhost:${port}`;
 const internalRuntimeSecret = process.env.ATLAS_INTERNAL_RUNTIME_SECRET?.trim()
   || randomBytes(32).toString("base64url");
@@ -68,7 +73,15 @@ process.on("SIGTERM", () => shutdown("SIGTERM", 143));
 
 startChild(
   "npm",
-  ["run", production ? "start:web" : "dev:web", "--", "--port", String(port)],
+  [
+    "run",
+    production ? "start:web" : "dev:web",
+    "--",
+    "--port",
+    String(port),
+    "--hostname",
+    hostname,
+  ],
   "web",
 );
 try {

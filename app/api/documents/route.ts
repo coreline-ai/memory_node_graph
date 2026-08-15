@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server";
-import { requireAtlasWriteAccess } from "../../lib/auth/write-access";
+import { requireAtlasReadAccess, requireAtlasWriteAccess } from "../../lib/auth/write-access";
 import { ingestMarkdown, MAX_MARKDOWN_FILES } from "../../lib/ingestion/ingestion-service";
 import {
   completedDocumentMutationReceipt,
   documentMutationResponse,
   failedDocumentMutationReceipt,
 } from "../../lib/ingestion/document-mutation-receipt";
-import { decodeMarkdownBytes } from "../../lib/markdown/validate-markdown";
+import {
+  decodeMarkdownBytes,
+  MAX_MARKDOWN_FILE_SIZE,
+} from "../../lib/markdown/validate-markdown";
 import { getDashboardSnapshot } from "../../lib/storage/graph-repository";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+const MAX_MARKDOWN_UPLOAD_BYTES = MAX_MARKDOWN_FILES * MAX_MARKDOWN_FILE_SIZE + 256 * 1024;
+
+export async function GET(request: Request) {
+  const unauthorized = requireAtlasReadAccess(request);
+  if (unauthorized) return unauthorized;
   return NextResponse.json(await getDashboardSnapshot(), {
     headers: { "cache-control": "no-store" },
   });
@@ -20,6 +27,14 @@ export async function GET() {
 export async function POST(request: Request) {
   const unauthorized = requireAtlasWriteAccess(request);
   if (unauthorized) return unauthorized;
+
+  const contentLength = request.headers.get("content-length")?.trim();
+  if (contentLength && /^\d+$/.test(contentLength) && Number(contentLength) > MAX_MARKDOWN_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: "Markdown 업로드 전체 크기 한도를 초과했습니다.", code: "ATLAS_UPLOAD_TOO_LARGE" },
+      { status: 413 },
+    );
+  }
 
   try {
     const form = await request.formData();

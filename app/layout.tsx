@@ -4,14 +4,29 @@ import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
-  const host =
-    requestHeaders.get("x-forwarded-host") ??
-    requestHeaders.get("host") ??
-    "localhost:3000";
-  const protocol =
-    requestHeaders.get("x-forwarded-proto") ??
-    (host.startsWith("localhost") ? "http" : "https");
-  const baseUrl = `${protocol}://${host}`;
+  const configuredOrigin = process.env.ATLAS_APP_ORIGIN?.trim();
+  const host = requestHeaders.get("host") ?? "localhost:3000";
+  const forwardedProtocol = requestHeaders.get("x-forwarded-proto")?.trim();
+  const candidateProtocol = forwardedProtocol === "https" ? "https" : "http";
+  const candidate = (() => {
+    try {
+      return new URL(`${candidateProtocol}://${host}`);
+    } catch {
+      return null;
+    }
+  })();
+  const localHost = candidate
+    && new Set(["localhost", "127.0.0.1", "[::1]", "::1"]).has(candidate.hostname);
+  const configured = (() => {
+    try {
+      if (!configuredOrigin) return null;
+      const url = new URL(configuredOrigin);
+      return url.protocol === "http:" || url.protocol === "https:" ? url : null;
+    } catch {
+      return null;
+    }
+  })();
+  const baseUrl = (configured ?? (localHost ? candidate : null) ?? new URL("http://localhost:3000")).origin;
 
   return {
     metadataBase: new URL(baseUrl),

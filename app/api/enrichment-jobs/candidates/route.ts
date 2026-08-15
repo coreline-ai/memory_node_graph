@@ -10,6 +10,7 @@ import {
   summarizeRelationshipCandidateAnchors,
 } from "../../../lib/llm/relationship-candidate-score";
 import { getEnrichmentJobRepository } from "../../../lib/storage/enrichment-job-repository";
+import { internalApiError } from "../../../lib/http/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -116,9 +117,9 @@ export async function POST(request: Request) {
     if (error instanceof RelationshipCandidateSelectionError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "관계 후보 선택을 검증하지 못했습니다." },
-      { status: 500 },
-    );
+    return internalApiError(error, {
+      message: "관계 후보 선택을 검증하지 못했습니다.",
+      scope: "enrichment-candidates",
+    });
   }
 }

@@ -10,6 +10,14 @@ const numberFrom = (name: string, fallback: number, minimum: number, maximum: nu
   return Number.isFinite(value) ? Math.min(maximum, Math.max(minimum, value)) : fallback;
 };
 
+export function assertRuntimeProductionConfiguration(
+  environment: NodeJS.ProcessEnv = process.env,
+) {
+  if (environment.NODE_ENV === "production" && environment.ATLAS_TEST_MODE === "true") {
+    throw new Error("production에서는 ATLAS_TEST_MODE를 사용할 수 없습니다.");
+  }
+}
+
 /**
  * Private configuration for the single local OAuth runtime. It deliberately
  * carries no OpenAI/GitHub API key and no browser-facing credential.
